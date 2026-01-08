@@ -1,0 +1,7 @@
+!/titanium-policy.iml
+
+!/titanium-policy-application.iml
+
+!/titanium-policy-common.iml
+!/.idea/
+!*/target/

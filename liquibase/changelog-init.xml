@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.1.xsd">
+
+    <!-- 初始化数据库表结构 -->
+    <changeSet id="20260106183001" author="Wayne sun">
+        <!-- 创建保单主表 -->
+        <createTable tableName="t_policy">
+            <column name="policy_id" type="VARCHAR(36)">
+                <!-- 主键+非空约束（正确的constraints子标签） -->
+                <constraints primaryKey="true" nullable="false" primaryKeyName="pk_t_policy"/>
+            </column>
+            <column name="policy_number" type="VARCHAR(20)">
+                <!-- 唯一+非空约束 -->
+                <constraints unique="true" nullable="false" uniqueConstraintName="uk_policy_number"/>
+            </column>
+            <column name="policy_no" type="VARCHAR(20)">
+                <!-- 唯一+非空约束 -->
+                <constraints unique="true" nullable="false" uniqueConstraintName="uk_policy_no"/>
+            </column>
+            <column name="customer_id" type="VARCHAR(36)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="product_id" type="VARCHAR(36)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="effective_date" type="DATETIME">
+                <constraints nullable="false"/>
+            </column>
+            <column name="expiry_date" type="DATETIME">
+                <constraints nullable="false"/>
+            </column>
+            <column name="premium" type="DECIMAL(18,2)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="currency" type="VARCHAR(3)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="status" type="VARCHAR(20)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="DATETIME">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="DATETIME">
+                <constraints nullable="false"/>
+            </column>
+            <column name="tenant_id" type="VARCHAR(36)">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <!-- 创建保单项表 -->
+        <createTable tableName="t_policy_item">
+            <column name="item_id" type="VARCHAR(36)">
+                <constraints primaryKey="true" nullable="false" primaryKeyName="pk_t_policy_item"/>
+            </column>
+            <column name="policy_id" type="VARCHAR(36)">
+                <!-- 外键约束+非空（Liquibase标准写法） -->
+                <constraints nullable="false"
+                             references="t_policy(policy_id)"/>
+            </column>
+            <column name="coverage_id" type="VARCHAR(36)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="coverage_code" type="VARCHAR(50)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="coverage_name" type="VARCHAR(100)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="coverage_description" type="VARCHAR(500)">
+                <!-- 无约束，无需constraints标签 -->
+            </column>
+            <column name="sum_insured" type="DECIMAL(18,2)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="sum_insured_currency" type="VARCHAR(3)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="premium" type="DECIMAL(18,2)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="premium_currency" type="VARCHAR(3)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="deductible" type="INT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="coinsurance" type="INT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="coverage_active" type="BOOLEAN" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="tenant_id" type="VARCHAR(36)">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <!-- 创建索引 -->
+        <createIndex tableName="t_policy" indexName="idx_policy_tenant">
+            <column name="tenant_id"/>
+        </createIndex>
+        <createIndex tableName="t_policy" indexName="idx_policy_customer">
+            <column name="customer_id"/>
+        </createIndex>
+        <createIndex tableName="t_policy" indexName="idx_policy_no">
+            <column name="policy_no"/>
+        </createIndex>
+        <createIndex tableName="t_policy" indexName="idx_policy_number">
+            <column name="policy_number"/>
+        </createIndex>
+        <createIndex tableName="t_policy_item" indexName="idx_policy_item_policy">
+            <column name="policy_id"/>
+        </createIndex>
+        <createIndex tableName="t_policy_item" indexName="idx_policy_item_tenant">
+            <column name="tenant_id"/>
+        </createIndex>
+    </changeSet>
+</databaseChangeLog>

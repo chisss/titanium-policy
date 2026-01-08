@@ -1,0 +1,15 @@
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/service/PolicyService.java
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/entity/PolicyItem.java
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/event/PolicyResumedEvent.java
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/valueobject/PolicyNo.java
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/event/PolicyCancelledEvent.java
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/valueobject/Coverage.java
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/event/PolicySuspendedEvent.java
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/event/PolicyCreatedEvent.java
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/repository/PolicyRepository.java
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/event/PolicyActivatedEvent.java
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/service/impl/PolicyServiceImpl.java
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/aggregate/Policy.java
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/valueobject/Amount.java
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/command/CreatePolicyCommand.java
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/event/PolicyExpiredEvent.java

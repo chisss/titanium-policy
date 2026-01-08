@@ -1,0 +1,9 @@
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/config/AxonConfig.java
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/entity/PolicyEntity.java
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/repository/PolicyRepositoryImpl.java
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/entity/PolicyItemEntity.java
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/config/KafkaConfig.java
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/entity/PolicyDocumentEntity.java
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/entity/PolicyProposalEntity.java
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/event/KafkaEventPublisher.java
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/entity/PolicyMultiRelationEntity.java
