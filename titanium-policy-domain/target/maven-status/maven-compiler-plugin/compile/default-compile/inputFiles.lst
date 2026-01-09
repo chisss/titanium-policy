@@ -11,5 +11,6 @@
 /Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/service/impl/PolicyServiceImpl.java
 /Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/aggregate/Policy.java
 /Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/valueobject/Amount.java
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/command/ActivatePolicyCommand.java
 /Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/command/CreatePolicyCommand.java
 /Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/event/PolicyExpiredEvent.java

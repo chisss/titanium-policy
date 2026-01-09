@@ -5,11 +5,11 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.2.3</version>
+        <version>4.0.1</version>
     </parent>
     <groupId>com.titanium</groupId>
     <artifactId>titanium-policy</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>1.0.0-SNAPSHOT</version>
     <packaging>pom</packaging>
     <name>titanium-policy</name>
     <description>保单系统 - 根项目</description>
@@ -135,8 +135,6 @@
                 <artifactId>axon-test</artifactId>
                 <version>${axon.version}</version>
             </dependency>
-            
-            <!-- Common Project -->
             <dependency>
                 <groupId>com.titanium</groupId>
                 <artifactId>titanium-common</artifactId>

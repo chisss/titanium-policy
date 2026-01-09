@@ -81,7 +81,7 @@ class PolicyApplicationServiceTest {
 
         fixture.given(new PolicyCreatedEvent(policyId, new PolicyNo(policyNo), "customer-001", "product-001",
                 LocalDateTime.now(), LocalDateTime.now().plusYears(1), new Amount(new BigDecimal("1000.0"), "CNY"),
-                PolicyEnum.PolicyStatus.PENDING, Collections.emptyList(), LocalDateTime.now(), LocalDateTime.now(),
+                PolicyEnum.PolicyStatus.PENDING, Collections.emptyList(),
                 tenantId));
 
         Policy mockPolicy = Mockito.mock(Policy.class);
