@@ -1,9 +1,0 @@
-com/titanium/policy/infrastructure/entity/PolicyMultiRelationEntity.class
-com/titanium/policy/infrastructure/config/KafkaConfig.class
-com/titanium/policy/infrastructure/event/KafkaEventPublisher.class
-com/titanium/policy/infrastructure/entity/PolicyDocumentEntity.class
-com/titanium/policy/infrastructure/entity/PolicyItemEntity.class
-com/titanium/policy/infrastructure/repository/PolicyRepositoryImpl.class
-com/titanium/policy/infrastructure/entity/PolicyEntity.class
-com/titanium/policy/infrastructure/entity/PolicyProposalEntity.class
-com/titanium/policy/infrastructure/config/AxonConfig.class
