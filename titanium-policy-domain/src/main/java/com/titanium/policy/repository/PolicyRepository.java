@@ -2,7 +2,7 @@ package com.titanium.policy.repository;
 
 import java.util.Optional;
 
-import com.titanium.metadata.enums.PolicyEnum.PolicyStatus;
+import com.titanium.metadata.enums.policy.PolicyEnum.PolicyStatus;
 import com.titanium.policy.aggregate.Policy;
 
 public interface PolicyRepository {

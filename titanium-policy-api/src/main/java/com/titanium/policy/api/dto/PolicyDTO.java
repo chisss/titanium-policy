@@ -3,7 +3,7 @@ package com.titanium.policy.api.dto;
 import java.time.LocalDateTime;
 import java.util.List;
 
-import com.titanium.metadata.enums.PolicyEnum;
+import com.titanium.metadata.enums.policy.PolicyEnum;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;

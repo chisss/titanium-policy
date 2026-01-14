@@ -10,7 +10,7 @@ import org.axonframework.modelling.command.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.titanium.common.exception.BusinessException;
-import com.titanium.metadata.enums.PolicyEnum.PolicyStatus;
+import com.titanium.metadata.enums.policy.PolicyEnum.PolicyStatus;
 import com.titanium.policy.aggregate.Policy;
 import com.titanium.policy.repository.PolicyRepository;
 

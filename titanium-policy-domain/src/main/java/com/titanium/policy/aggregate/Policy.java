@@ -9,7 +9,7 @@ import org.axonframework.modelling.command.AggregateIdentifier;
 import org.axonframework.modelling.command.AggregateLifecycle;
 import org.axonframework.spring.stereotype.Aggregate;
 
-import com.titanium.metadata.enums.PolicyEnum.PolicyStatus;
+import com.titanium.metadata.enums.policy.PolicyEnum.PolicyStatus;
 import com.titanium.policy.command.ActivatePolicyCommand;
 import com.titanium.policy.command.CreatePolicyCommand;
 import com.titanium.policy.entity.PolicyItem;
@@ -64,7 +64,7 @@ public class Policy {
         }
         AggregateLifecycle.apply(new PolicyCreatedEvent(command.policyId(), command.policyNo(), command.customerId(),
                 command.productId(), command.effectiveDate(), command.expiryDate(), command.premium(),
-                PolicyStatus.PENDING, command.policyItems(), command.tenantId()));
+                PolicyStatus.PENDING_EFFECTIVE, command.policyItems(), command.tenantId()));
     }
 
     @CommandHandler
@@ -73,7 +73,7 @@ public class Policy {
     }
 
     public void activate() {
-        if (this.status != PolicyStatus.PENDING) {
+        if (this.status != PolicyStatus.PENDING_EFFECTIVE) {
             throw new IllegalArgumentException("Only pending policies can be activated");
         }
         if (this.effectiveDate.isAfter(LocalDateTime.now())) {
@@ -121,7 +121,7 @@ public class Policy {
     }
 
     public boolean canActivate() {
-        return this.status == PolicyStatus.PENDING && !this.effectiveDate.isAfter(LocalDateTime.now());
+        return this.status == PolicyStatus.PENDING_EFFECTIVE && !this.effectiveDate.isAfter(LocalDateTime.now());
     }
 
     public boolean validateData() {

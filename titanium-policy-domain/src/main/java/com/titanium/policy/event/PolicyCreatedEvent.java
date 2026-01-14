@@ -3,7 +3,7 @@ package com.titanium.policy.event;
 import java.time.LocalDateTime;
 import java.util.List;
 
-import com.titanium.metadata.enums.PolicyEnum.PolicyStatus;
+import com.titanium.metadata.enums.policy.PolicyEnum.PolicyStatus;
 import com.titanium.policy.entity.PolicyItem;
 import com.titanium.policy.valueobject.Amount;
 import com.titanium.policy.valueobject.PolicyNo;

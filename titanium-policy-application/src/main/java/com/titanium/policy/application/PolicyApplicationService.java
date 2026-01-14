@@ -5,7 +5,7 @@ import java.util.Optional;
 import org.axonframework.commandhandling.gateway.CommandGateway;
 import org.springframework.stereotype.Service;
 
-import com.titanium.metadata.enums.PolicyEnum.PolicyStatus;
+import com.titanium.metadata.enums.policy.PolicyEnum.PolicyStatus;
 import com.titanium.policy.aggregate.Policy;
 import com.titanium.policy.command.CreatePolicyCommand;
 import com.titanium.policy.repository.PolicyRepository;
@@ -88,7 +88,7 @@ public class PolicyApplicationService {
             return true;
         } else {
             // 6. 如果不能激活，更新状态为审核失败
-            policyService.updatePolicyStatus(policy, PolicyStatus.PENDING);
+            policyService.updatePolicyStatus(policy, PolicyStatus.PENDING_EFFECTIVE);
             return false;
         }
     }
@@ -100,7 +100,7 @@ public class PolicyApplicationService {
      */
     public void batchUpdatePolicyStatus(String tenantId) {
         // 获取所有待处理或已激活的保单
-        Iterable<Policy> policies = policyRepository.findByStatusIn(tenantId, PolicyStatus.PENDING,
+        Iterable<Policy> policies = policyRepository.findByStatusIn(tenantId, PolicyStatus.PENDING_EFFECTIVE,
                 PolicyStatus.EFFECTIVE);
 
         for (Policy policy : policies) {

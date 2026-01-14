@@ -1,7 +1,7 @@
 package com.titanium.policy.service;
 
 import com.titanium.policy.aggregate.Policy;
-import com.titanium.metadata.enums.PolicyEnum.PolicyStatus;
+import com.titanium.metadata.enums.policy.PolicyEnum.PolicyStatus;
 
 /**
  * 保单领域服务

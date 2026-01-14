@@ -6,7 +6,7 @@ import java.util.Objects;
 
 import org.springframework.stereotype.Service;
 
-import com.titanium.metadata.enums.PolicyEnum.PolicyStatus;
+import com.titanium.metadata.enums.policy.PolicyEnum.PolicyStatus;
 import com.titanium.policy.aggregate.Policy;
 import com.titanium.policy.service.PolicyService;
 import com.titanium.policy.valueobject.Amount;
@@ -21,7 +21,7 @@ public class PolicyServiceImpl implements PolicyService {
         }
 
         // 只有待激活状态的保单可以激活
-        if (policy.getStatus() != PolicyStatus.PENDING) {
+        if (policy.getStatus() != PolicyStatus.PENDING_EFFECTIVE) {
             return false;
         }
 
@@ -130,7 +130,7 @@ public class PolicyServiceImpl implements PolicyService {
             case EFFECTIVE:
                 policy.activate();
                 break;
-            case PENDING:
+            case PENDING_EFFECTIVE:
                 // 待处理状态不需要特殊方法
                 break;
         }

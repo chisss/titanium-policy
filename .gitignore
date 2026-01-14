@@ -1,7 +1,59 @@
-!/titanium-policy.iml
+# Maven构建输出
+/target/
+.mvn/
 
-!/titanium-policy-application.iml
+# IDE文件
+.idea/
+*.iml
+*.iws
+*.ipr
+.classpath
+.project
+.settings/
+.vscode/
+*.swp
+*.swo
+*~
 
-!/titanium-policy-common.iml
-!/.idea/
-!*/target/
+# 操作系统文件
+.DS_Store
+Thumbs.db
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+
+# 日志文件
+logs/
+*.log
+*.log.*
+
+# 临时文件
+*.tmp
+*.temp
+*.cache
+*.bak
+*.backup
+
+# 环境配置文件
+.env
+.env.local
+.env.*.local
+application-dev.yml
+application-test.yml
+application-prod.yml
+
+# 数据库文件
+*.db
+*.sqlite
+*.sqlite3
+
+# 其他
+*.jar
+*.war
+*.ear
+*.zip
+*.tar.gz
+*.rar
+*.md

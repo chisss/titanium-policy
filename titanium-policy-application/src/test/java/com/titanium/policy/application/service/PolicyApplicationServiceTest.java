@@ -24,7 +24,7 @@ import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 
-import com.titanium.metadata.enums.PolicyEnum;
+import com.titanium.metadata.enums.policy.PolicyEnum;
 import com.titanium.policy.aggregate.Policy;
 import com.titanium.policy.application.PolicyApplicationService;
 import com.titanium.policy.command.CreatePolicyCommand;
@@ -81,7 +81,7 @@ class PolicyApplicationServiceTest {
 
         fixture.given(new PolicyCreatedEvent(policyId, new PolicyNo(policyNo), "customer-001", "product-001",
                 LocalDateTime.now(), LocalDateTime.now().plusYears(1), new Amount(new BigDecimal("1000.0"), "CNY"),
-                PolicyEnum.PolicyStatus.PENDING, Collections.emptyList(),
+                PolicyEnum.PolicyStatus.PENDING_EFFECTIVE, Collections.emptyList(),
                 tenantId));
 
         Policy mockPolicy = Mockito.mock(Policy.class);
@@ -107,7 +107,7 @@ class PolicyApplicationServiceTest {
 
         // 创建模拟的 Policy 对象
         Policy mockPolicy = Mockito.mock(Policy.class);
-        when(mockPolicy.getStatus()).thenReturn(PolicyEnum.PolicyStatus.PENDING);
+        when(mockPolicy.getStatus()).thenReturn(PolicyEnum.PolicyStatus.PENDING_EFFECTIVE);
 
         // 模拟依赖
         when(policyRepository.findById(policyId, tenantId)).thenReturn(Optional.of(mockPolicy));

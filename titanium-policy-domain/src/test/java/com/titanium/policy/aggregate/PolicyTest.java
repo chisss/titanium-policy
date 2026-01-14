@@ -13,7 +13,7 @@ import org.axonframework.test.aggregate.FixtureConfiguration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import com.titanium.metadata.enums.PolicyEnum.PolicyStatus;
+import com.titanium.metadata.enums.policy.PolicyEnum.PolicyStatus;
 import com.titanium.policy.command.ActivatePolicyCommand;
 import com.titanium.policy.command.CreatePolicyCommand;
 import com.titanium.policy.entity.PolicyItem;
@@ -62,7 +62,7 @@ class PolicyTest {
                 .when(new CreatePolicyCommand(policyId, policyNumber, customerId, productId, effectiveDate, expiryDate,
                         premium, policyItems, tenantId))
                 .expectEvents(new PolicyCreatedEvent(policyId, policyNumber, customerId, productId, effectiveDate,
-                        expiryDate, premium, PolicyStatus.PENDING, policyItems, tenantId));
+                        expiryDate, premium, PolicyStatus.PENDING_EFFECTIVE, policyItems, tenantId));
     }
 
     @Test
@@ -79,7 +79,7 @@ class PolicyTest {
         List<PolicyItem> policyItems = Collections.emptyList();
 
         fixture.given(new PolicyCreatedEvent(policyId, policyNumber, customerId, productId, effectiveDate, expiryDate,
-                premium, PolicyStatus.PENDING, policyItems, tenantId))
+                premium, PolicyStatus.PENDING_EFFECTIVE, policyItems, tenantId))
                 .when(new ActivatePolicyCommand(policyId, tenantId))
                 // 使用事件匹配器验证激活事件
                 .expectEvents(new PolicyActivatedEvent(policyId, effectiveDate, tenantId));
@@ -99,7 +99,7 @@ class PolicyTest {
         List<PolicyItem> policyItems = Collections.emptyList();
 
         fixture.given(new PolicyCreatedEvent(policyId, policyNumber, customerId, productId, effectiveDate, expiryDate,
-                premium, PolicyStatus.PENDING, policyItems, tenantId))
+                premium, PolicyStatus.PENDING_EFFECTIVE, policyItems, tenantId))
                 .when(new ActivatePolicyCommand(policyId, tenantId)).expectException(IllegalArgumentException.class);
     }
 
@@ -118,7 +118,7 @@ class PolicyTest {
 
         fixture.given(
                 new PolicyCreatedEvent(policyId, policyNumber, customerId, productId, effectiveDate, expiryDate,
-                        premium, PolicyStatus.PENDING, policyItems, tenantId),
+                        premium, PolicyStatus.PENDING_EFFECTIVE, policyItems, tenantId),
                 new PolicyActivatedEvent(policyId, fixedTime, tenantId))
                 .when(new ActivatePolicyCommand(policyId, tenantId)).expectException(IllegalArgumentException.class);
     }

@@ -12,8 +12,8 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
  */
 @SpringBootApplication(exclude = { AxonServerAutoConfiguration.class })
 @ComponentScan(basePackages = { "com.titanium.policy", "com.titanium.common" })
-@EntityScan(basePackages = { "com.titanium.policy.infrastructure.entity" })
-@EnableJpaRepositories(basePackages = { "com.titanium.policy.infrastructure.*" })
+@EntityScan(basePackages = {"com.titanium.policy.infrastructure.entity"})
+@EnableJpaRepositories(basePackages = { "com.titanium.policy.infrastructure.repository" })
 public class PolicyApplication {
 
     public static void main(String[] args) {
