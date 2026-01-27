@@ -16,7 +16,7 @@ import lombok.Setter;
 @Setter
 public class PolicyDocumentEntity {
     @Id
-    @Column(name = "id", nullable = false, length = 32)
+    @Column(name = "doc_id", nullable = false, length = 32)
     private String id;
 
     @Column(name = "tenant_id", nullable = false, length = 32)

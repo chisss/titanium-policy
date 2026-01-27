@@ -121,4 +121,9 @@
             <column name="tenant_id"/>
         </createIndex>
     </changeSet>
+
+    <!-- 更新保单域表结构，添加投保意向单、投保单等相关表 -->
+    <changeSet id="20260122100000" author="Wayne sun">
+        <sqlFile path="20260122_init_policy_tables.sql" relativeToChangelogFile="true"/>
+    </changeSet>
 </databaseChangeLog>

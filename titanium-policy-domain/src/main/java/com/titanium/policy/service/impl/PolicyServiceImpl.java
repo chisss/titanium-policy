@@ -21,13 +21,13 @@ public class PolicyServiceImpl implements PolicyService {
         }
 
         // 只有待激活状态的保单可以激活
-        if (policy.getStatus() != PolicyStatus.PENDING_EFFECTIVE) {
+        if (!Objects.equals(policy.getStatus().statusCode().getCode(), PolicyStatus.PENDING_EFFECTIVE.getCode())) {
             return false;
         }
 
         // 确保生效日期不晚于当前日期
         LocalDateTime now = LocalDateTime.now();
-        return !policy.getEffectiveDate().isAfter(now);
+        return !policy.getBasicInfo().insurancePeriodStart().isAfter(now);
     }
 
     @Override
@@ -37,22 +37,22 @@ public class PolicyServiceImpl implements PolicyService {
         }
 
         // 如果保单已经被取消，不算过期
-        if (policy.getStatus() == PolicyStatus.CANCELLED) {
+        if (Objects.equals(policy.getStatus().statusCode().getCode(), PolicyStatus.CANCELLED.getCode())) {
             return false;
         }
 
         LocalDateTime now = LocalDateTime.now();
-        return policy.getExpiryDate().isBefore(now);
+        return policy.getBasicInfo().insurancePeriodEnd().isBefore(now);
     }
 
     @Override
     public Policy calculatePremium(Policy policy) {
-        if (policy == null || policy.getPolicyItems() == null || policy.getPolicyItems().isEmpty()) {
+        if (policy == null || policy.getInsuranceProducts() == null || policy.getInsuranceProducts().isEmpty()) {
             return policy;
         }
 
         // 计算所有保单项的保费总和
-        Amount totalPremium = policy.getPolicyItems().stream().map(item -> item.premium())
+        Amount totalPremium = policy.getInsuranceProducts().stream().map(item -> item.premium())
                 .reduce(Amount.of(BigDecimal.ZERO, "CNY"), Amount::add);
 
         // 更新保单的总保费
@@ -70,29 +70,25 @@ public class PolicyServiceImpl implements PolicyService {
 
         // 验证基本字段
         if (Objects.isNull(policy.getPolicyId()) || Objects.isNull(policy.getPolicyNo())
-                || Objects.isNull(policy.getCustomerId()) || Objects.isNull(policy.getProductId())
-                || Objects.isNull(policy.getEffectiveDate()) || Objects.isNull(policy.getExpiryDate())
-                || Objects.isNull(policy.getPremium()) || Objects.isNull(policy.getStatus())
-                || Objects.isNull(policy.getTenantId())) {
+                || Objects.isNull(policy.getStatus()) || Objects.isNull(policy.getTenantId())) {
             return false;
         }
 
         // 验证生效日期必须早于过期日期
-        if (!policy.getEffectiveDate().isBefore(policy.getExpiryDate())) {
+        if (!policy.getBasicInfo().insurancePeriodStart().isBefore(policy.getBasicInfo().insurancePeriodEnd())) {
             return false;
         }
 
         // 验证保费必须大于0
-        if (policy.getPremium().value().compareTo(BigDecimal.ZERO) <= 0) {
+        if (policy.getBasicInfo().totalPremium().value().compareTo(BigDecimal.ZERO) <= 0) {
             return false;
         }
 
         // 验证保单项
-        if (policy.getPolicyItems() != null) {
-            for (var item : policy.getPolicyItems()) {
-                if (Objects.isNull(item.itemId()) || Objects.isNull(item.coverageId())
-                        || Objects.isNull(item.coverage()) || Objects.isNull(item.sumInsured())
-                        || Objects.isNull(item.premium())) {
+        if (policy.getInsuranceProducts() != null) {
+            for (var item : policy.getInsuranceProducts()) {
+                if (Objects.isNull(item.productId()) || Objects.isNull(item.coverages())
+                        || Objects.isNull(item.sumInsured()) || Objects.isNull(item.premium())) {
                     return false;
                 }
             }
@@ -108,11 +104,13 @@ public class PolicyServiceImpl implements PolicyService {
         }
 
         // 根据业务规则验证状态转换
-        if (policy.getStatus() == PolicyStatus.CANCELLED && newStatus != PolicyStatus.CANCELLED) {
+        if (Objects.equals(policy.getStatus().statusCode().getCode(), PolicyStatus.CANCELLED.getCode())
+                && newStatus != PolicyStatus.CANCELLED) {
             throw new IllegalArgumentException("已取消的保单不能改变状态");
         }
 
-        if (policy.getStatus() == PolicyStatus.EXPIRED && newStatus != PolicyStatus.EXPIRED) {
+        if (Objects.equals(policy.getStatus().statusCode().getCode(), PolicyStatus.EXPIRED.getCode())
+                && newStatus != PolicyStatus.EXPIRED) {
             throw new IllegalArgumentException("已过期的保单不能改变状态");
         }
 

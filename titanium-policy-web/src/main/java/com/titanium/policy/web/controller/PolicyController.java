@@ -14,7 +14,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.titanium.policy.aggregate.Policy;
-import com.titanium.policy.application.PolicyApplicationService;
+import com.titanium.policy.application.command.PolicyApplicationService;
+import com.titanium.policy.application.query.PolicyAppQueryService;
 import com.titanium.policy.command.CreatePolicyCommand;
 
 import jakarta.annotation.Resource;
@@ -28,6 +29,9 @@ public class PolicyController {
 
     @Resource
     private PolicyApplicationService policyApplicationService;
+
+    @Resource
+    private PolicyAppQueryService    policyAppQueryService;
 
     /**
      * 创建保单
@@ -49,9 +53,9 @@ public class PolicyController {
      * @return 保单详情
      */
     @GetMapping("/{policyId}")
-    public ResponseEntity<Policy> getPolicy(@PathVariable String policyId,
+    public ResponseEntity<Policy> getPolicy(@PathVariable String policyNo,
                                             @RequestHeader("X-Tenant-Id") String tenantId) {
-        Optional<Policy> policy = policyApplicationService.getPolicyById(policyId, tenantId);
+        Optional<Policy> policy = policyAppQueryService.findByPolicyNo(policyNo, tenantId);
         return policy.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
     }
 

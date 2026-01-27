@@ -4,20 +4,19 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-import org.axonframework.modelling.command.Aggregate;
 import org.axonframework.modelling.command.AggregateNotFoundException;
-import org.axonframework.modelling.command.Repository;
+import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.titanium.common.exception.BusinessException;
-import com.titanium.metadata.enums.policy.PolicyEnum.PolicyStatus;
 import com.titanium.policy.aggregate.Policy;
+import com.titanium.policy.infrastructure.entity.PolicyEntity;
+import com.titanium.policy.infrastructure.mapper.PolicyMapper;
+import com.titanium.policy.infrastructure.repository.jpa.JpaPolicyRepository;
 import com.titanium.policy.repository.PolicyRepository;
+import com.titanium.policy.valueobject.PolicyStatus;
 
 import jakarta.annotation.Resource;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
-import jakarta.persistence.Query;
 import lombok.extern.log4j.Log4j2;
 
 /**
@@ -30,14 +29,14 @@ import lombok.extern.log4j.Log4j2;
  * @note 核心设计： 1. 聚合根加载：通过Axon Repository加载，结合多租户校验； 2.
  *       持久化：Axon事件溯源自动保存事件，save方法仅做参数校验； 3. 删除：采用软删除（标记状态），而非硬删除，符合事件溯源设计；
  */
-@org.springframework.stereotype.Repository
+@Repository
 @Log4j2
 public class PolicyRepositoryImpl implements PolicyRepository {
-    @PersistenceContext
-    private EntityManager      entityManager;
+    @Resource
+    private JpaPolicyRepository jpaPolicyRepository;
 
     @Resource
-    private Repository<Policy> axonRepository;
+    private PolicyMapper        policyMapper;
 
     /**
      * 按ID+租户ID查询保单聚合根
@@ -53,29 +52,10 @@ public class PolicyRepositoryImpl implements PolicyRepository {
     public Optional<Policy> findById(String policyId, String tenantId) {
         try {
             // 1. 加载Axon聚合根包装对象（适配你的Aggregate<T>接口）
-            Aggregate<Policy> aggregate = axonRepository.load(policyId);
-
-            // 2. 通过invoke方法获取聚合根实例+多租户校验（核心修正）
-            Policy policy = aggregate.invoke(aPolicy -> {
-                // 这里的policy就是聚合根实例，在invoke内部完成多租户校验
-                if (!tenantId.equals(aPolicy.getTenantId())) {
-                    throw new BusinessException("403", "无权访问其他租户的保单数据");
-                }
-                return aPolicy; // 返回聚合根实例
-            });
-
-            return Optional.of(policy);
+            return jpaPolicyRepository.findById(policyId).map(policyMapper::toAggregate);
         } catch (AggregateNotFoundException e) {
-            // 聚合根不存在，返回空（预期异常）
+            log.error("加载保单聚合根失败：{}", e.getMessage());
             return Optional.empty();
-        } catch (BusinessException e) {
-            log.error("多租户违规：{}", e.getMessage());
-            // 业务异常（多租户违规），抛上层处理
-            throw e;
-        } catch (Exception e) {
-            log.error("保存保单聚合根异常：{}", e.getMessage());
-            // 非预期异常，包装成业务异常抛出
-            throw new BusinessException("500", "加载保单聚合根失败：" + e.getMessage(), e);
         }
     }
 
@@ -125,43 +105,111 @@ public class PolicyRepositoryImpl implements PolicyRepository {
         Policy policy = findById(policyId, tenantId).orElseThrow(() -> new BusinessException("404", "保单不存在或无权访问"));
 
         // 2. 业务规则校验：激活/生效状态的保单不允许删除
-        if (PolicyStatus.EFFECTIVE.equals(policy.getStatus())) {
+        if (PolicyStatus.StatusCode.EFFECTIVE.equals(policy.getStatus().statusCode())) {
             throw new BusinessException("400", "已激活的保单不允许删除");
         }
 
         // 3. 软删除：使用is_deleted字段标记为已删除
-        String deleteHql = "UPDATE PolicyEntity p SET p.isDeleted = 1, p.updateTime = CURRENT_TIMESTAMP "
-                + "WHERE p.id = :policyId AND p.tenantId = :tenantId AND p.isDeleted = 0";
-        Query deleteQuery = entityManager.createQuery(deleteHql).setParameter("policyId", policyId)
-                .setParameter("tenantId", tenantId);
-
-        int affectedRows = deleteQuery.executeUpdate();
-        if (affectedRows == 0) {
+        Optional<PolicyEntity> entityOpt = jpaPolicyRepository.findById(policyId);
+        if (entityOpt.isPresent()) {
+            PolicyEntity entity = entityOpt.get();
+            entity.setIsDeleted(1);
+            jpaPolicyRepository.save(entity);
+        } else {
             throw new BusinessException("500", "软删除保单失败，未找到匹配数据");
         }
     }
 
+    /**
+     * 根据状态查询保单
+     * 
+     * @param tenantId 租户ID
+     * @param statusCode 状态编码
+     * @return 保单迭代器
+     */
     @Override
-    public Iterable<Policy> findByStatusIn(String tenantId, PolicyStatus... statuses) {
-        if (tenantId == null || tenantId.isEmpty() || statuses == null || statuses.length == 0) {
+    public Iterable<Policy> findByStatus(String tenantId, PolicyStatus.StatusCode statusCode) {
+        if (tenantId == null || tenantId.isEmpty() || statusCode == null) {
             return java.util.Collections.emptyList();
         }
 
         try {
             // 查询状态在指定列表中的保单ID
-            String selectHql = "SELECT p.id FROM PolicyEntity p WHERE p.tenantId = :tenantId AND p.policyStatus IN :statuses AND p.isDeleted = 0";
-            Query query = entityManager.createQuery(selectHql).setParameter("tenantId", tenantId)
-                    .setParameter("statuses", java.util.Arrays.asList(statuses));
-
-            // 获取所有匹配的保单ID
-            List<String> policyIds = query.getResultList();
+            Iterable<PolicyEntity> entities = jpaPolicyRepository.findByPolicyStatusAndTenantId(statusCode.name(),
+                    tenantId);
 
             // 创建结果列表
             List<Policy> policies = new ArrayList<>();
 
-            // 逐个加载聚合根（注意：对于大量数据，这可能会导致性能问题）
-            for (String policyId : policyIds) {
-                Optional<Policy> policyOptional = findById(policyId, tenantId);
+            // 逐个加载聚合根
+            for (PolicyEntity entity : entities) {
+                Optional<Policy> policyOptional = findById(entity.getPolicyId(), tenantId);
+                policyOptional.ifPresent(policies::add);
+            }
+
+            return policies;
+        } catch (Exception e) {
+            log.error("批量查询保单失败：{}", e.getMessage());
+            throw new BusinessException("500", "批量查询保单失败：" + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 根据保单编号查询保单
+     * 
+     * @param policyNo 保单编号
+     * @param tenantId 租户ID
+     * @return 保单聚合根
+     */
+    @Override
+    public Optional<Policy> findByPolicyNo(String policyNo, String tenantId) {
+        Optional<PolicyEntity> entityOpt = jpaPolicyRepository.findByPolicyNoAndTenantId(policyNo, tenantId);
+        if (entityOpt.isPresent()) {
+            return findById(entityOpt.get().getPolicyId(), tenantId);
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * 根据关联投保单ID查询保单
+     * 
+     * @param applicationId 投保单ID
+     * @param tenantId 租户ID
+     * @return 保单聚合根
+     */
+    @Override
+    public Optional<Policy> findByApplicationId(String applicationId, String tenantId) {
+        Optional<PolicyEntity> entityOpt = jpaPolicyRepository.findByApplicationIdAndTenantId(applicationId, tenantId);
+        if (entityOpt.isPresent()) {
+            return findById(entityOpt.get().getPolicyId(), tenantId);
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * 根据投保人ID查询保单
+     * 
+     * @param policyHolderId 投保人ID
+     * @param tenantId 租户ID
+     * @return 保单迭代器
+     */
+    @Override
+    public Iterable<Policy> findByPolicyHolderId(String policyHolderId, String tenantId) {
+        if (policyHolderId == null || policyHolderId.isEmpty() || tenantId == null || tenantId.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+
+        try {
+            // 查询状态在指定列表中的保单ID
+            Iterable<PolicyEntity> entities = jpaPolicyRepository.findByPolicyHolderIdAndTenantId(policyHolderId,
+                    tenantId);
+
+            // 创建结果列表
+            List<Policy> policies = new ArrayList<>();
+
+            // 逐个加载聚合根
+            for (PolicyEntity entity : entities) {
+                Optional<Policy> policyOptional = findById(entity.getPolicyId(), tenantId);
                 policyOptional.ifPresent(policies::add);
             }
 
