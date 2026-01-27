@@ -164,13 +164,14 @@
     </dependencyManagement>
 
     <modules>
-        <module>titanium-policy-application</module>
         <module>titanium-policy-api</module>
+        <module>titanium-policy-common</module>
         <module>titanium-policy-domain</module>
+        <module>titanium-policy-application</module>
         <module>titanium-policy-infrastructure</module>
+        <module>titanium-policy-query</module>
         <module>titanium-policy-web</module>
         <module>titanium-policy-bootstrap</module>
-        <module>titanium-policy-common</module>
     </modules>
 
     <build>

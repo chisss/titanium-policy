@@ -58,14 +58,90 @@ axon:
     messages: jackson
   eventhandling:
     processors:
-      policyProcessor:
-        mode: subscribing
+      policy-query-group:
+        # 源码默认已是TRACKING，可省略；若需显式声明也可保留
+        # mode: TRACKING
+        dlq:
+          enabled: true  # 核心：源码默认false，必须显式开启DLQ
+          max-size: 1000 # 补充：源码未直接定义max-size，但这是DLQ核心配置（需手动加）
+          cache:
+            enabled: true # 补充：DLQ缓存，源码默认false，需手动开启缓存（提升性能）,生产环境按需开启
+            size: 2048 # 补充：缓存大小，默认1000（需手动加）
+        # 可选优化：提升批量消费效率（源码默认batchSize=1，生产建议调大）
+        batchSize: 10
   eventstore:
     jpa:
       entity-manager-provider: default
+
   axonserver:
-    enabled: false
-  
+    # 1. 集群连接配置
+    clientId: policy-query-node-${HOSTNAME} # 结合主机名，便于识别节点
+    servers: axonserver-1:8124,axonserver-2:8124,axonserver-3:8124 # 集群地址
+    context: policy-business # 业务上下文隔离
+# --------------------------生产环境优化选项-----------------------------
+
+    # 生产环境开启SSL（需配置certFile）
+    sslEnabled: true
+    certFile: /etc/axon/cert/axonserver.crt
+    # 可选：AxonServer认证token（若服务端开启认证）
+    token: ${AXON_SERVER_TOKEN} # 从环境变量读取，避免硬编码
+    # 2. 流控优化（保单场景默认5000足够，高并发可调整）
+    permits: 10000
+    # 单独为事件流控配置（可选，若事件量远大于命令/查询）
+    eventFlowControl:
+      permits: 15000
+      nrOfNewPermits: 5000
+      newPermitsThreshold: 7500
+
+    # 3. 线程优化（高并发保单场景）
+    commandThreads: 20
+    queryThreads: 20
+
+    # 4. 分布式事件处理器负载均衡（核心：开启自动均衡）
+    eventhandling:
+      processors:
+        policy-query-group: # 你的事件处理分组
+          loadBalancingStrategy: round-robin # 轮询负载均衡
+          automaticBalancing: true # 开启自动负载均衡
+
+    # 5. 连接优化（默认合理，显式声明）
+    connectTimeout: 5000
+    reconnectInterval: 2000
+    # 心跳配置（默认合理）
+    heartbeat:
+      enabled: true
+      interval: 10000
+      timeout: 7500
+
+      # 6. 其他生产配置
+    maxMessageSize: 10485760 # 最大消息大小10MB（应对大事件载荷）
+    commitTimeout: 15000 # 提交超时延长至15秒（集群场景）
+    eventBlockListingEnabled: true # 保留事件黑名单（防止异常事件拖垮消费）
+  tracing:
+    repository:
+      aggregateIdAttributeName: axon.aggregateId
+    # --------------------------生产环境优化选项-----------------------------
+    # 2. 分布式事件处理器纳入同一个Trace（便于追踪“Command→事件→Query层消费”全链路）
+    eventProcessor:
+      distributedInSameTrace: true # 源码默认false，改为true
+      distributedInSameTraceTimeLimit: 5m # 超时从2分钟延长到5分钟（适配慢消费场景）
+      disableBatchTrace: false # 保留批量消费的追踪（便于排查批量消费异常）
+    # 3. 自定义Span属性（仅保留核心元数据，减少追踪数据量）
+    attributeProviders:
+      aggregateIdentifier: true # 必带：聚合ID（如PolicyId）
+      messageId: true # 必带：消息ID
+      messageName: true # 必带：消息名（如PolicyIssuedEvent）
+      metadata: true # 必带：元数据（如tenantId）
+      payloadType: true # 必带：载荷类型
+      messageType: false # 可选关闭：消息类型（与messageName重复）
+    # 4. 命令/查询总线保持分布式同Trace（默认已开，显式声明）
+    commandBus:
+      distributedInSameTrace: true
+    queryBus:
+      distributedInSameTrace: true
+    # 5. Saga追踪（若用到Saga则配置，如保单续保流程）
+    sagaManager:
+      sagaIdentifierAttributeName: axon.policySagaId # 自定义Saga ID属性名，便于识别
 # 多租户配置
 tenant:
   enabled: true
