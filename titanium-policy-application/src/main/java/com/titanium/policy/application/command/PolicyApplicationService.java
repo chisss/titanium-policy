@@ -1,56 +1,96 @@
 package com.titanium.policy.application.command;
 
-import java.util.Optional;
-
 import org.axonframework.commandhandling.gateway.CommandGateway;
 import org.springframework.stereotype.Service;
 
-import com.titanium.policy.aggregate.Policy;
 import com.titanium.policy.command.ActivatePolicyCommand;
+import com.titanium.policy.command.CancelPolicyCommand;
 import com.titanium.policy.command.CreatePolicyCommand;
-import com.titanium.policy.repository.PolicyRepository;
+import com.titanium.policy.command.CreatePolicyDirectlyCommand;
+import com.titanium.policy.command.IssuePolicyCommand;
+import com.titanium.policy.command.ResumePolicyCommand;
+import com.titanium.policy.command.SuspendPolicyCommand;
+import com.titanium.policy.command.TerminatePolicyCommand;
+import com.titanium.policy.service.IssuanceOrchestrator;
+import com.titanium.policy.service.IssuanceRequest;
+import com.titanium.policy.service.IssuanceResult;
+import com.titanium.policy.valueobject.IssuanceProcessConfig;
 
 import jakarta.annotation.Resource;
 
 /**
  * 保单应用服务
- * <p>
- * 处理保单相关的命令，协调领域层和基础设施层
- * </p>
  */
 @Service
 public class PolicyApplicationService {
     @Resource
-    private CommandGateway   commandGateway;
+    private CommandGateway       commandGateway;
 
     @Resource
-    private PolicyRepository policyRepository;
+    private IssuanceOrchestrator issuanceOrchestrator;
 
     /**
-     * 创建保单
-     *
-     * @param command 创建保单命令
-     * @return 保单ID
+     * 创建保单（从投保单创建）
      */
     public String createPolicy(CreatePolicyCommand command) {
-        // 发送命令
         commandGateway.sendAndWait(command);
         return command.policyId();
     }
 
     /**
+     * 智能出单（根据出单配置编排）
+     */
+    public IssuanceResult issueByConfig(IssuanceProcessConfig config, IssuanceRequest request) {
+        return issuanceOrchestrator.orchestrate(config, request);
+    }
+
+    /**
+     * 一步出单
+     */
+    public String createPolicyDirectly(CreatePolicyDirectlyCommand command) {
+        commandGateway.sendAndWait(command);
+        return command.policyId();
+    }
+
+    /**
+     * 签发保单
+     */
+    public void issuePolicy(String policyId, String operatorId, String tenantId) {
+        commandGateway.sendAndWait(new IssuePolicyCommand(policyId, operatorId, tenantId));
+    }
+
+    /**
      * 激活保单
-     *
-     * @param policyId 保单ID
-     * @param tenantId 租户ID
      */
     public void activatePolicy(String policyId, String tenantId) {
-        // 从仓库获取保单
-        Optional<Policy> policyOptional = policyRepository.findById(policyId, tenantId);
-        if (policyOptional.isEmpty()) {
-            throw new IllegalArgumentException("Policy not found: " + policyId);
-        }
-        ActivatePolicyCommand command = new ActivatePolicyCommand(policyId, tenantId);
+        commandGateway.sendAndWait(new ActivatePolicyCommand(policyId, tenantId));
+    }
+
+    /**
+     * 暂停保单（保全域触发）
+     */
+    public void suspendPolicy(SuspendPolicyCommand command) {
+        commandGateway.sendAndWait(command);
+    }
+
+    /**
+     * 恢复保单（保全域触发）
+     */
+    public void resumePolicy(ResumePolicyCommand command) {
+        commandGateway.sendAndWait(command);
+    }
+
+    /**
+     * 终止保单（保全域触发/退保）
+     */
+    public void terminatePolicy(TerminatePolicyCommand command) {
+        commandGateway.sendAndWait(command);
+    }
+
+    /**
+     * 取消保单（仅未生效保单）
+     */
+    public void cancelPolicy(CancelPolicyCommand command) {
         commandGateway.sendAndWait(command);
     }
 }

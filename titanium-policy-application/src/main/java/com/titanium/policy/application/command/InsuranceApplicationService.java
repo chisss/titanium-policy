@@ -1,75 +1,59 @@
 package com.titanium.policy.application.command;
 
-import java.util.Optional;
-
 import org.axonframework.commandhandling.gateway.CommandGateway;
 import org.springframework.stereotype.Service;
 
-import com.titanium.policy.aggregate.Insurance;
 import com.titanium.policy.command.ConvertProposalToInsuranceCommand;
-import com.titanium.policy.repository.InsuranceRepository;
+import com.titanium.policy.command.CreateInsuranceDirectlyCommand;
+import com.titanium.policy.command.ReceiveUnderwritingResultCommand;
+import com.titanium.policy.command.SubmitUnderwritingCommand;
+import com.titanium.policy.command.TriggerIssuanceCommand;
+import com.titanium.policy.valueobject.insurance.UnderwritingResult;
 
 import jakarta.annotation.Resource;
 
 /**
  * 投保单应用服务
- * <p>
- * 处理投保单相关的命令，协调领域层和基础设施层
- * </p>
  */
 @Service
 public class InsuranceApplicationService {
     @Resource
-    private CommandGateway      commandGateway;
-
-    @Resource
-    private InsuranceRepository insuranceRepository;
+    private CommandGateway commandGateway;
 
     /**
-     * 从投保意向单创建投保单
-     *
-     * @param command 转换命令
-     * @return 投保单ID
+     * 从投保意向单创建投保单（三步出单）
      */
     public String convertFromProposal(ConvertProposalToInsuranceCommand command) {
-        // 发送命令
+        commandGateway.sendAndWait(command);
+        return command.insuranceId();
+    }
+
+    /**
+     * 直接创建投保单（两步出单）
+     */
+    public String createInsuranceDirectly(CreateInsuranceDirectlyCommand command) {
         commandGateway.sendAndWait(command);
         return command.insuranceId();
     }
 
     /**
      * 提交核保
-     *
-     * @param applicationId 投保单ID
-     * @param tenantId 租户ID
      */
-    public void submitUnderwriting(String applicationId, String tenantId) {
-        // 从仓库获取投保单
-        Optional<Insurance> insuranceOptional = insuranceRepository.findById(applicationId, tenantId);
-        if (insuranceOptional.isEmpty()) {
-            throw new IllegalArgumentException("Insurance application not found: " + applicationId);
-        }
-        Insurance insurance = insuranceOptional.get();
-        // 提交核保
-        insurance.submitUnderwriting();
-        insuranceRepository.save(insurance);
+    public void submitUnderwriting(String insuranceId, String tenantId) {
+        commandGateway.sendAndWait(new SubmitUnderwritingCommand(insuranceId, tenantId));
     }
 
     /**
-     * 触发承保流程
-     *
-     * @param insuranceId 投保单ID
-     * @param tenantId 租户ID
+     * 接收核保结果（核保域回调）
      */
-    public void triggerUnderwriting(String insuranceId, String tenantId) {
-        // 从仓库获取投保单
-        Optional<Insurance> insuranceOptional = insuranceRepository.findById(insuranceId, tenantId);
-        if (insuranceOptional.isEmpty()) {
-            throw new IllegalArgumentException("Insurance application not found: " + insuranceId);
-        }
-        Insurance insurance = insuranceOptional.get();
-        // 触发承保流程
-        insurance.triggerUnderwriting();
-        insuranceRepository.save(insurance);
+    public void receiveUnderwritingResult(String insuranceId, UnderwritingResult result, String tenantId) {
+        commandGateway.sendAndWait(new ReceiveUnderwritingResultCommand(insuranceId, result, tenantId));
+    }
+
+    /**
+     * 触发承保出单
+     */
+    public void triggerIssuance(String insuranceId, String tenantId) {
+        commandGateway.sendAndWait(new TriggerIssuanceCommand(insuranceId, tenantId));
     }
 }

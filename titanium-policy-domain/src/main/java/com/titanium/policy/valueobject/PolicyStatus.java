@@ -7,7 +7,23 @@ import lombok.Getter;
 /**
  * 保单状态值对象
  * <p>
- * 管控保单生命周期状态流转，包含状态编码、状态变更时间、变更原因和操作人ID
+ * 管控保单生命周期状态流转，包含状态编码、状态变更时间、变更原因和操作人ID。
+ * 状态机：
+ * <pre>
+ * NOT_EFFECTIVE ──activate()──► EFFECTIVE ──suspend()──► SUSPENDED
+ *       │                          │    ◄──resume()───      │
+ *       │                          │                        │
+ *       │                     terminate()              terminate()
+ *       │                          │                        │
+ *       │                          ▼                        ▼
+ *       │                     TERMINATED ◄──────────────────┘
+ *       │
+ *       └──cancel()──► CANCELLED (终态，仅未生效可取消)
+ *
+ * EFFECTIVE ──expire()──► EXPIRED (定时任务触发，止期到达)
+ * </pre>
+ * 注：suspend()/resume()/terminate() 均由保全域审批完成后触发，保单域被动执行。
+ * 数据变更类保全(投保人/受益人/缴费方式/加减保)不改变保单状态，只更新数据+版本号递增。
  * </p>
  *
  * @param statusCode 状态编码
@@ -19,9 +35,6 @@ public record PolicyStatus(StatusCode statusCode, LocalDateTime statusTime, Stri
 
     /**
      * 状态流转方法
-     * <p>
-     * 执行状态流转校验，确保状态变更符合业务规则
-     * </p>
      *
      * @param newStatusCode 新状态编码
      * @param changeReason 变更原因
@@ -29,9 +42,28 @@ public record PolicyStatus(StatusCode statusCode, LocalDateTime statusTime, Stri
      * @return 新的状态值对象
      */
     public PolicyStatus transitionStatus(StatusCode newStatusCode, String changeReason, String operatorId) {
-        // 状态流转规则校验
         validateTransition(newStatusCode);
         return new PolicyStatus(newStatusCode, LocalDateTime.now(), changeReason, operatorId);
+    }
+
+    /**
+     * 判断保单是否处于有效状态（可用于保全域/理赔域校验）
+     *
+     * @return 是否有效
+     */
+    public boolean isActive() {
+        return this.statusCode == StatusCode.EFFECTIVE;
+    }
+
+    /**
+     * 判断保单是否处于终态
+     *
+     * @return 是否终态
+     */
+    public boolean isTerminal() {
+        return this.statusCode == StatusCode.TERMINATED
+                || this.statusCode == StatusCode.EXPIRED
+                || this.statusCode == StatusCode.CANCELLED;
     }
 
     /**
@@ -40,30 +72,33 @@ public record PolicyStatus(StatusCode statusCode, LocalDateTime statusTime, Stri
      * @param newStatusCode 新状态编码
      */
     private void validateTransition(StatusCode newStatusCode) {
-        // 未生效状态可以转为生效
+        // 同状态允许（如签发时仍为 NOT_EFFECTIVE）
+        if (this.statusCode == newStatusCode) {
+            return;
+        }
+        // NOT_EFFECTIVE → EFFECTIVE（生效）
         if (this.statusCode == StatusCode.NOT_EFFECTIVE && newStatusCode == StatusCode.EFFECTIVE) {
             return;
         }
-        // 生效状态可以转为暂停
+        // NOT_EFFECTIVE → CANCELLED（取消，仅未生效可取消）
+        if (this.statusCode == StatusCode.NOT_EFFECTIVE && newStatusCode == StatusCode.CANCELLED) {
+            return;
+        }
+        // EFFECTIVE → SUSPENDED（暂停，保全域触发）
         if (this.statusCode == StatusCode.EFFECTIVE && newStatusCode == StatusCode.SUSPENDED) {
             return;
         }
-        // 暂停状态可以转为生效
+        // SUSPENDED → EFFECTIVE（恢复，保全域触发）
         if (this.statusCode == StatusCode.SUSPENDED && newStatusCode == StatusCode.EFFECTIVE) {
             return;
         }
-        // 生效或暂停状态可以转为终止
+        // EFFECTIVE/SUSPENDED → TERMINATED（终止，保全域触发/退保）
         if ((this.statusCode == StatusCode.EFFECTIVE || this.statusCode == StatusCode.SUSPENDED)
                 && newStatusCode == StatusCode.TERMINATED) {
             return;
         }
-        // 生效或暂停状态可以转为失效
-        if ((this.statusCode == StatusCode.EFFECTIVE || this.statusCode == StatusCode.SUSPENDED)
-                && newStatusCode == StatusCode.EXPIRED) {
-            return;
-        }
-        // 任何状态都可以转为已批改
-        if (newStatusCode == StatusCode.ENDORSED) {
+        // EFFECTIVE → EXPIRED（到期失效，定时任务触发）
+        if (this.statusCode == StatusCode.EFFECTIVE && newStatusCode == StatusCode.EXPIRED) {
             return;
         }
         // 其他状态流转不允许
@@ -72,34 +107,22 @@ public record PolicyStatus(StatusCode statusCode, LocalDateTime statusTime, Stri
     }
 
     /**
-     * 状态编码枚举
+     * 状态编码枚举 - 对齐 metadata 层 PolicyEnum.PolicyStatus
      */
     @Getter
     public enum StatusCode {
-        /**
-         * 未生效
-         */
+        /** 未生效（对应 metadata PENDING_EFFECTIVE） */
         NOT_EFFECTIVE("NOT_EFFECTIVE", "未生效"),
-        /**
-         * 生效
-         */
+        /** 生效 */
         EFFECTIVE("EFFECTIVE", "生效"),
-        /**
-         * 暂停
-         */
+        /** 暂停（保全域触发） */
         SUSPENDED("SUSPENDED", "暂停"),
-        /**
-         * 终止
-         */
+        /** 终止（保全域触发/退保） */
         TERMINATED("TERMINATED", "终止"),
-        /**
-         * 失效
-         */
+        /** 到期失效（定时任务触发） */
         EXPIRED("EXPIRED", "失效"),
-        /**
-         * 已批改
-         */
-        ENDORSED("ENDORSED", "已批改");
+        /** 已取消（仅未生效保单可取消） */
+        CANCELLED("CANCELLED", "已取消");
 
         private final String code;
         private final String name;

@@ -16,7 +16,15 @@ import org.springframework.web.bind.annotation.RestController;
 import com.titanium.policy.aggregate.Policy;
 import com.titanium.policy.application.command.PolicyApplicationService;
 import com.titanium.policy.application.query.PolicyAppQueryService;
+import com.titanium.policy.command.CancelPolicyCommand;
 import com.titanium.policy.command.CreatePolicyCommand;
+import com.titanium.policy.command.CreatePolicyDirectlyCommand;
+import com.titanium.policy.command.ResumePolicyCommand;
+import com.titanium.policy.command.SuspendPolicyCommand;
+import com.titanium.policy.command.TerminatePolicyCommand;
+import com.titanium.policy.service.IssuanceRequest;
+import com.titanium.policy.service.IssuanceResult;
+import com.titanium.policy.valueobject.IssuanceProcessConfig;
 
 import jakarta.annotation.Resource;
 
@@ -33,43 +41,86 @@ public class PolicyController {
     @Resource
     private PolicyAppQueryService    policyAppQueryService;
 
-    /**
-     * 创建保单
-     *
-     * @param command 创建保单命令
-     * @return 响应结果
-     */
+    /** 创建保单（从投保单创建） */
     @PostMapping
     public ResponseEntity<String> createPolicy(@RequestBody CreatePolicyCommand command) {
         String policyId = policyApplicationService.createPolicy(command);
         return new ResponseEntity<>(policyId, HttpStatus.CREATED);
     }
 
-    /**
-     * 获取保单详情
-     *
-     * @param policyId 保单ID
-     * @param tenantId 租户ID
-     * @return 保单详情
-     */
-    @GetMapping("/{policyId}")
+    /** 一步出单 */
+    @PostMapping("/direct")
+    public ResponseEntity<String> createPolicyDirectly(@RequestBody CreatePolicyDirectlyCommand command) {
+        String policyId = policyApplicationService.createPolicyDirectly(command);
+        return new ResponseEntity<>(policyId, HttpStatus.CREATED);
+    }
+
+    /** 智能出单 */
+    @PostMapping("/issue")
+    public ResponseEntity<IssuanceResult> issueByConfig(@RequestBody IssuanceRequest request,
+                                                        @RequestHeader("X-Tenant-Id") String tenantId) {
+        IssuanceProcessConfig config = IssuanceProcessConfig.oneStep(request.productCode());
+        IssuanceResult result = policyApplicationService.issueByConfig(config, request);
+        if (!result.success()) {
+            return ResponseEntity.badRequest().body(result);
+        }
+        return new ResponseEntity<>(result, HttpStatus.CREATED);
+    }
+
+    /** 获取保单详情 */
+    @GetMapping("/{policyNo}")
     public ResponseEntity<Policy> getPolicy(@PathVariable String policyNo,
                                             @RequestHeader("X-Tenant-Id") String tenantId) {
         Optional<Policy> policy = policyAppQueryService.findByPolicyNo(policyNo, tenantId);
         return policy.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    /**
-     * 激活保单
-     *
-     * @param policyId 保单ID
-     * @param tenantId 租户ID
-     * @return 响应结果
-     */
+    /** 签发保单 */
+    @PutMapping("/{policyId}/issue")
+    public ResponseEntity<Void> issuePolicy(@PathVariable String policyId,
+                                            @RequestHeader("X-Operator-Id") String operatorId,
+                                            @RequestHeader("X-Tenant-Id") String tenantId) {
+        policyApplicationService.issuePolicy(policyId, operatorId, tenantId);
+        return ResponseEntity.noContent().build();
+    }
+
+    /** 激活保单 */
     @PutMapping("/{policyId}/activate")
     public ResponseEntity<Void> activatePolicy(@PathVariable String policyId,
                                                @RequestHeader("X-Tenant-Id") String tenantId) {
         policyApplicationService.activatePolicy(policyId, tenantId);
+        return ResponseEntity.noContent().build();
+    }
+
+    /** 暂停保单 */
+    @PutMapping("/{policyId}/suspend")
+    public ResponseEntity<Void> suspendPolicy(@PathVariable String policyId,
+                                              @RequestBody SuspendPolicyCommand command) {
+        policyApplicationService.suspendPolicy(command);
+        return ResponseEntity.noContent().build();
+    }
+
+    /** 恢复保单 */
+    @PutMapping("/{policyId}/resume")
+    public ResponseEntity<Void> resumePolicy(@PathVariable String policyId,
+                                             @RequestBody ResumePolicyCommand command) {
+        policyApplicationService.resumePolicy(command);
+        return ResponseEntity.noContent().build();
+    }
+
+    /** 终止保单 */
+    @PutMapping("/{policyId}/terminate")
+    public ResponseEntity<Void> terminatePolicy(@PathVariable String policyId,
+                                                @RequestBody TerminatePolicyCommand command) {
+        policyApplicationService.terminatePolicy(command);
+        return ResponseEntity.noContent().build();
+    }
+
+    /** 取消保单 */
+    @PutMapping("/{policyId}/cancel")
+    public ResponseEntity<Void> cancelPolicy(@PathVariable String policyId,
+                                             @RequestBody CancelPolicyCommand command) {
+        policyApplicationService.cancelPolicy(command);
         return ResponseEntity.noContent().build();
     }
 }

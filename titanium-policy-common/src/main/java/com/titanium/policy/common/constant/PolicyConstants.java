@@ -4,6 +4,7 @@ package com.titanium.policy.common.constant;
  * 保单系统常量类
  */
 public class PolicyConstants {
+    public static final String POLICY_SYSTEM = "POLICY_SYSTEM";
     
     /**
      * 保单状态常量
