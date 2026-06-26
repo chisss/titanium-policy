@@ -1,0 +1,4 @@
+com/titanium/policy/web/controller/PolicyController.class
+com/titanium/policy/web/config/TenantConfig.class
+com/titanium/policy/web/controller/ProposalController.class
+com/titanium/policy/web/controller/InsuranceController.class

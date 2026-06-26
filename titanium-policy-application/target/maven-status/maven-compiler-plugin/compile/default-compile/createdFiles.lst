@@ -1,0 +1,17 @@
+com/titanium/policy/application/saga/IssuanceSaga.class
+com/titanium/policy/application/service/ProductServiceAdapter.class
+com/titanium/policy/application/command/InsuranceApplicationService.class
+com/titanium/policy/application/service/SyncUnderwritingDecisionAdapter$1.class
+com/titanium/policy/application/command/ProposalApplicationService.class
+com/titanium/policy/application/command/PolicyApplicationService.class
+com/titanium/policy/application/service/ClauseService.class
+com/titanium/policy/application/service/RuleEngineService.class
+com/titanium/policy/application/service/UnderwritingServiceAdapter.class
+com/titanium/policy/application/service/UnderwritingService.class
+com/titanium/policy/application/query/ProposalAppQueryService.class
+com/titanium/policy/application/service/RuleEngineServiceAdapter.class
+com/titanium/policy/application/service/SyncUnderwritingDecisionAdapter.class
+com/titanium/policy/application/query/PolicyAppQueryService.class
+com/titanium/policy/application/service/ClauseServiceAdapter.class
+com/titanium/policy/application/service/ProductService.class
+com/titanium/policy/application/query/InsuranceAppQueryService.class

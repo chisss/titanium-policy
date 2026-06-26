@@ -1,0 +1,12 @@
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-query/src/main/java/com/titanium/policy/query/handler/PolicyProjectionEventHandler.java
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-query/src/main/java/com/titanium/policy/query/query/FindPoliciesByCustomerQuery.java
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-query/src/main/java/com/titanium/policy/query/service/impl/PolicyQueryServiceImpl.java
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-query/src/main/java/com/titanium/policy/query/query/FindPolicyByIdQuery.java
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-query/src/main/java/com/titanium/policy/query/scheduled/DeadLetterQueueService.java
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-query/src/main/java/com/titanium/policy/query/entity/PolicyQueryResult.java
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-query/src/main/java/com/titanium/policy/query/service/PolicyQueryService.java
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-query/src/main/java/com/titanium/policy/query/repository/PolicyViewRepository.java
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-query/src/main/java/com/titanium/policy/query/config/PolicyQueryCacheConfig.java
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-query/src/main/java/com/titanium/policy/query/query/FindPoliciesByMultipleConditionsQuery.java
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-query/src/main/java/com/titanium/policy/query/handler/PolicyQueryHandler.java
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-query/src/main/java/com/titanium/policy/query/entity/PolicyView.java

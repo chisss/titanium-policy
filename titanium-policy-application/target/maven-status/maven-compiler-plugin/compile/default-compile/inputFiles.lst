@@ -1,0 +1,16 @@
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-application/src/main/java/com/titanium/policy/application/query/PolicyAppQueryService.java
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-application/src/main/java/com/titanium/policy/application/service/ProductService.java
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-application/src/main/java/com/titanium/policy/application/service/SyncUnderwritingDecisionAdapter.java
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-application/src/main/java/com/titanium/policy/application/service/ClauseServiceAdapter.java
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-application/src/main/java/com/titanium/policy/application/saga/IssuanceSaga.java
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-application/src/main/java/com/titanium/policy/application/service/RuleEngineServiceAdapter.java
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-application/src/main/java/com/titanium/policy/application/service/ClauseService.java
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-application/src/main/java/com/titanium/policy/application/query/ProposalAppQueryService.java
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-application/src/main/java/com/titanium/policy/application/command/ProposalApplicationService.java
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-application/src/main/java/com/titanium/policy/application/service/UnderwritingServiceAdapter.java
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-application/src/main/java/com/titanium/policy/application/service/UnderwritingService.java
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-application/src/main/java/com/titanium/policy/application/command/InsuranceApplicationService.java
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-application/src/main/java/com/titanium/policy/application/command/PolicyApplicationService.java
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-application/src/main/java/com/titanium/policy/application/service/ProductServiceAdapter.java
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-application/src/main/java/com/titanium/policy/application/query/InsuranceAppQueryService.java
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-application/src/main/java/com/titanium/policy/application/service/RuleEngineService.java
