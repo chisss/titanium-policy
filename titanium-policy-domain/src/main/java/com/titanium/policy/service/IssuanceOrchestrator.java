@@ -10,6 +10,9 @@ import com.titanium.policy.command.ConvertProposalToInsuranceCommand;
 import com.titanium.policy.command.CreateInsuranceDirectlyCommand;
 import com.titanium.policy.command.CreatePolicyDirectlyCommand;
 import com.titanium.policy.command.CreateProposalCommand;
+import com.titanium.policy.service.ClauseServicePort;
+import com.titanium.policy.service.ProductServicePort;
+import com.titanium.policy.service.UnderwritingServicePort;
 import com.titanium.policy.valueobject.Amount;
 import com.titanium.policy.valueobject.IssuanceMode;
 import com.titanium.policy.valueobject.IssuanceProcessConfig;
@@ -37,6 +40,15 @@ public class IssuanceOrchestrator {
 
     @Resource
     private RiskAssessmentExecutor riskAssessmentExecutor;
+
+    @Resource
+    private ProductServicePort productServicePort;
+
+    @Resource
+    private ClauseServicePort clauseServicePort;
+
+    @Resource
+    private UnderwritingServicePort underwritingServicePort;
 
     /**
      * 编排出单流程
@@ -115,6 +127,24 @@ public class IssuanceOrchestrator {
 
         commandGateway.sendAndWait(command);
         log.info("两步出单 - 投保单创建完成, insuranceId={}, insuranceNo={}", insuranceId, insuranceNo);
+
+        // 调用核保服务创建核保
+        log.info("创建核保申请");
+        try {
+            // 构建核保请求
+            java.util.Map<String, Object> underwritingRequest = new java.util.HashMap<>();
+            underwritingRequest.put("insuranceId", insuranceId);
+            underwritingRequest.put("policyHolderId", request.policyHolderId());
+            underwritingRequest.put("productCode", request.productCode());
+            underwritingRequest.put("totalPremium", request.totalPremium());
+            
+            // 调用核保服务
+            Object underwritingResult = underwritingServicePort.createUnderwriting(underwritingRequest, request.tenantId());
+            log.info("核保申请创建成功");
+        } catch (Exception e) {
+            log.error("创建核保申请失败: {}", e.getMessage());
+            return IssuanceResult.rejected("创建核保申请失败: " + e.getMessage());
+        }
 
         return IssuanceResult.success(IssuanceMode.TWO_STEP, null, null, insuranceId, insuranceNo);
     }

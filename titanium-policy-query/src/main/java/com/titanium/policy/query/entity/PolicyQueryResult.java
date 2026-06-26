@@ -3,6 +3,12 @@ package com.titanium.policy.query.entity;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import com.titanium.metadata.enums.CurrencyEnum;
+import com.titanium.metadata.enums.policy.PolicyEnum;
+import com.titanium.metadata.enums.policy.PolicyForm;
+import com.titanium.metadata.enums.product.ProductEnum.PeriodUnit;
+import com.titanium.policy.valueobject.PolicyItemType;
+
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -33,7 +39,7 @@ public class PolicyQueryResult {
     /**
      * 保单形态
      */
-    private String                      policyForm;
+    private PolicyForm                  policyForm;
 
     /**
      * 投保人ID
@@ -78,7 +84,7 @@ public class PolicyQueryResult {
     /**
      * 币种
      */
-    private String                      currency;
+    private CurrencyEnum                currency;
 
     /**
      * 生效日期
@@ -93,7 +99,7 @@ public class PolicyQueryResult {
     /**
      * 保单状态
      */
-    private String                      status;
+    private PolicyEnum.PolicyStatus     status;
 
     /**
      * 创建时间
@@ -129,7 +135,7 @@ public class PolicyQueryResult {
         /**
          * 项目类型
          */
-        private String  itemType;
+        private PolicyItemType itemType;
 
         /**
          * 项目名称
@@ -154,6 +160,6 @@ public class PolicyQueryResult {
         /**
          * 保险期限单位
          */
-        private String  periodUnit;
+        private PeriodUnit periodUnit;
     }
 }

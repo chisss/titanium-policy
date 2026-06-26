@@ -2,6 +2,8 @@ package com.titanium.policy.command;
 
 import java.time.LocalDateTime;
 
+import com.titanium.metadata.enums.policy.PolicyForm;
+import com.titanium.metadata.enums.product.ProductEnum.SalesChannel;
 import com.titanium.policy.valueobject.Amount;
 
 /*
@@ -26,7 +28,7 @@ public record CreatePolicyCommand(
                                   /*
                                    * 保单形态
                                    */
-                                  String policyForm,
+                                  PolicyForm policyForm,
                                   /*
                                    * 签发机构
                                    */
@@ -59,7 +61,7 @@ public record CreatePolicyCommand(
                                   /*
                                    * 渠道
                                    */
-                                  String channel,
+                                  SalesChannel channel,
 
                                   /*
                                    * 租户ID

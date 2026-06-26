@@ -6,7 +6,7 @@ import com.titanium.metadata.enums.billing.BillingEnum;
 import com.titanium.policy.valueobject.Amount;
 
 public record PaymentRecord(String paymentId, String paymentNo, Amount paymentAmount, LocalDateTime paymentTime,
-                            String paymentMethod, BillingEnum.ReconciliationStatus reconciliationStatus) {
+                            BillingEnum.PaymentMethod paymentMethod, BillingEnum.ReconciliationStatus reconciliationStatus) {
     /**
      * 记录缴费信息
      * <p>

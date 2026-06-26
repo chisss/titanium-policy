@@ -55,6 +55,12 @@
             <groupId>com.alibaba.fastjson2</groupId>
             <artifactId>fastjson2</artifactId>
         </dependency>
+        <!-- Spring Cloud OpenFeign (PolicyApi Feign 接口) -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-openfeign</artifactId>
+        </dependency>
+
         <!-- Swagger Annotations -->
         <dependency>
             <groupId>io.swagger.core.v3</groupId>

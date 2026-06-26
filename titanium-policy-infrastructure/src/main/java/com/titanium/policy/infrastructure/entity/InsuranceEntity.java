@@ -2,8 +2,14 @@ package com.titanium.policy.infrastructure.entity;
 
 import java.time.LocalDateTime;
 
+import com.titanium.metadata.enums.policy.PolicyForm;
+import com.titanium.metadata.enums.underwriting.UnderwritingEnum.ConclusionType;
+import com.titanium.policy.valueobject.insurance.InsuranceStatus;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.Getter;
@@ -42,8 +48,9 @@ public class InsuranceEntity {
     /**
      * 保单形态：个单/团单/父子
      */
+    @Enumerated(EnumType.STRING)
     @Column(name = "policy_form", nullable = false)
-    private String        policyForm;
+    private PolicyForm    policyForm;
 
     /**
      * 父投保单ID
@@ -102,8 +109,9 @@ public class InsuranceEntity {
     /**
      * 核保结果编码
      */
+    @Enumerated(EnumType.STRING)
     @Column(name = "underwriting_result_code")
-    private String        underwritingResultCode;
+    private ConclusionType underwritingResultCode;
 
     /**
      * 核保意见
@@ -132,8 +140,9 @@ public class InsuranceEntity {
     /**
      * 状态编码
      */
+    @Enumerated(EnumType.STRING)
     @Column(name = "status_code", nullable = false)
-    private String        statusCode;
+    private InsuranceStatus.StatusCode statusCode;
 
     /**
      * 状态变更时间

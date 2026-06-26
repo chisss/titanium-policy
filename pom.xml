@@ -29,10 +29,21 @@
         <liquibase.version>4.26.0</liquibase.version>
         <spring.boot.liquibase.starter.version>4.0.1</spring.boot.liquibase.starter.version>
         <mapstruct.version>1.5.5.Final</mapstruct.version>
+        <!-- Spring Cloud BOM：统一管理 openfeign 等 cloud 组件版本（修复 application 模块 openfeign 缺失版本问题） -->
+        <spring-cloud.version>2023.0.2</spring-cloud.version>
     </properties>
 
     <dependencyManagement>
         <dependencies>
+            <!-- Spring Cloud Dependencies BOM -->
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>${spring-cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
             <!-- Spring Boot -->
             <dependency>
                 <groupId>org.springframework.boot</groupId>
@@ -207,6 +218,11 @@
                             <groupId>org.projectlombok</groupId>
                             <artifactId>lombok</artifactId>
                             <version>${lombok.version}</version>
+                        </path>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok-mapstruct-binding</artifactId>
+                            <version>0.2.0</version>
                         </path>
                     </annotationProcessorPaths>
                     <compilerArgs>

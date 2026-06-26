@@ -5,6 +5,8 @@ import java.util.List;
 
 import org.axonframework.modelling.command.TargetAggregateIdentifier;
 
+import com.titanium.metadata.enums.policy.PolicyForm;
+import com.titanium.metadata.enums.product.ProductEnum.SalesChannel;
 import com.titanium.policy.entity.InsuranceProduct;
 import com.titanium.policy.entity.insurance.InsuredPartyList;
 import com.titanium.policy.valueobject.Amount;
@@ -18,12 +20,12 @@ public record CreatePolicyDirectlyCommand(
         String policyNo,
         String productId,
         String productCode,
-        String policyForm,
+        PolicyForm policyForm,
         String policyHolderId,
         int insuredCount,
         Amount totalPremium,
         LocalDateTime insurancePeriodStart,
         LocalDateTime insurancePeriodEnd,
-        String channel,
+        SalesChannel channel,
         String tenantId
 ) {}

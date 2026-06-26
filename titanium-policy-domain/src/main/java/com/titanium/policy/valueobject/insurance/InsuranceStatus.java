@@ -2,6 +2,8 @@ package com.titanium.policy.valueobject.insurance;
 
 import java.time.LocalDateTime;
 
+import com.titanium.policy.exception.PolicyStatusTransitionException;
+
 import lombok.Getter;
 
 /**
@@ -66,8 +68,8 @@ public record InsuranceStatus(StatusCode statusCode, LocalDateTime statusTime, S
                 && this.statusCode != StatusCode.VOIDED) {
             return;
         }
-        throw new IllegalArgumentException(
-                String.format("Invalid status transition from %s to %s", this.statusCode, newStatusCode));
+        throw new PolicyStatusTransitionException(
+                "投保单", "", this.statusCode.name(), newStatusCode.name());
     }
 
     @Getter

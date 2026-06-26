@@ -2,6 +2,8 @@ package com.titanium.policy.entity.proposal;
 
 import java.util.regex.Pattern;
 
+import com.titanium.metadata.enums.customer.CustomerEnum.IdCardType;
+
 /**
  * 投保意向单申请人实体
  * <p>
@@ -20,7 +22,7 @@ public record ProposalHolder(
         /**
          * 证件类型
          */
-        String certType,
+        IdCardType certType,
         /**
          * 证件号
          */
@@ -48,7 +50,7 @@ public record ProposalHolder(
             return false;
         }
         // 证件类型和证件号不能为空
-        if (certType == null || certType.trim().isEmpty() || certNo == null || certNo.trim().isEmpty()) {
+        if (certType == null || certNo == null || certNo.trim().isEmpty()) {
             return false;
         }
         // 手机号格式校验

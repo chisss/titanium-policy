@@ -2,6 +2,8 @@ package com.titanium.policy.valueobject.proposal;
 
 import java.time.LocalDateTime;
 
+import com.titanium.policy.exception.PolicyStatusTransitionException;
+
 import lombok.Getter;
 
 /**
@@ -48,8 +50,8 @@ public record ProposalStatus(StatusCode statusCode, LocalDateTime statusTime, St
             return;
         }
         // 其他状态流转不允许
-        throw new IllegalArgumentException(
-                String.format("Invalid status transition from %s to %s", this.statusCode, newStatusCode));
+        throw new PolicyStatusTransitionException(
+                "投保意向单", "", this.statusCode.name(), newStatusCode.name());
     }
 
     /**

@@ -4,7 +4,11 @@ import org.springframework.stereotype.Service;
 
 import com.titanium.policy.valueobject.RiskAssessmentStep;
 
+import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * 风控校验执行器
@@ -15,6 +19,9 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @Service
 public class RiskAssessmentExecutor {
+
+    @Resource
+    private RuleEngineServicePort ruleEngineServicePort;
 
     /**
      * 执行风控校验步骤
@@ -62,9 +69,23 @@ public class RiskAssessmentExecutor {
      * 基础自动核保 - 调用核保规则引擎
      */
     private boolean executeBasicUnderwriting(IssuanceRequest request) {
-        // TODO: 调用核保域规则引擎
-        log.info("基础自动核保通过");
-        return true;
+        log.info("执行基础自动核保");
+        try {
+            // 构建规则引擎参数
+            Map<String, Object> variables = new HashMap<>();
+            variables.put("policyHolderId", request.policyHolderId());
+            variables.put("productCode", request.productCode());
+            variables.put("totalPremium", request.totalPremium());
+            variables.put("insuredCount", request.insuredCount());
+            
+            // 调用规则引擎执行核保规则
+            Object result = ruleEngineServicePort.executeRule("UNDERWRITING_BASIC", variables, request.tenantId());
+            log.info("基础自动核保通过");
+            return true;
+        } catch (Exception e) {
+            log.error("基础自动核保失败: {}", e.getMessage());
+            return false;
+        }
     }
 
     /**

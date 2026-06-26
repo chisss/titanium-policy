@@ -10,12 +10,15 @@ import org.axonframework.modelling.command.AggregateIdentifier;
 import org.axonframework.modelling.command.AggregateLifecycle;
 import org.axonframework.spring.stereotype.Aggregate;
 
+import com.titanium.metadata.enums.policy.PolicyForm;
+import com.titanium.metadata.enums.product.ProductEnum.SalesChannel;
 import com.titanium.policy.command.CreateProposalCommand;
 import com.titanium.policy.command.SubmitProposalCommand;
 import com.titanium.policy.command.VoidProposalCommand;
 import com.titanium.policy.entity.proposal.ProposalHolder;
 import com.titanium.policy.entity.proposal.ProposalSubject;
 import com.titanium.policy.event.proposal.ProposalConvertedEvent;
+import com.titanium.policy.exception.PolicyBusinessRuleException;
 import com.titanium.policy.event.proposal.ProposalCreatedEvent;
 import com.titanium.policy.event.proposal.ProposalSubmittedEvent;
 import com.titanium.policy.event.proposal.ProposalVoidedEvent;
@@ -46,11 +49,11 @@ public class Proposal {
     /** 意向单编号 */
     private String                proposalNo;
     /** 保单形态：个单/团单/父子 */
-    private String                policyForm;
+    private PolicyForm            policyForm;
     /** 父意向单ID */
     private String                parentProposalId;
     /** 销售渠道 */
-    private String                channel;
+    private SalesChannel          channel;
     /** 创建时间 */
     private LocalDateTime         createTime;
     /** 更新时间 */
@@ -100,7 +103,7 @@ public class Proposal {
     public void handle(VoidProposalCommand command) {
         ProposalStatus.StatusCode currentStatus = this.status.statusCode();
         if (currentStatus != ProposalStatus.StatusCode.DRAFT && currentStatus != ProposalStatus.StatusCode.SUBMITTED) {
-            throw new IllegalArgumentException("Only draft or submitted proposals can be voided");
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "Only draft or submitted proposals can be voided");
         }
         AggregateLifecycle.apply(new ProposalVoidedEvent(command.proposalId(), command.changeReason(),
                 LocalDateTime.now(), this.tenantId));
@@ -148,16 +151,71 @@ public class Proposal {
     // ==================== 业务方法 ====================
 
     /**
-     * 转为投保单 - 校验状态并发布转换事件
+     * 创建意向单草稿（纯对象工厂，供应用层/单元测试以非事件溯源方式构建）
+     *
+     * @param proposalId 意向单ID
+     * @param proposalNo 意向单编号
+     * @param policyForm 保单形态
+     * @param channel 销售渠道
+     * @param basicInfo 基本信息
+     * @param tenantId 租户ID
+     * @return 草稿状态的意向单
+     */
+    public static Proposal createDraft(String proposalId, String proposalNo, PolicyForm policyForm, SalesChannel channel,
+                                       ProposalBasicInfo basicInfo, String tenantId) {
+        LocalDateTime now = LocalDateTime.now();
+        Proposal proposal = new Proposal();
+        proposal.proposalId = proposalId;
+        proposal.proposalNo = proposalNo;
+        proposal.policyForm = policyForm;
+        proposal.channel = channel;
+        proposal.basicInfo = basicInfo;
+        proposal.tenantId = tenantId;
+        proposal.createTime = now;
+        proposal.updateTime = now;
+        proposal.applicants = new ArrayList<>();
+        proposal.subjects = new ArrayList<>();
+        proposal.status = new ProposalStatus(ProposalStatus.StatusCode.DRAFT, now, "创建草稿");
+        return proposal;
+    }
+
+    /**
+     * 提交意向单（纯对象方法）：校验申请人/标的后流转为已提交
+     *
+     * @param changeReason 变更原因
+     */
+    public void submitProposal(String changeReason) {
+        validateApplicants();
+        validateSubjects();
+        this.status = this.status.transitionStatus(ProposalStatus.StatusCode.SUBMITTED, changeReason);
+        this.updateTime = LocalDateTime.now();
+    }
+
+    /**
+     * 作废意向单（纯对象方法）
+     *
+     * @param changeReason 变更原因
+     */
+    public void voidProposal(String changeReason) {
+        ProposalStatus.StatusCode currentStatus = this.status.statusCode();
+        if (currentStatus != ProposalStatus.StatusCode.DRAFT && currentStatus != ProposalStatus.StatusCode.SUBMITTED) {
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "Only draft or submitted proposals can be voided");
+        }
+        this.status = this.status.transitionStatus(ProposalStatus.StatusCode.VOIDED, changeReason);
+        this.updateTime = LocalDateTime.now();
+    }
+
+    /**
+     * 转为投保单 - 校验状态并流转（纯对象方法）
      *
      * @param changeReason 转换原因
      */
     public void convertToApplication(String changeReason) {
         if (this.status.statusCode() != ProposalStatus.StatusCode.SUBMITTED) {
-            throw new IllegalArgumentException("Only submitted proposals can be converted to application");
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "Only submitted proposals can be converted to application");
         }
-        AggregateLifecycle
-                .apply(new ProposalConvertedEvent(this.proposalId, changeReason, LocalDateTime.now(), this.tenantId));
+        this.status = this.status.transitionStatus(ProposalStatus.StatusCode.CONVERTED_TO_APPLICATION, changeReason);
+        this.updateTime = LocalDateTime.now();
     }
 
     /**
@@ -182,39 +240,40 @@ public class Proposal {
 
     private void validateRequiredFields() {
         if (basicInfo == null) {
-            throw new IllegalArgumentException("Basic info cannot be null");
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "Basic info cannot be null");
         }
         if (basicInfo.customerId() == null || basicInfo.customerId().isEmpty()) {
-            throw new IllegalArgumentException("Customer ID cannot be null or empty");
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "Customer ID cannot be null or empty");
         }
         if (basicInfo.expectedProductCode() == null || basicInfo.expectedProductCode().isEmpty()) {
-            throw new IllegalArgumentException("Expected product code cannot be null or empty");
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "Expected product code cannot be null or empty");
         }
     }
 
     private void validateApplicants() {
         if (applicants.isEmpty()) {
-            throw new IllegalArgumentException("At least one applicant is required");
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "At least one applicant is required");
         }
         for (ProposalHolder applicant : applicants) {
             if (!applicant.verifyApplicantInfo()) {
-                throw new IllegalArgumentException("Invalid applicant info: " + applicant.name());
+                throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION",
+                        "Invalid applicant info: " + applicant.name());
             }
         }
     }
 
     private void validateSubjects() {
         if (subjects.isEmpty()) {
-            throw new IllegalArgumentException("At least one subject is required");
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "At least one subject is required");
         }
-        if ("GROUP".equals(this.policyForm) && subjects.size() < 2) {
-            throw new IllegalArgumentException("Group policy requires at least 2 subjects");
+        if (PolicyForm.GROUP == this.policyForm && subjects.size() < 2) {
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "Group policy requires at least 2 subjects");
         }
     }
 
     private void ensureDraftStatus() {
         if (this.status.statusCode() != ProposalStatus.StatusCode.DRAFT) {
-            throw new IllegalArgumentException("Only draft proposals can be modified");
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "Only draft proposals can be modified");
         }
     }
 

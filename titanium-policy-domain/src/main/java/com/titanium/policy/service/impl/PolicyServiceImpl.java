@@ -114,22 +114,31 @@ public class PolicyServiceImpl implements PolicyService {
             throw new IllegalArgumentException("已过期的保单不能改变状态");
         }
 
-        // 根据新状态调用相应的聚合根方法
+        // 根据新状态调用聚合根的公开状态转换方法
+        // 注：Policy 为 Axon 聚合根，无参状态方法(cancel/suspend/activate)不存在，
+        // 统一通过聚合根公开的 updatePolicyStatus(StatusCode, reason, operator) 驱动状态机
+        final String operator = "POLICY_DOMAIN_SERVICE";
         switch (newStatus) {
             case CANCELLED:
-                policy.cancel();
+                policy.updatePolicyStatus(
+                        com.titanium.policy.valueobject.PolicyStatus.StatusCode.CANCELLED, "保单作废", operator);
                 break;
             case EXPIRED:
                 policy.expire();
                 break;
             case SUSPENDED:
-                policy.suspend();
+                policy.updatePolicyStatus(
+                        com.titanium.policy.valueobject.PolicyStatus.StatusCode.SUSPENDED, "保单暂停", operator);
                 break;
             case EFFECTIVE:
-                policy.activate();
+                policy.updatePolicyStatus(
+                        com.titanium.policy.valueobject.PolicyStatus.StatusCode.EFFECTIVE, "保单生效", operator);
                 break;
             case PENDING_EFFECTIVE:
                 // 待处理状态不需要特殊方法
+                break;
+            default:
+                // TERMINATED/LAPSED 等其余状态当前不由本服务驱动
                 break;
         }
     }

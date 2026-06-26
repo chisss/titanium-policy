@@ -1,7 +1,13 @@
 package com.titanium.policy.infrastructure.entity;
 
+import com.titanium.metadata.enums.policy.PolicyForm;
+import com.titanium.metadata.enums.product.ProductEnum.SalesChannel;
+import com.titanium.policy.valueobject.proposal.ProposalStatus;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.Getter;
@@ -36,8 +42,9 @@ public class ProposalEntity {
     /**
      * 保单形态：个单/团单/父子
      */
+    @Enumerated(EnumType.STRING)
     @Column(name = "policy_form", nullable = false)
-    private String policyForm;
+    private PolicyForm policyForm;
 
     /**
      * 父意向单ID
@@ -48,8 +55,9 @@ public class ProposalEntity {
     /**
      * 销售渠道
      */
+    @Enumerated(EnumType.STRING)
     @Column(name = "channel", nullable = false)
-    private String channel;
+    private SalesChannel channel;
 
     /**
      * 客户ID
@@ -96,8 +104,9 @@ public class ProposalEntity {
     /**
      * 状态编码
      */
+    @Enumerated(EnumType.STRING)
     @Column(name = "status_code", nullable = false)
-    private String statusCode;
+    private ProposalStatus.StatusCode statusCode;
 
     /**
      * 状态变更时间

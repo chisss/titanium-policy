@@ -2,6 +2,10 @@ package com.titanium.policy.entity.insurance;
 
 import java.util.List;
 
+import com.titanium.metadata.enums.customer.CustomerEnum.CustomerGender;
+import com.titanium.metadata.enums.customer.CustomerEnum.IdCardType;
+import com.titanium.metadata.enums.customer.CustomerEnum.InsuranceRole;
+
 /**
  * 投保参与方清单实体
  * <p>
@@ -63,7 +67,7 @@ public record InsuredPartyList(
                              /*
                               * 证件类型
                               */
-                             String certType,
+                             IdCardType certType,
                              /*
                               * 证件号
                               */
@@ -89,7 +93,7 @@ public record InsuredPartyList(
                               /*
                                * 证件类型
                                */
-                              String certType,
+                              IdCardType certType,
                               /*
                                * 证件号
                                */
@@ -101,7 +105,7 @@ public record InsuredPartyList(
                               /*
                                * 性别
                                */
-                              String gender) {
+                              CustomerGender gender) {
     }
 
     /**
@@ -119,7 +123,7 @@ public record InsuredPartyList(
                                   /*
                                    * 证件类型
                                    */
-                                  String certType,
+                                  IdCardType certType,
                                   /*
                                    * 证件号
                                    */
@@ -127,7 +131,7 @@ public record InsuredPartyList(
                                   /*
                                    * 受益类型
                                    */
-                                  String beneficiaryType,
+                                  InsuranceRole beneficiaryType,
                                   /*
                                    * 受益比例
                                    */

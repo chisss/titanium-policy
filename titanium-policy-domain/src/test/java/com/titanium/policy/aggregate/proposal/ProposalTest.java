@@ -39,7 +39,7 @@ class ProposalTest {
         applicant = new ProposalHolder(
                 "applicant-123",
                 "张三",
-                "ID",
+                com.titanium.metadata.enums.customer.CustomerEnum.IdCardType.CHINA_ID_CARD,
                 "110101199001011234",
                 "13800138000",
                 true
@@ -48,17 +48,17 @@ class ProposalTest {
         // 初始化标的
         subject = new ProposalSubject(
                 "subject-123",
-                "VEHICLE",
+                com.titanium.policy.valueobject.SubjectType.VEHICLE,
                 "京A12345",
-                "A"
+                com.titanium.metadata.enums.underwriting.UnderwritingEnum.RiskLevel.STANDARD
         );
 
         // 创建投保意向单草稿
         proposal = Proposal.createDraft(
                 "proposal-123",
                 "PROP-202601220001",
-                "INDIVIDUAL",
-                "ONLINE",
+                com.titanium.metadata.enums.policy.PolicyForm.INDIVIDUAL,
+                com.titanium.metadata.enums.product.ProductEnum.SalesChannel.ONLINE,
                 basicInfo,
                 "tenant-123"
         );
@@ -72,8 +72,8 @@ class ProposalTest {
         // 验证投保意向单基本信息
         assertEquals("proposal-123", proposal.getProposalId());
         assertEquals("PROP-202601220001", proposal.getProposalNo());
-        assertEquals("INDIVIDUAL", proposal.getPolicyForm());
-        assertEquals("ONLINE", proposal.getChannel());
+        assertEquals(com.titanium.metadata.enums.policy.PolicyForm.INDIVIDUAL, proposal.getPolicyForm());
+        assertEquals(com.titanium.metadata.enums.product.ProductEnum.SalesChannel.ONLINE, proposal.getChannel());
         assertEquals(ProposalStatus.StatusCode.DRAFT, proposal.getStatus().statusCode());
         assertNotNull(proposal.getCreateTime());
         assertNotNull(proposal.getUpdateTime());

@@ -11,6 +11,7 @@ import org.axonframework.modelling.command.AggregateLifecycle;
 import org.axonframework.spring.stereotype.Aggregate;
 
 import com.titanium.metadata.enums.policy.PolicyEnum;
+import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.policy.command.ActivatePolicyCommand;
 import com.titanium.policy.command.CancelPolicyCommand;
 import com.titanium.policy.command.CreatePolicyCommand;
@@ -29,6 +30,7 @@ import com.titanium.policy.event.PolicyCancelledEvent;
 import com.titanium.policy.event.PolicyCreatedEvent;
 import com.titanium.policy.event.PolicyExpiredEvent;
 import com.titanium.policy.event.PolicyIssuedEvent;
+import com.titanium.policy.exception.PolicyBusinessRuleException;
 import com.titanium.policy.event.PolicyPaymentRecordedEvent;
 import com.titanium.policy.event.PolicyResumedEvent;
 import com.titanium.policy.event.PolicySuspendedEvent;
@@ -65,7 +67,7 @@ public class Policy {
     /** 关联投保单ID */
     private String                 insuranceId;
     /** 保单形态 */
-    private String                 policyForm;
+    private PolicyForm             policyForm;
     /** 父保单ID */
     private String                 parentPolicyId;
     /** 签发机构 */
@@ -129,7 +131,7 @@ public class Policy {
     @CommandHandler
     public void handle(IssuePolicyCommand command) {
         if (this.status.statusCode() != PolicyStatus.StatusCode.NOT_EFFECTIVE) {
-            throw new IllegalArgumentException("Only NOT_EFFECTIVE policies can be issued");
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "Only NOT_EFFECTIVE policies can be issued");
         }
         generateDocument();
         AggregateLifecycle.apply(new PolicyIssuedEvent(this.policyId, this.policyNo.value(), LocalDateTime.now(),
@@ -142,16 +144,16 @@ public class Policy {
     @CommandHandler
     public void handle(ActivatePolicyCommand command) {
         if (this.status.statusCode() != PolicyStatus.StatusCode.NOT_EFFECTIVE) {
-            throw new IllegalArgumentException("Only NOT_EFFECTIVE policies can be activated");
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "Only NOT_EFFECTIVE policies can be activated");
         }
         // 校验首期保费是否已缴纳
         if (this.premiumPlan != null && this.premiumPlan.paymentStatus() == PremiumPlan.PaymentStatus.UNPAID) {
-            throw new IllegalArgumentException("First premium must be paid before activation");
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "First premium must be paid before activation");
         }
         // 校验保障起期是否到达
         if (this.basicInfo != null && this.basicInfo.insurancePeriodStart() != null
                 && this.basicInfo.insurancePeriodStart().isAfter(LocalDateTime.now())) {
-            throw new IllegalArgumentException("Insurance period has not started yet");
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "Insurance period has not started yet");
         }
         AggregateLifecycle.apply(new PolicyActivatedEvent(this.policyId, LocalDateTime.now(), this.tenantId));
     }
@@ -162,7 +164,7 @@ public class Policy {
     @CommandHandler
     public void handle(SuspendPolicyCommand command) {
         if (this.status.statusCode() != PolicyStatus.StatusCode.EFFECTIVE) {
-            throw new IllegalArgumentException("Only EFFECTIVE policies can be suspended");
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "Only EFFECTIVE policies can be suspended");
         }
         AggregateLifecycle.apply(new PolicySuspendedEvent(this.policyId, LocalDateTime.now(), this.tenantId));
     }
@@ -173,7 +175,7 @@ public class Policy {
     @CommandHandler
     public void handle(ResumePolicyCommand command) {
         if (this.status.statusCode() != PolicyStatus.StatusCode.SUSPENDED) {
-            throw new IllegalArgumentException("Only SUSPENDED policies can be resumed");
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "Only SUSPENDED policies can be resumed");
         }
         AggregateLifecycle.apply(new PolicyResumedEvent(this.policyId, LocalDateTime.now(), this.tenantId));
     }
@@ -185,10 +187,10 @@ public class Policy {
     public void handle(TerminatePolicyCommand command) {
         PolicyStatus.StatusCode currentStatus = this.status.statusCode();
         if (currentStatus != PolicyStatus.StatusCode.EFFECTIVE && currentStatus != PolicyStatus.StatusCode.SUSPENDED) {
-            throw new IllegalArgumentException("Only EFFECTIVE or SUSPENDED policies can be terminated");
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "Only EFFECTIVE or SUSPENDED policies can be terminated");
         }
         AggregateLifecycle.apply(new PolicyTerminatedEvent(this.policyId, command.reason(),
-                command.terminationReason() != null ? command.terminationReason().getCode() : null, LocalDateTime.now(),
+                command.terminationReason(), LocalDateTime.now(),
                 command.operatorId(), this.tenantId));
     }
 
@@ -198,7 +200,7 @@ public class Policy {
     @CommandHandler
     public void handle(CancelPolicyCommand command) {
         if (this.status.statusCode() != PolicyStatus.StatusCode.NOT_EFFECTIVE) {
-            throw new IllegalArgumentException("Only NOT_EFFECTIVE policies can be cancelled");
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "Only NOT_EFFECTIVE policies can be cancelled");
         }
         AggregateLifecycle.apply(new PolicyCancelledEvent(this.policyId, LocalDateTime.now(), this.tenantId));
     }
@@ -271,7 +273,7 @@ public class Policy {
      */
     public void expire() {
         if (this.status.statusCode() != PolicyStatus.StatusCode.EFFECTIVE) {
-            throw new IllegalArgumentException("Only EFFECTIVE policies can expire");
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "Only EFFECTIVE policies can expire");
         }
         AggregateLifecycle.apply(new PolicyExpiredEvent(this.policyId, LocalDateTime.now(), this.tenantId));
     }
@@ -311,7 +313,7 @@ public class Policy {
                 this.policyRelation = new PolicyRelation(PolicyEnum.PolicyLevel.PARENT, null,
                         this.policyRelation.subPolicyCount() + 1, this.policyRelation.groupId());
             } else {
-                throw new IllegalArgumentException("Only parent policies can link sub policies");
+                throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "Only parent policies can link sub policies");
             }
         } else {
             this.policyRelation = new PolicyRelation(this.policyRelation.policyLevel(),

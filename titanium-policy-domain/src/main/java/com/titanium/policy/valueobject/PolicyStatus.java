@@ -2,6 +2,8 @@ package com.titanium.policy.valueobject;
 
 import java.time.LocalDateTime;
 
+import com.titanium.policy.exception.PolicyStatusTransitionException;
+
 import lombok.Getter;
 
 /**
@@ -102,8 +104,8 @@ public record PolicyStatus(StatusCode statusCode, LocalDateTime statusTime, Stri
             return;
         }
         // 其他状态流转不允许
-        throw new IllegalArgumentException(
-                String.format("Invalid status transition from %s to %s", this.statusCode, newStatusCode));
+        throw new PolicyStatusTransitionException(
+                "保单", "", this.statusCode.name(), newStatusCode.name());
     }
 
     /**

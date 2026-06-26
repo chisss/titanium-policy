@@ -1,5 +1,6 @@
 package com.titanium.policy.infrastructure.repository.jpa;
 
+import com.titanium.metadata.enums.policy.PolicyEnum;
 import com.titanium.policy.infrastructure.entity.PolicyEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -34,11 +35,11 @@ public interface JpaPolicyRepository extends JpaRepository<PolicyEntity, String>
     /**
      * 根据保单状态查询保单
      *
-     * @param policyStatus 保单状态
+     * @param policyStatus 保单状态（与实体字段一致的枚举类型）
      * @param tenantId     租户ID
      * @return 正式保单实体列表
      */
-    Iterable<PolicyEntity> findByPolicyStatusAndTenantId(String policyStatus, String tenantId);
+    Iterable<PolicyEntity> findByPolicyStatusAndTenantId(PolicyEnum.PolicyStatus policyStatus, String tenantId);
 
     /**
      * 根据投保人ID查询保单

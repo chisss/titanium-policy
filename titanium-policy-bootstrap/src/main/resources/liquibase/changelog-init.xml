@@ -161,4 +161,7 @@
             <column name="document_type"/>
         </createIndex>
     </changeSet>
+
+    <!-- CQRS 读模型投影表（事件投影维护，读写分离） -->
+    <include file="liquibase/20260623_policy_view_projection.xml"/>
 </databaseChangeLog>

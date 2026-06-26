@@ -2,8 +2,12 @@ package com.titanium.policy.infrastructure.entity;
 
 import java.time.LocalDateTime;
 
+import com.titanium.policy.valueobject.PolicyDocumentType;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Lob;
 import jakarta.persistence.Table;
@@ -25,8 +29,9 @@ public class PolicyDocumentEntity {
     @Column(name = "policy_id", nullable = false, length = 32)
     private String policyId;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "document_type", nullable = false, length = 32)
-    private String documentType;
+    private PolicyDocumentType documentType;
 
     @Column(name = "document_name", nullable = false, length = 128)
     private String documentName;

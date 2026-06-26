@@ -3,8 +3,14 @@ package com.titanium.policy.infrastructure.entity;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+import com.titanium.metadata.enums.InsuranceType;
+import com.titanium.metadata.enums.policy.PolicyEnum;
+import com.titanium.metadata.enums.policy.PolicyForm;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.Getter;
@@ -49,8 +55,9 @@ public class PolicyEntity {
     /**
      * 保单形态
      */
+    @Enumerated(EnumType.STRING)
     @Column(name = "policy_form", nullable = false, length = 32)
-    private String        policyForm;
+    private PolicyForm    policyForm;
 
     /**
      * 父保单ID
@@ -67,20 +74,23 @@ public class PolicyEntity {
     /**
      * 保单状态
      */
+    @Enumerated(EnumType.STRING)
     @Column(name = "policy_status", nullable = false, length = 32)
-    private String        policyStatus;
+    private PolicyEnum.PolicyStatus policyStatus;
 
     /**
      * 保单类型
      */
+    @Enumerated(EnumType.STRING)
     @Column(name = "policy_type", nullable = false, length = 32)
-    private String        policyType;
+    private PolicyForm    policyType;
 
     /**
      * 保险类型
      */
+    @Enumerated(EnumType.STRING)
     @Column(name = "insurance_type", nullable = false, length = 32)
-    private String        insuranceType;
+    private InsuranceType insuranceType;
 
     /**
      * 投保人ID

@@ -1,6 +1,7 @@
 package com.titanium.policy.infrastructure.repository.jpa;
 
 import com.titanium.policy.infrastructure.entity.ProposalEntity;
+import com.titanium.policy.valueobject.proposal.ProposalStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -29,7 +30,7 @@ public interface JpaProposalRepository extends JpaRepository<ProposalEntity, Str
      * @param tenantId   租户ID
      * @return 投保意向单实体列表
      */
-    Iterable<ProposalEntity> findByStatusCodeAndTenantId(String statusCode, String tenantId);
+    Iterable<ProposalEntity> findByStatusCodeAndTenantId(ProposalStatus.StatusCode statusCode, String tenantId);
 
     /**
      * 根据客户ID查询意向单

@@ -10,6 +10,8 @@ import org.axonframework.modelling.command.AggregateIdentifier;
 import org.axonframework.modelling.command.AggregateLifecycle;
 import org.axonframework.spring.stereotype.Aggregate;
 
+import com.titanium.metadata.enums.policy.PolicyForm;
+import com.titanium.metadata.enums.underwriting.UnderwritingEnum.ConclusionType;
 import com.titanium.policy.command.ConvertProposalToInsuranceCommand;
 import com.titanium.policy.command.CreateInsuranceDirectlyCommand;
 import com.titanium.policy.command.ReceiveUnderwritingResultCommand;
@@ -17,6 +19,7 @@ import com.titanium.policy.command.SubmitUnderwritingCommand;
 import com.titanium.policy.command.TriggerIssuanceCommand;
 import com.titanium.policy.entity.insurance.InsuranceProduct;
 import com.titanium.policy.entity.insurance.InsuredPartyList;
+import com.titanium.policy.exception.PolicyBusinessRuleException;
 import com.titanium.policy.event.insurance.InsuranceCreatedEvent;
 import com.titanium.policy.event.insurance.InsuranceIssuedEvent;
 import com.titanium.policy.event.insurance.InsuranceSubmittedForUnderwritingEvent;
@@ -50,7 +53,7 @@ public class Insurance {
     /** 关联意向单ID */
     private String                 proposalId;
     /** 保单形态 */
-    private String                 policyForm;
+    private PolicyForm             policyForm;
     /** 父投保单ID */
     private String                 parentInsuranceId;
     /** 创建时间 */
@@ -104,12 +107,12 @@ public class Insurance {
         InsuranceStatus.StatusCode currentStatus = this.status.statusCode();
         if (currentStatus != InsuranceStatus.StatusCode.DRAFT && currentStatus != InsuranceStatus.StatusCode.SUBMITTED
                 && currentStatus != InsuranceStatus.StatusCode.UNDERWRITING_SUSPENDED) {
-            throw new IllegalArgumentException(
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION",
                     "Only draft, submitted or suspended applications can be submitted for underwriting");
         }
         validateApplicationInfo();
         if (this.insuredPartyList != null && !this.insuredPartyList.verifyPartyInfo()) {
-            throw new IllegalArgumentException("Invalid insured party information");
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "Invalid insured party information");
         }
         validateInsuranceLines();
 
@@ -128,11 +131,11 @@ public class Insurance {
     @CommandHandler
     public void handle(ReceiveUnderwritingResultCommand command) {
         if (this.status.statusCode() != InsuranceStatus.StatusCode.UNDERWRITING) {
-            throw new IllegalArgumentException("Only applications in underwriting can receive results");
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "Only applications in underwriting can receive results");
         }
         UnderwritingResult result = command.underwritingResult();
         AggregateLifecycle.apply(new UnderwritingResultReceivedEvent(this.insuranceId, result.underwritingId(),
-                result.resultCode().getCode(), result.underwritingOpinion(), result.underwriterId(),
+                result.resultCode(), result.underwritingOpinion(), result.underwriterId(),
                 result.underwritingTime(), result.condition(), this.tenantId));
     }
 
@@ -142,7 +145,7 @@ public class Insurance {
     @CommandHandler
     public void handle(TriggerIssuanceCommand command) {
         if (this.status.statusCode() != InsuranceStatus.StatusCode.UNDERWRITING_APPROVED) {
-            throw new IllegalArgumentException("Only underwriting approved applications can trigger issuance");
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "Only underwriting approved applications can trigger issuance");
         }
         AggregateLifecycle.apply(
                 new InsuranceIssuedEvent(this.insuranceId, this.insuranceNo, LocalDateTime.now(), this.tenantId));
@@ -176,19 +179,20 @@ public class Insurance {
 
     @EventSourcingHandler
     public void on(UnderwritingResultReceivedEvent event) {
-        UnderwritingResult.ResultCode resultCode = UnderwritingResult.ResultCode.valueOf(event.resultCode());
+        ConclusionType resultCode = event.resultCode();
         this.underwritingResult = new UnderwritingResult(event.underwritingId(), resultCode, event.opinion(),
                 event.underwriterId(), event.underwritingTime(), event.underwritingCondition());
 
         InsuranceStatus.StatusCode newStatus = switch (resultCode) {
-            case APPROVED -> InsuranceStatus.StatusCode.UNDERWRITING_APPROVED;
-            case REJECTED -> InsuranceStatus.StatusCode.UNDERWRITING_REJECTED;
-            case SUSPENDED -> InsuranceStatus.StatusCode.UNDERWRITING_SUSPENDED;
+            case ACCEPT, MODIFY -> InsuranceStatus.StatusCode.UNDERWRITING_APPROVED;
+            case REJECT -> InsuranceStatus.StatusCode.UNDERWRITING_REJECTED;
+            case POSTPONE -> InsuranceStatus.StatusCode.UNDERWRITING_SUSPENDED;
         };
         String changeReason = switch (resultCode) {
-            case APPROVED -> "核保通过";
-            case REJECTED -> "核保拒绝";
-            case SUSPENDED -> "核保暂缓";
+            case ACCEPT -> "核保通过";
+            case MODIFY -> "核保通过（修改条件承保）";
+            case REJECT -> "核保拒绝";
+            case POSTPONE -> "核保暂缓";
         };
         this.status = this.status.transitionStatus(newStatus, changeReason);
         this.updateTime = LocalDateTime.now();
@@ -208,7 +212,7 @@ public class Insurance {
     public void addInsuranceLine(InsuranceProduct insuranceProduct) {
         ensureDraftStatus();
         if (!insuranceProduct.verifyLineConstraint()) {
-            throw new IllegalArgumentException("Invalid insurance line constraint: " + insuranceProduct.productCode());
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "Invalid insurance line constraint: " + insuranceProduct.productCode());
         }
         this.insuranceProducts.add(insuranceProduct);
         this.updateTime = LocalDateTime.now();
@@ -227,27 +231,27 @@ public class Insurance {
 
     private void validateApplicationInfo() {
         if (this.basicInfo == null) {
-            throw new IllegalArgumentException("Basic info cannot be null");
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "Basic info cannot be null");
         }
         if (this.basicInfo.holderId() == null || this.basicInfo.holderId().isEmpty()) {
-            throw new IllegalArgumentException("Holder ID cannot be null or empty");
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "Holder ID cannot be null or empty");
         }
     }
 
     private void validateInsuranceLines() {
         if (this.insuranceProducts == null || this.insuranceProducts.isEmpty()) {
-            throw new IllegalArgumentException("At least one insurance line is required");
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "At least one insurance line is required");
         }
         for (InsuranceProduct line : this.insuranceProducts) {
             if (!line.verifyLineConstraint()) {
-                throw new IllegalArgumentException("Invalid insurance line: " + line.productCode());
+                throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "Invalid insurance line: " + line.productCode());
             }
         }
     }
 
     private void ensureDraftStatus() {
         if (this.status.statusCode() != InsuranceStatus.StatusCode.DRAFT) {
-            throw new IllegalArgumentException("Only draft applications can be modified");
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "Only draft applications can be modified");
         }
     }
 

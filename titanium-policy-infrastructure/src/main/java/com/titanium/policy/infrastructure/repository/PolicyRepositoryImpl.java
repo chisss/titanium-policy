@@ -134,8 +134,12 @@ public class PolicyRepositoryImpl implements PolicyRepository {
         }
 
         try {
+            // 本地状态机 StatusCode 映射到读侧持久化使用的 metadata PolicyEnum.PolicyStatus
+            // （NOT_EFFECTIVE 对齐 PENDING_EFFECTIVE，其余同名映射）
+            com.titanium.metadata.enums.policy.PolicyEnum.PolicyStatus persistedStatus =
+                    toMetadataStatus(statusCode);
             // 查询状态在指定列表中的保单ID
-            Iterable<PolicyEntity> entities = jpaPolicyRepository.findByPolicyStatusAndTenantId(statusCode.name(),
+            Iterable<PolicyEntity> entities = jpaPolicyRepository.findByPolicyStatusAndTenantId(persistedStatus,
                     tenantId);
 
             // 创建结果列表
@@ -218,5 +222,23 @@ public class PolicyRepositoryImpl implements PolicyRepository {
             log.error("批量查询保单失败：{}", e.getMessage());
             throw new BusinessException("500", "批量查询保单失败：" + e.getMessage(), e);
         }
+    }
+
+    /**
+     * 将保单域本地状态机编码映射为读侧持久化的 metadata 枚举
+     *
+     * @param statusCode 本地状态机编码
+     * @return metadata 保单状态枚举
+     */
+    private com.titanium.metadata.enums.policy.PolicyEnum.PolicyStatus toMetadataStatus(
+            PolicyStatus.StatusCode statusCode) {
+        return switch (statusCode) {
+            case NOT_EFFECTIVE -> com.titanium.metadata.enums.policy.PolicyEnum.PolicyStatus.PENDING_EFFECTIVE;
+            case EFFECTIVE -> com.titanium.metadata.enums.policy.PolicyEnum.PolicyStatus.EFFECTIVE;
+            case SUSPENDED -> com.titanium.metadata.enums.policy.PolicyEnum.PolicyStatus.SUSPENDED;
+            case TERMINATED -> com.titanium.metadata.enums.policy.PolicyEnum.PolicyStatus.TERMINATED;
+            case EXPIRED -> com.titanium.metadata.enums.policy.PolicyEnum.PolicyStatus.EXPIRED;
+            case CANCELLED -> com.titanium.metadata.enums.policy.PolicyEnum.PolicyStatus.CANCELLED;
+        };
     }
 }

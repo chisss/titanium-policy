@@ -2,6 +2,8 @@ package com.titanium.policy.valueobject;
 
 import java.time.LocalDateTime;
 
+import com.titanium.metadata.enums.product.ProductEnum.SalesChannel;
+
 /**
  * 保单基本信息值对象
  * <p>
@@ -36,7 +38,7 @@ public record PolicyBasicInfo(
                               /*
                                * 销售渠道
                                */
-                              String channel) {
+                              SalesChannel channel) {
     /**
      * 创建初始保单基本信息
      * <p>
@@ -53,7 +55,7 @@ public record PolicyBasicInfo(
      */
     public static PolicyBasicInfo createInitial(String policyHolderId, int insuredCount, Amount totalPremium,
                                                 LocalDateTime insurancePeriodStart, LocalDateTime insurancePeriodEnd,
-                                                String channel) {
+                                                SalesChannel channel) {
         return new PolicyBasicInfo(policyHolderId, insuredCount, totalPremium, insurancePeriodStart, insurancePeriodEnd,
                 1, // 初始版本号为1
                 channel);

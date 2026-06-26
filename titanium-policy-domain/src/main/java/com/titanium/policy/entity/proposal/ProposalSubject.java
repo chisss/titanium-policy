@@ -1,5 +1,8 @@
 package com.titanium.policy.entity.proposal;
 
+import com.titanium.metadata.enums.underwriting.UnderwritingEnum;
+import com.titanium.policy.valueobject.SubjectType;
+
 /**
  * 投保意向单标的实体
  * <p>
@@ -14,15 +17,15 @@ public record ProposalSubject(
         /**
          * 标的类型：车辆/房屋/人身/财产
          */
-        String subjectType,
+        SubjectType subjectType,
         /**
          * 标的简要信息：车牌号/房屋地址/姓名
          */
         String simpleInfo,
         /**
-         * 预估风险等级：A/B/C/D
+         * 预估风险等级
          */
-        String estimatedRiskLevel
+        UnderwritingEnum.RiskLevel estimatedRiskLevel
 ) {
     /**
      * 更新标的简要信息
@@ -40,7 +43,7 @@ public record ProposalSubject(
      * @param estimatedRiskLevel 新的预估风险等级
      * @return 更新后的标的实体
      */
-    public ProposalSubject updateEstimatedRiskLevel(String estimatedRiskLevel) {
+    public ProposalSubject updateEstimatedRiskLevel(UnderwritingEnum.RiskLevel estimatedRiskLevel) {
         return new ProposalSubject(subjectId, subjectType, simpleInfo, estimatedRiskLevel);
     }
 }

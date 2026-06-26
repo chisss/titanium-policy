@@ -5,27 +5,11 @@ package com.titanium.policy.common.constant;
  */
 public class PolicyConstants {
     public static final String POLICY_SYSTEM = "POLICY_SYSTEM";
-    
-    /**
-     * 保单状态常量
-     */
-    public static class PolicyStatus {
-        public static final String PENDING = "PENDING"; // 待激活
-        public static final String ACTIVE = "ACTIVE"; // 已激活
-        public static final String EXPIRED = "EXPIRED"; // 已过期
-        public static final String CANCELLED = "CANCELLED"; // 已取消
-    }
-    
-    /**
-     * 事件类型常量
-     */
-    public static class EventType {
-        public static final String POLICY_CREATED = "POLICY_CREATED"; // 保单创建
-        public static final String POLICY_ACTIVATED = "POLICY_ACTIVATED"; // 保单激活
-        public static final String POLICY_EXPIRED = "POLICY_EXPIRED"; // 保单过期
-        public static final String POLICY_CANCELLED = "POLICY_CANCELLED"; // 保单取消
-    }
-    
+
+    // 保单状态已统一为 com.titanium.metadata.enums.policy.PolicyEnum.PolicyStatus
+    // 与本地 com.titanium.policy.valueobject.PolicyStatus.StatusCode，此处原 PolicyStatus 字符串常量已删除。
+    // 事件类型已迁移为枚举 com.titanium.policy.valueobject.PolicyEventType，此处原 EventType 字符串常量已删除。
+
     /**
      * 消息队列主题常量
      */

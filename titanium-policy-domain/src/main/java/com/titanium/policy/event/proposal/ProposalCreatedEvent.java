@@ -3,6 +3,9 @@ package com.titanium.policy.event.proposal;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+import com.titanium.metadata.enums.policy.PolicyForm;
+import com.titanium.metadata.enums.product.ProductEnum.SalesChannel;
+
 /**
  * 意向单创建事件
  *
@@ -22,8 +25,8 @@ import java.time.LocalDateTime;
 public record ProposalCreatedEvent(
         String proposalId,
         String proposalNo,
-        String policyForm,
-        String channel,
+        PolicyForm policyForm,
+        SalesChannel channel,
         String customerId,
         BigDecimal intendedSumInsured,
         BigDecimal intendedPremium,

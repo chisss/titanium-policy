@@ -4,6 +4,8 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import com.titanium.metadata.enums.policy.PolicyForm;
+
 /**
  * 投保单提交核保事件 - Kafka发布到核保域消费
  */
@@ -18,6 +20,6 @@ public record InsuranceSubmittedForUnderwritingEvent(
         LocalDateTime insurancePeriodEnd,
         List<String> productCodes,
         int underwritingPriority,
-        String policyForm,
+        PolicyForm policyForm,
         String tenantId
 ) {}

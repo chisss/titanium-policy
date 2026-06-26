@@ -56,7 +56,7 @@ public class ProposalRepositoryImpl implements ProposalRepository {
 
     @Override
     public Iterable<Proposal> findByStatus(String tenantId, ProposalStatus.StatusCode statusCode) {
-        Iterable<ProposalEntity> entities = jpaProposalRepository.findByStatusCodeAndTenantId(statusCode.name(), tenantId);
+        Iterable<ProposalEntity> entities = jpaProposalRepository.findByStatusCodeAndTenantId(statusCode, tenantId);
         List<Proposal> proposals = new ArrayList<>();
         for (ProposalEntity entity : entities) {
             proposals.add(convertToAggregate(entity));
@@ -100,7 +100,7 @@ public class ProposalRepositoryImpl implements ProposalRepository {
         entity.setInsurancePeriodStart(proposal.getBasicInfo().insurancePeriodStart());
         entity.setInsurancePeriodEnd(proposal.getBasicInfo().insurancePeriodEnd());
         entity.setExpectedProductCode(proposal.getBasicInfo().expectedProductCode());
-        entity.setStatusCode(proposal.getStatus().statusCode().name());
+        entity.setStatusCode(proposal.getStatus().statusCode());
         entity.setStatusTime(proposal.getStatus().statusTime());
         entity.setChangeReason(proposal.getStatus().changeReason());
         entity.setCreateTime(proposal.getCreateTime());
@@ -126,7 +126,7 @@ public class ProposalRepositoryImpl implements ProposalRepository {
         );
 
         ProposalStatus status = new ProposalStatus(
-                ProposalStatus.StatusCode.valueOf(entity.getStatusCode()),
+                entity.getStatusCode(),
                 entity.getStatusTime(),
                 entity.getChangeReason()
         );

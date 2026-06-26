@@ -83,7 +83,7 @@ public class InsuranceController {
     @PutMapping("/{insuranceId}/underwrite")
     public ResponseEntity<Void> triggerUnderwriting(@PathVariable String insuranceId,
                                                     @RequestHeader("X-Tenant-Id") String tenantId) {
-        insuranceApplicationService.triggerUnderwriting(insuranceId, tenantId);
+        insuranceApplicationService.submitUnderwriting(insuranceId, tenantId);
         return ResponseEntity.noContent().build();
     }
 }

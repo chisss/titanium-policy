@@ -4,6 +4,8 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import com.titanium.metadata.enums.policy.PolicyForm;
+
 /**
  * 投保单创建事件
  */
@@ -11,7 +13,7 @@ public record InsuranceCreatedEvent(
         String insuranceId,
         String insuranceNo,
         String proposalId,
-        String policyForm,
+        PolicyForm policyForm,
         String holderId,
         int insuredCount,
         BigDecimal exactPremium,

@@ -1,6 +1,7 @@
 package com.titanium.policy.infrastructure.repository.jpa;
 
 import com.titanium.policy.infrastructure.entity.InsuranceEntity;
+import com.titanium.policy.valueobject.insurance.InsuranceStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;
@@ -39,7 +40,7 @@ public interface JpaInsuranceRepository extends JpaRepository<InsuranceEntity, S
      * @param tenantId   租户ID
      * @return 投保单实体列表
      */
-    Iterable<InsuranceEntity> findByStatusCodeAndTenantId(String statusCode, String tenantId);
+    Iterable<InsuranceEntity> findByStatusCodeAndTenantId(InsuranceStatus.StatusCode statusCode, String tenantId);
 
     /**
      * 根据投保人ID查询投保单

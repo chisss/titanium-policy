@@ -25,8 +25,8 @@ public class PolicyDTO {
     private LocalDateTime       expiryDate;
     @Schema(description = "保费", example = "1000.00")
     private AmountDTO           premium;
-    @Schema(description = "保单状态", example = "ACTIVE", exampleClasses = PolicyEnum.PolicyStatus.class)
-    private Integer             status;
+    @Schema(description = "保单状态", example = "EFFECTIVE", exampleClasses = PolicyEnum.PolicyStatus.class)
+    private PolicyEnum.PolicyStatus status;
     @Schema(description = "保单项列表")
     private List<PolicyItemDTO> policyItems;
     @Schema(description = "创建时间", example = "2023-08-01T00:00:00")

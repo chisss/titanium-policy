@@ -52,7 +52,7 @@ public class InsuranceRepositoryImpl implements InsuranceRepository {
 
     @Override
     public Iterable<Insurance> findByStatus(String tenantId, InsuranceStatus.StatusCode statusCode) {
-        Iterable<InsuranceEntity> entities = jpaInsuranceRepository.findByStatusCodeAndTenantId(statusCode.getCode(),
+        Iterable<InsuranceEntity> entities = jpaInsuranceRepository.findByStatusCodeAndTenantId(statusCode,
                 tenantId);
         List<Insurance> insurances = new ArrayList<>();
         for (InsuranceEntity entity : entities) {

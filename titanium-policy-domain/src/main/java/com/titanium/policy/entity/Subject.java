@@ -1,5 +1,8 @@
 package com.titanium.policy.entity;
 
+import com.titanium.metadata.enums.underwriting.UnderwritingEnum;
+import com.titanium.policy.valueobject.SubjectType;
+
 /**
  * 保险标的实体
  * <p>
@@ -14,7 +17,7 @@ public record Subject(
                       /*
                        * 标的类型
                        */
-                      String subjectType,
+                      SubjectType subjectType,
                       /*
                        * 标的详细信息
                        */
@@ -22,7 +25,7 @@ public record Subject(
                       /*
                        * 最终风险等级
                        */
-                      String riskLevel,
+                      UnderwritingEnum.RiskLevel riskLevel,
                       /*
                        * 标的合格状态
                        */
@@ -49,7 +52,7 @@ public record Subject(
      * @param riskLevel 新的风险等级
      * @return 更新后的标的实体
      */
-    public Subject updateRiskLevel(String riskLevel) {
+    public Subject updateRiskLevel(UnderwritingEnum.RiskLevel riskLevel) {
         return new Subject(subjectId, subjectType, detailInfo, riskLevel, qualifiedStatus);
     }
 }

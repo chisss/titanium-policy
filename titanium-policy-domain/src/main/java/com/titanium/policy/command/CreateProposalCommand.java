@@ -4,6 +4,8 @@ import java.time.LocalDateTime;
 
 import org.axonframework.modelling.command.TargetAggregateIdentifier;
 
+import com.titanium.metadata.enums.policy.PolicyForm;
+import com.titanium.metadata.enums.product.ProductEnum.SalesChannel;
 import com.titanium.policy.valueobject.Amount;
 
 import lombok.Builder;
@@ -27,8 +29,9 @@ import lombok.Builder;
  * @param tenantId 租户ID
  */
 @Builder
-public record CreateProposalCommand(@TargetAggregateIdentifier String proposalId, String proposalNo, String policyForm,
-                                    String channel, String customerId, Amount intendedSumInsured,
-                                    Amount intendedPremium, LocalDateTime insurancePeriodStart,
-                                    LocalDateTime insurancePeriodEnd, String expectedProductCode, String tenantId) {
+public record CreateProposalCommand(@TargetAggregateIdentifier String proposalId, String proposalNo,
+                                    PolicyForm policyForm, SalesChannel channel, String customerId,
+                                    Amount intendedSumInsured, Amount intendedPremium,
+                                    LocalDateTime insurancePeriodStart, LocalDateTime insurancePeriodEnd,
+                                    String expectedProductCode, String tenantId) {
 }

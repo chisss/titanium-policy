@@ -2,6 +2,8 @@ package com.titanium.policy.service;
 
 import java.time.LocalDateTime;
 
+import com.titanium.metadata.enums.policy.PolicyForm;
+import com.titanium.metadata.enums.product.ProductEnum.SalesChannel;
 import com.titanium.policy.valueobject.Amount;
 
 /**
@@ -10,12 +12,12 @@ import com.titanium.policy.valueobject.Amount;
 public record IssuanceRequest(
         String productId,
         String productCode,
-        String policyForm,
+        PolicyForm policyForm,
         String policyHolderId,
         int insuredCount,
         Amount totalPremium,
         LocalDateTime insurancePeriodStart,
         LocalDateTime insurancePeriodEnd,
-        String channel,
+        SalesChannel channel,
         String tenantId
 ) {}

@@ -6,6 +6,8 @@ import java.util.List;
 
 import org.axonframework.modelling.command.TargetAggregateIdentifier;
 
+import com.titanium.metadata.enums.policy.PolicyForm;
+
 /**
  * 直接创建投保单命令（两步出单，跳过意向单）
  */
@@ -13,7 +15,7 @@ public record CreateInsuranceDirectlyCommand(
         @TargetAggregateIdentifier
         String insuranceId,
         String insuranceNo,
-        String policyForm,
+        PolicyForm policyForm,
         String holderId,
         int insuredCount,
         BigDecimal exactPremium,
