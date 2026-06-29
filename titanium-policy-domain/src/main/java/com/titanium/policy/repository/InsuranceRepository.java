@@ -1,9 +1,9 @@
 package com.titanium.policy.repository;
 
+import java.util.Optional;
+
 import com.titanium.policy.aggregate.Insurance;
 import com.titanium.policy.valueobject.insurance.InsuranceStatus;
-
-import java.util.Optional;
 
 /**
  * 投保单仓库接口

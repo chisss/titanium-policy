@@ -24,7 +24,7 @@ import lombok.extern.log4j.Log4j2;
  * <p>
  * 适配Axon事件溯源框架，实现多租户隔离的保单聚合根仓储操作
  * </p>
- * 
+ *
  * @since 1.0.0
  * @note 核心设计： 1. 聚合根加载：通过Axon Repository加载，结合多租户校验； 2.
  *       持久化：Axon事件溯源自动保存事件，save方法仅做参数校验； 3. 删除：采用软删除（标记状态），而非硬删除，符合事件溯源设计；
@@ -43,7 +43,7 @@ public class PolicyRepositoryImpl implements PolicyRepository {
      * <p>
      * 通过Axon Repository加载聚合根，并校验多租户隔离
      * </p>
-     * 
+     *
      * @param policyId 保单聚合根ID
      * @param tenantId 租户ID（多租户隔离）
      * @return 保单聚合根Optional，不存在则返回empty
@@ -64,7 +64,7 @@ public class PolicyRepositoryImpl implements PolicyRepository {
      * <p>
      * Axon中聚合根的持久化由事件溯源自动处理（事件保存到Event Store）， 此处save方法仅校验聚合根合法性，确保多租户隔离
      * </p>
-     * 
+     *
      * @param policy 保单聚合根
      * @return 校验后的聚合根
      * @throws BusinessException 当聚合根参数不合法时抛出
@@ -93,7 +93,7 @@ public class PolicyRepositoryImpl implements PolicyRepository {
      * <p>
      * 符合事件溯源设计：保留事件和聚合根数据，仅标记状态，可追溯删除操作
      * </p>
-     * 
+     *
      * @param policyId 保单ID
      * @param tenantId 租户ID
      * @throws BusinessException 当保单状态不允许删除/跨租户删除时抛出
@@ -122,7 +122,7 @@ public class PolicyRepositoryImpl implements PolicyRepository {
 
     /**
      * 根据状态查询保单
-     * 
+     *
      * @param tenantId 租户ID
      * @param statusCode 状态编码
      * @return 保单迭代器
@@ -160,7 +160,7 @@ public class PolicyRepositoryImpl implements PolicyRepository {
 
     /**
      * 根据保单编号查询保单
-     * 
+     *
      * @param policyNo 保单编号
      * @param tenantId 租户ID
      * @return 保单聚合根
@@ -176,7 +176,7 @@ public class PolicyRepositoryImpl implements PolicyRepository {
 
     /**
      * 根据关联投保单ID查询保单
-     * 
+     *
      * @param applicationId 投保单ID
      * @param tenantId 租户ID
      * @return 保单聚合根
@@ -192,7 +192,7 @@ public class PolicyRepositoryImpl implements PolicyRepository {
 
     /**
      * 根据投保人ID查询保单
-     * 
+     *
      * @param policyHolderId 投保人ID
      * @param tenantId 租户ID
      * @return 保单迭代器
@@ -238,6 +238,7 @@ public class PolicyRepositoryImpl implements PolicyRepository {
             case SUSPENDED -> com.titanium.metadata.enums.policy.PolicyEnum.PolicyStatus.SUSPENDED;
             case TERMINATED -> com.titanium.metadata.enums.policy.PolicyEnum.PolicyStatus.TERMINATED;
             case EXPIRED -> com.titanium.metadata.enums.policy.PolicyEnum.PolicyStatus.EXPIRED;
+            case LAPSED -> com.titanium.metadata.enums.policy.PolicyEnum.PolicyStatus.LAPSED;
             case CANCELLED -> com.titanium.metadata.enums.policy.PolicyEnum.PolicyStatus.CANCELLED;
         };
     }

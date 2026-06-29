@@ -6,15 +6,11 @@ import java.util.UUID;
 import org.axonframework.commandhandling.gateway.CommandGateway;
 import org.springframework.stereotype.Service;
 
-import com.titanium.policy.command.ConvertProposalToInsuranceCommand;
+import com.titanium.metadata.enums.product.ProductEnum;
 import com.titanium.policy.command.CreateInsuranceDirectlyCommand;
 import com.titanium.policy.command.CreatePolicyDirectlyCommand;
 import com.titanium.policy.command.CreateProposalCommand;
-import com.titanium.policy.service.ClauseServicePort;
-import com.titanium.policy.service.ProductServicePort;
-import com.titanium.policy.service.UnderwritingServicePort;
-import com.titanium.policy.valueobject.Amount;
-import com.titanium.policy.valueobject.IssuanceMode;
+import com.titanium.policy.exception.PolicyBusinessRuleException;
 import com.titanium.policy.valueobject.IssuanceProcessConfig;
 import com.titanium.policy.valueobject.RiskAssessmentStep;
 
@@ -51,6 +47,19 @@ public class IssuanceOrchestrator {
     private UnderwritingServicePort underwritingServicePort;
 
     /**
+     * 产品驱动出单编排：由产品域配置决定出单模式（一步/两步/三步），取代调用方硬编码。
+     *
+     * @param request 出单请求（含 productId/productCode/tenantId）
+     * @return 出单结果
+     */
+    public IssuanceResult orchestrate(IssuanceRequest request) {
+        ProductEnum.IssuanceMode mode = productServicePort.getIssuanceMode(request.productId(), request.tenantId());
+        log.info("产品驱动出单, 产品={}, 由产品配置决定出单模式={}", request.productCode(), mode);
+        IssuanceProcessConfig config = IssuanceProcessConfig.forMode(mode, request.productCode());
+        return orchestrate(config, request);
+    }
+
+    /**
      * 编排出单流程
      *
      * @param config 出单配置
@@ -73,6 +82,8 @@ public class IssuanceOrchestrator {
             case ONE_STEP -> executeOneStep(config, request);
             case TWO_STEP -> executeTwoStep(config, request);
             case THREE_STEP -> executeThreeStep(config, request);
+            case CUSTOM -> throw new PolicyBusinessRuleException("ISSUANCE_MODE_UNSUPPORTED",
+                    "自定义出单模式(CUSTOM)暂未支持,需规则引擎域配合");
         };
     }
 
@@ -101,7 +112,7 @@ public class IssuanceOrchestrator {
         commandGateway.sendAndWait(command);
         log.info("一步出单完成, policyId={}, policyNo={}", policyId, policyNo);
 
-        return IssuanceResult.success(IssuanceMode.ONE_STEP, policyId, policyNo, null, null);
+        return IssuanceResult.success(ProductEnum.IssuanceMode.ONE_STEP, policyId, policyNo, null, null);
     }
 
     /**
@@ -137,7 +148,7 @@ public class IssuanceOrchestrator {
             underwritingRequest.put("policyHolderId", request.policyHolderId());
             underwritingRequest.put("productCode", request.productCode());
             underwritingRequest.put("totalPremium", request.totalPremium());
-            
+
             // 调用核保服务
             Object underwritingResult = underwritingServicePort.createUnderwriting(underwritingRequest, request.tenantId());
             log.info("核保申请创建成功");
@@ -146,7 +157,7 @@ public class IssuanceOrchestrator {
             return IssuanceResult.rejected("创建核保申请失败: " + e.getMessage());
         }
 
-        return IssuanceResult.success(IssuanceMode.TWO_STEP, null, null, insuranceId, insuranceNo);
+        return IssuanceResult.success(ProductEnum.IssuanceMode.TWO_STEP, null, null, insuranceId, insuranceNo);
     }
 
     /**
@@ -173,7 +184,7 @@ public class IssuanceOrchestrator {
         commandGateway.sendAndWait(command);
         log.info("三步出单 - 意向单创建完成, proposalId={}, proposalNo={}", proposalId, proposalNo);
 
-        return IssuanceResult.success(IssuanceMode.THREE_STEP, null, null, null, null)
+        return IssuanceResult.success(ProductEnum.IssuanceMode.THREE_STEP, null, null, null, null)
                 .withProposal(proposalId, proposalNo);
     }
 }

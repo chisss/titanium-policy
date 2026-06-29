@@ -3,6 +3,8 @@ package com.titanium.policy.valueobject;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+import com.titanium.metadata.valueobject.Money;
+
 /**
  * 保费计划值对象
  * <p>
@@ -15,7 +17,7 @@ import java.time.LocalDateTime;
  * @param premiumDueDate 保费到期日
  * @param paymentStatus 缴费状态
  */
-public record PremiumPlan(Amount premiumAmount, PaymentMethod paymentMethod, PaymentCycle paymentCycle,
+public record PremiumPlan(Money premiumAmount, PaymentMethod paymentMethod, PaymentCycle paymentCycle,
                           LocalDateTime premiumDueDate, PaymentStatus paymentStatus) {
 
     /**
@@ -26,7 +28,7 @@ public record PremiumPlan(Amount premiumAmount, PaymentMethod paymentMethod, Pay
      *
      * @return 每期应缴保费
      */
-    public Amount calculateDuePremium() {
+    public Money calculateDuePremium() {
         if (paymentMethod == PaymentMethod.SINGLE_PAYMENT) {
             // 趸缴情况下，每期应缴保费等于总保费
             return premiumAmount;
@@ -35,15 +37,15 @@ public record PremiumPlan(Amount premiumAmount, PaymentMethod paymentMethod, Pay
             switch (paymentCycle) {
                 case MONTHLY -> {
                     // 月缴：总保费除以12
-                    return Amount.of(premiumAmount.value().divide(BigDecimal.valueOf(12)), premiumAmount.currency());
+                    return Money.of(premiumAmount.value().divide(BigDecimal.valueOf(12)), premiumAmount.currency());
                 }
                 case QUARTERLY -> {
                     // 季缴：总保费除以4
-                    return Amount.of(premiumAmount.value().divide(BigDecimal.valueOf(4)), premiumAmount.currency());
+                    return Money.of(premiumAmount.value().divide(BigDecimal.valueOf(4)), premiumAmount.currency());
                 }
                 case SEMI_ANNUALLY -> {
                     // 半年缴：总保费除以2
-                    return Amount.of(premiumAmount.value().divide(BigDecimal.valueOf(2)), premiumAmount.currency());
+                    return Money.of(premiumAmount.value().divide(BigDecimal.valueOf(2)), premiumAmount.currency());
                 }
                 case ANNUALLY -> {
                     // 年缴：总保费

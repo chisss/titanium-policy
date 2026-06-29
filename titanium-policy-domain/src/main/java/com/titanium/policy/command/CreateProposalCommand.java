@@ -6,7 +6,7 @@ import org.axonframework.modelling.command.TargetAggregateIdentifier;
 
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.enums.product.ProductEnum.SalesChannel;
-import com.titanium.policy.valueobject.Amount;
+import com.titanium.metadata.valueobject.Money;
 
 import lombok.Builder;
 
@@ -31,7 +31,7 @@ import lombok.Builder;
 @Builder
 public record CreateProposalCommand(@TargetAggregateIdentifier String proposalId, String proposalNo,
                                     PolicyForm policyForm, SalesChannel channel, String customerId,
-                                    Amount intendedSumInsured, Amount intendedPremium,
+                                    Money intendedSumInsured, Money intendedPremium,
                                     LocalDateTime insurancePeriodStart, LocalDateTime insurancePeriodEnd,
                                     String expectedProductCode, String tenantId) {
 }

@@ -1,10 +1,11 @@
 package com.titanium.policy.infrastructure.repository.jpa;
 
-import com.titanium.policy.infrastructure.entity.InsuranceEntity;
-import com.titanium.policy.valueobject.insurance.InsuranceStatus;
+import java.util.Optional;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 
-import java.util.Optional;
+import com.titanium.policy.infrastructure.entity.InsuranceEntity;
+import com.titanium.policy.valueobject.insurance.InsuranceStatus;
 
 /**
  * 投保单JPA仓库接口

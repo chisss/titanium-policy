@@ -1,6 +1,6 @@
 package com.titanium.policy.service;
 
-import com.titanium.policy.valueobject.IssuanceMode;
+import com.titanium.metadata.enums.product.ProductEnum;
 
 /**
  * 出单结果
@@ -8,7 +8,7 @@ import com.titanium.policy.valueobject.IssuanceMode;
 public record IssuanceResult(
         boolean success,
         String rejectReason,
-        IssuanceMode issuanceMode,
+        ProductEnum.IssuanceMode issuanceMode,
         String policyId,
         String policyNo,
         String insuranceId,
@@ -20,7 +20,7 @@ public record IssuanceResult(
         return new IssuanceResult(false, reason, null, null, null, null, null, null, null);
     }
 
-    public static IssuanceResult success(IssuanceMode mode, String policyId, String policyNo,
+    public static IssuanceResult success(ProductEnum.IssuanceMode mode, String policyId, String policyNo,
                                          String insuranceId, String insuranceNo) {
         return new IssuanceResult(true, null, mode, policyId, policyNo, insuranceId, insuranceNo, null, null);
     }

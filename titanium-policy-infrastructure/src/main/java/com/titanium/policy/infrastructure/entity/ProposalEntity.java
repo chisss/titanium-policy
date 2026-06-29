@@ -1,5 +1,7 @@
 package com.titanium.policy.infrastructure.entity;
 
+import java.time.LocalDateTime;
+
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.enums.product.ProductEnum.SalesChannel;
 import com.titanium.policy.valueobject.proposal.ProposalStatus;
@@ -12,8 +14,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
-
-import java.time.LocalDateTime;
 
 /**
  * 投保意向单数据库实体

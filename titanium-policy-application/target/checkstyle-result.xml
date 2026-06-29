@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<checkstyle version="10.20.1">
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-application/src/main/java/com/titanium/policy/application/saga/IssuanceSaga.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-application/src/main/java/com/titanium/policy/application/command/InsuranceApplicationService.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-application/src/main/java/com/titanium/policy/application/command/ProposalApplicationService.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-application/src/main/java/com/titanium/policy/application/command/PolicyApplicationService.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-application/src/main/java/com/titanium/policy/application/service/ClauseServiceAdapter.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-application/src/main/java/com/titanium/policy/application/service/EndorsementNoGeneratorImpl.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-application/src/main/java/com/titanium/policy/application/service/ProductServiceAdapter.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-application/src/main/java/com/titanium/policy/application/service/UnderwritingServiceAdapter.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-application/src/main/java/com/titanium/policy/application/service/ProductService.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-application/src/main/java/com/titanium/policy/application/service/RuleEngineServiceAdapter.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-application/src/main/java/com/titanium/policy/application/service/SyncUnderwritingDecisionAdapter.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-application/src/main/java/com/titanium/policy/application/service/UnderwritingService.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-application/src/main/java/com/titanium/policy/application/service/RuleEngineService.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-application/src/main/java/com/titanium/policy/application/service/ClauseService.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-application/src/main/java/com/titanium/policy/application/query/PolicyAppQueryService.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-application/src/main/java/com/titanium/policy/application/query/InsuranceAppQueryService.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-application/src/main/java/com/titanium/policy/application/query/ProposalAppQueryService.java">
+</file>
+</checkstyle>

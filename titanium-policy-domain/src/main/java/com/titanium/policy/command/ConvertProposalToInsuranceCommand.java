@@ -6,7 +6,7 @@ import java.util.List;
 import org.axonframework.modelling.command.TargetAggregateIdentifier;
 
 import com.titanium.metadata.enums.policy.PolicyForm;
-import com.titanium.policy.valueobject.Amount;
+import com.titanium.metadata.valueobject.Money;
 
 import lombok.Builder;
 
@@ -33,7 +33,7 @@ import lombok.Builder;
 @Builder
 public record ConvertProposalToInsuranceCommand(@TargetAggregateIdentifier String insuranceId, String insuranceNo,
                                                 String proposalId, PolicyForm policyForm, String applicantId,
-                                                int insuredCount, Amount exactPremium,
+                                                int insuredCount, Money exactPremium,
                                                 LocalDateTime insurancePeriodStart, LocalDateTime insurancePeriodEnd,
                                                 List<String> productCodes, int underwritingPriority,
                                                 String changeReason, String tenantId) {

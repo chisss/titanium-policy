@@ -1,8 +1,7 @@
 package com.titanium.policy.api;
 
-import com.titanium.policy.api.dto.CreatePolicyDTO;
-import com.titanium.policy.api.dto.PolicyDTO;
-import com.titanium.policy.api.response.ApiResponse;
+import java.util.List;
+
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -12,7 +11,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 
-import java.util.List;
+import com.titanium.policy.api.dto.CreatePolicyDTO;
+import com.titanium.policy.api.dto.PolicyDTO;
+import com.titanium.policy.api.response.ApiResponse;
 
 /**
  * 保单API
@@ -99,4 +100,3 @@ public interface PolicyApi {
     @GetMapping
     ApiResponse<List<PolicyDTO>> getAllPolicies();
 }
-

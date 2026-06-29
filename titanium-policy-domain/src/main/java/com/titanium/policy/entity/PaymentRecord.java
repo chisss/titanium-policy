@@ -3,9 +3,9 @@ package com.titanium.policy.entity;
 import java.time.LocalDateTime;
 
 import com.titanium.metadata.enums.billing.BillingEnum;
-import com.titanium.policy.valueobject.Amount;
+import com.titanium.metadata.valueobject.Money;
 
-public record PaymentRecord(String paymentId, String paymentNo, Amount paymentAmount, LocalDateTime paymentTime,
+public record PaymentRecord(String paymentId, String paymentNo, Money paymentAmount, LocalDateTime paymentTime,
                             BillingEnum.PaymentMethod paymentMethod, BillingEnum.ReconciliationStatus reconciliationStatus) {
     /**
      * 记录缴费信息

@@ -7,6 +7,7 @@
 /Users/sunwei/titanium-project/titanium-policy/titanium-policy-application/src/main/java/com/titanium/policy/application/service/ClauseService.java
 /Users/sunwei/titanium-project/titanium-policy/titanium-policy-application/src/main/java/com/titanium/policy/application/query/ProposalAppQueryService.java
 /Users/sunwei/titanium-project/titanium-policy/titanium-policy-application/src/main/java/com/titanium/policy/application/command/ProposalApplicationService.java
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-application/src/main/java/com/titanium/policy/application/service/EndorsementNoGeneratorImpl.java
 /Users/sunwei/titanium-project/titanium-policy/titanium-policy-application/src/main/java/com/titanium/policy/application/service/UnderwritingServiceAdapter.java
 /Users/sunwei/titanium-project/titanium-policy/titanium-policy-application/src/main/java/com/titanium/policy/application/service/UnderwritingService.java
 /Users/sunwei/titanium-project/titanium-policy/titanium-policy-application/src/main/java/com/titanium/policy/application/command/InsuranceApplicationService.java

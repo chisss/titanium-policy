@@ -3,14 +3,14 @@ package com.titanium.policy.entity;
 import java.time.LocalDateTime;
 import java.util.List;
 
-import com.titanium.policy.valueobject.Amount;
+import com.titanium.metadata.valueobject.Money;
 
 /**
  * 投保险种实体类
  * <p>
  * 表示一个具体的保险产品，包含产品ID、产品代码、产品名称、保障责任、保额、保险期限、保费等信息
  * </p>
- * 
+ *
  * @param productId 保险产品ID，唯一标识一个保险产品
  * @param productCode 保险产品代码，用于外部系统引用
  * @param productName 保险产品名称，用于展示给用户
@@ -20,8 +20,8 @@ import com.titanium.policy.valueobject.Amount;
  * @param premium 保费，用户支付的保险费用
  * @param coverages 保障责任列表，包含保险产品的具体保障内容
  */
-public record InsuranceProduct(String productId, String productCode, String productName, Amount sumInsured,
-                               LocalDateTime insurancePeriodStart, LocalDateTime insurancePeriodEnd, Amount premium,
+public record InsuranceProduct(String productId, String productCode, String productName, Money sumInsured,
+                               LocalDateTime insurancePeriodStart, LocalDateTime insurancePeriodEnd, Money premium,
                                List<Coverage> coverages) {
 
     /**

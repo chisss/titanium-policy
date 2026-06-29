@@ -5,6 +5,7 @@ com/titanium/policy/application/service/SyncUnderwritingDecisionAdapter$1.class
 com/titanium/policy/application/command/ProposalApplicationService.class
 com/titanium/policy/application/command/PolicyApplicationService.class
 com/titanium/policy/application/service/ClauseService.class
+com/titanium/policy/application/service/EndorsementNoGeneratorImpl.class
 com/titanium/policy/application/service/RuleEngineService.class
 com/titanium/policy/application/service/UnderwritingServiceAdapter.class
 com/titanium/policy/application/service/UnderwritingService.class

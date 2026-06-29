@@ -90,6 +90,7 @@ public interface PolicyMapper {
             case SUSPENDED -> PolicyEnum.PolicyStatus.SUSPENDED;
             case TERMINATED -> PolicyEnum.PolicyStatus.TERMINATED;
             case EXPIRED -> PolicyEnum.PolicyStatus.EXPIRED;
+            case LAPSED -> PolicyEnum.PolicyStatus.LAPSED;
             case CANCELLED -> PolicyEnum.PolicyStatus.CANCELLED;
         };
     }

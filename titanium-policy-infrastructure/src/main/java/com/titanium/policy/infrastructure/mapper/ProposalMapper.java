@@ -1,7 +1,6 @@
 package com.titanium.policy.infrastructure.mapper;
 
 import org.mapstruct.Mapper;
-import org.mapstruct.Mapping;
 import org.mapstruct.ReportingPolicy;
 
 import com.titanium.policy.aggregate.Proposal;
@@ -32,7 +31,7 @@ public interface ProposalMapper {
 //    @Mapping(source = "basicInfo.insurancePeriodEnd", target = "insurancePeriodEnd")
 //    @Mapping(source = "basicInfo.expectedProductCode", target = "expectedProductCode")
     ProposalEntity toEntity(Proposal proposal);
-    
+
     /**
      * 将投保意向单数据库实体转换为聚合根
      *

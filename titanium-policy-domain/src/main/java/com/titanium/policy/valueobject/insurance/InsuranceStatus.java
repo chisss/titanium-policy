@@ -9,8 +9,8 @@ import lombok.Getter;
 /**
  * 投保单状态值对象
  * <p>
- * 管控投保单生命周期状态流转。
- * 状态机：
+ * 管控投保单生命周期状态流转。 状态机：
+ *
  * <pre>
  * DRAFT ──submit()──► SUBMITTED ──submitUnderwriting()──► UNDERWRITING
  *                                                            │
@@ -62,14 +62,11 @@ public record InsuranceStatus(StatusCode statusCode, LocalDateTime statusTime, S
             return;
         }
         // 任何非终态都可以转为 VOIDED
-        if (newStatusCode == StatusCode.VOIDED
-                && this.statusCode != StatusCode.ISSUED
-                && this.statusCode != StatusCode.UNDERWRITING_REJECTED
-                && this.statusCode != StatusCode.VOIDED) {
+        if (newStatusCode == StatusCode.VOIDED && this.statusCode != StatusCode.ISSUED
+                && this.statusCode != StatusCode.UNDERWRITING_REJECTED && this.statusCode != StatusCode.VOIDED) {
             return;
         }
-        throw new PolicyStatusTransitionException(
-                "投保单", "", this.statusCode.name(), newStatusCode.name());
+        throw new PolicyStatusTransitionException("投保单", "", this.statusCode.name(), newStatusCode.name());
     }
 
     @Getter

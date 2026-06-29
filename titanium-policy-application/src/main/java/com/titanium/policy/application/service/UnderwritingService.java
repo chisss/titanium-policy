@@ -1,16 +1,17 @@
 package com.titanium.policy.application.service;
 
+import java.util.List;
+
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Service;
+
 import com.titanium.underwriting.api.UnderwritingApi;
 import com.titanium.underwriting.api.dto.UnderwritingDTO;
 import com.titanium.underwriting.api.request.CreateUnderwritingRequest;
 import com.titanium.underwriting.api.request.UnderwriteRequest;
-import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Service;
 
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
-
-import java.util.List;
 
 /**
  * 核保服务客户端

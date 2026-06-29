@@ -1,18 +1,20 @@
 package com.titanium.policy.aggregate.proposal;
 
-import com.titanium.policy.aggregate.Proposal;
-import com.titanium.policy.entity.proposal.ProposalHolder;
-import com.titanium.policy.entity.proposal.ProposalSubject;
-import com.titanium.policy.valueobject.proposal.ProposalBasicInfo;
-import com.titanium.policy.valueobject.proposal.ProposalStatus;
-import com.titanium.policy.valueobject.Amount;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import com.titanium.metadata.valueobject.Money;
+import com.titanium.policy.aggregate.Proposal;
+import com.titanium.policy.entity.proposal.ProposalHolder;
+import com.titanium.policy.entity.proposal.ProposalSubject;
+import com.titanium.policy.exception.PolicyBusinessRuleException;
+import com.titanium.policy.valueobject.proposal.ProposalBasicInfo;
+import com.titanium.policy.valueobject.proposal.ProposalStatus;
 
 /**
  * 投保意向单聚合测试
@@ -28,8 +30,8 @@ class ProposalTest {
         // 初始化基本信息
         basicInfo = new ProposalBasicInfo(
                 "customer-123",
-                Amount.of(new BigDecimal(100000), "CNY"),
-                Amount.of(new BigDecimal(5000), "CNY"),
+                Money.of(new BigDecimal(100000), "CNY"),
+                Money.of(new BigDecimal(5000), "CNY"),
                 LocalDateTime.now(),
                 LocalDateTime.now().plusYears(1),
                 "PROD-001"
@@ -128,10 +130,10 @@ class ProposalTest {
         // 只添加标的，不添加申请人
         proposal.addSubject(subject);
         // 验证提交时是否抛出异常
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
+        PolicyBusinessRuleException exception = assertThrows(PolicyBusinessRuleException.class, () -> {
             proposal.submitProposal("客户确认提交");
         });
-        assertEquals("At least one applicant is required", exception.getMessage());
+        assertTrue(exception.getMessage().contains("At least one applicant is required"));
     }
 
     /**
@@ -142,10 +144,10 @@ class ProposalTest {
         // 只添加申请人，不添加标的
         proposal.addApplicant(applicant);
         // 验证提交时是否抛出异常
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
+        PolicyBusinessRuleException exception = assertThrows(PolicyBusinessRuleException.class, () -> {
             proposal.submitProposal("客户确认提交");
         });
-        assertEquals("At least one subject is required", exception.getMessage());
+        assertTrue(exception.getMessage().contains("At least one subject is required"));
     }
 
     /**
@@ -195,9 +197,9 @@ class ProposalTest {
         // 第一次转为投保单
         proposal.convertToApplication("转为投保单");
         // 验证第二次转为投保单时是否抛出异常
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
+        PolicyBusinessRuleException exception = assertThrows(PolicyBusinessRuleException.class, () -> {
             proposal.convertToApplication("再次转为投保单");
         });
-        assertEquals("Only submitted proposals can be converted to application", exception.getMessage());
+        assertTrue(exception.getMessage().contains("Only submitted proposals can be converted to application"));
     }
 }

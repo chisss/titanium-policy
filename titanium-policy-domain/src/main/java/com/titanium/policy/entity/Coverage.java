@@ -1,6 +1,6 @@
 package com.titanium.policy.entity;
 
-import com.titanium.policy.valueobject.Amount;
+import com.titanium.metadata.valueobject.Money;
 
 /**
  * 保障责任实体
@@ -24,7 +24,7 @@ public record Coverage(
                        /**
                         * 责任保额
                         */
-                       Amount coverageSumInsured,
+                       Money coverageSumInsured,
                        /**
                         * 赔付条件
                         */

@@ -4,7 +4,7 @@ import java.time.LocalDateTime;
 
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.enums.product.ProductEnum.SalesChannel;
-import com.titanium.policy.valueobject.Amount;
+import com.titanium.metadata.valueobject.Money;
 
 /*
  * 创建保单命令
@@ -44,11 +44,11 @@ public record CreatePolicyCommand(
                                   /*
                                    * 保额
                                    */
-                                  Amount sumInsured,
+                                  Money sumInsured,
                                   /*
                                    * 保费
                                    */
-                                  Amount premium,
+                                  Money premium,
                                   /*
                                    * 生效日期
                                    */

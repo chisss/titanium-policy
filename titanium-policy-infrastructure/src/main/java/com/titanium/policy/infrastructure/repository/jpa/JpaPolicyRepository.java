@@ -1,11 +1,11 @@
 package com.titanium.policy.infrastructure.repository.jpa;
 
+import java.util.Optional;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+
 import com.titanium.metadata.enums.policy.PolicyEnum;
 import com.titanium.policy.infrastructure.entity.PolicyEntity;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
-
-import java.util.Optional;
 
 /**
  * 正式保单JPA仓库接口

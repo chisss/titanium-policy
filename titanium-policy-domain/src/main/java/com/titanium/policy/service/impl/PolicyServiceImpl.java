@@ -7,9 +7,9 @@ import java.util.Objects;
 import org.springframework.stereotype.Service;
 
 import com.titanium.metadata.enums.policy.PolicyEnum.PolicyStatus;
+import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.aggregate.Policy;
 import com.titanium.policy.service.PolicyService;
-import com.titanium.policy.valueobject.Amount;
 
 @Service
 public class PolicyServiceImpl implements PolicyService {
@@ -52,8 +52,8 @@ public class PolicyServiceImpl implements PolicyService {
         }
 
         // 计算所有保单项的保费总和
-        Amount totalPremium = policy.getInsuranceProducts().stream().map(item -> item.premium())
-                .reduce(Amount.of(BigDecimal.ZERO, "CNY"), Amount::add);
+        Money totalPremium = policy.getInsuranceProducts().stream().map(item -> item.premium())
+                .reduce(Money.zero("CNY"), Money::add);
 
         // 更新保单的总保费
         // 注意：由于Policy是聚合根，我们需要通过方法来更新保费

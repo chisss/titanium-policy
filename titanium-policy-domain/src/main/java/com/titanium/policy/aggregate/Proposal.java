@@ -12,17 +12,17 @@ import org.axonframework.spring.stereotype.Aggregate;
 
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.enums.product.ProductEnum.SalesChannel;
+import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.command.CreateProposalCommand;
 import com.titanium.policy.command.SubmitProposalCommand;
 import com.titanium.policy.command.VoidProposalCommand;
 import com.titanium.policy.entity.proposal.ProposalHolder;
 import com.titanium.policy.entity.proposal.ProposalSubject;
 import com.titanium.policy.event.proposal.ProposalConvertedEvent;
-import com.titanium.policy.exception.PolicyBusinessRuleException;
 import com.titanium.policy.event.proposal.ProposalCreatedEvent;
 import com.titanium.policy.event.proposal.ProposalSubmittedEvent;
 import com.titanium.policy.event.proposal.ProposalVoidedEvent;
-import com.titanium.policy.valueobject.Amount;
+import com.titanium.policy.exception.PolicyBusinessRuleException;
 import com.titanium.policy.valueobject.proposal.ProposalBasicInfo;
 import com.titanium.policy.valueobject.proposal.ProposalStatus;
 
@@ -40,7 +40,7 @@ import lombok.Getter;
  */
 @Aggregate
 @Getter
-@Builder(builderMethodName = "builder")
+@Builder(toBuilder = true)
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 public class Proposal {
     /** 聚合根唯一标识 */
@@ -103,7 +103,8 @@ public class Proposal {
     public void handle(VoidProposalCommand command) {
         ProposalStatus.StatusCode currentStatus = this.status.statusCode();
         if (currentStatus != ProposalStatus.StatusCode.DRAFT && currentStatus != ProposalStatus.StatusCode.SUBMITTED) {
-            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "Only draft or submitted proposals can be voided");
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION",
+                    "Only draft or submitted proposals can be voided");
         }
         AggregateLifecycle.apply(new ProposalVoidedEvent(command.proposalId(), command.changeReason(),
                 LocalDateTime.now(), this.tenantId));
@@ -124,8 +125,8 @@ public class Proposal {
         this.subjects = new ArrayList<>();
         this.status = new ProposalStatus(ProposalStatus.StatusCode.DRAFT, event.createTime(), "创建草稿");
         this.basicInfo = new ProposalBasicInfo(event.customerId(),
-                event.intendedSumInsured() != null ? Amount.of(event.intendedSumInsured(), "CNY") : null,
-                event.intendedPremium() != null ? Amount.of(event.intendedPremium(), "CNY") : null,
+                event.intendedSumInsured() != null ? Money.of(event.intendedSumInsured(), "CNY") : null,
+                event.intendedPremium() != null ? Money.of(event.intendedPremium(), "CNY") : null,
                 event.insurancePeriodStart(), event.insurancePeriodEnd(), event.expectedProductCode());
     }
 
@@ -161,8 +162,8 @@ public class Proposal {
      * @param tenantId 租户ID
      * @return 草稿状态的意向单
      */
-    public static Proposal createDraft(String proposalId, String proposalNo, PolicyForm policyForm, SalesChannel channel,
-                                       ProposalBasicInfo basicInfo, String tenantId) {
+    public static Proposal createDraft(String proposalId, String proposalNo, PolicyForm policyForm,
+                                       SalesChannel channel, ProposalBasicInfo basicInfo, String tenantId) {
         LocalDateTime now = LocalDateTime.now();
         Proposal proposal = new Proposal();
         proposal.proposalId = proposalId;
@@ -199,7 +200,8 @@ public class Proposal {
     public void voidProposal(String changeReason) {
         ProposalStatus.StatusCode currentStatus = this.status.statusCode();
         if (currentStatus != ProposalStatus.StatusCode.DRAFT && currentStatus != ProposalStatus.StatusCode.SUBMITTED) {
-            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "Only draft or submitted proposals can be voided");
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION",
+                    "Only draft or submitted proposals can be voided");
         }
         this.status = this.status.transitionStatus(ProposalStatus.StatusCode.VOIDED, changeReason);
         this.updateTime = LocalDateTime.now();
@@ -212,7 +214,8 @@ public class Proposal {
      */
     public void convertToApplication(String changeReason) {
         if (this.status.statusCode() != ProposalStatus.StatusCode.SUBMITTED) {
-            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "Only submitted proposals can be converted to application");
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION",
+                    "Only submitted proposals can be converted to application");
         }
         this.status = this.status.transitionStatus(ProposalStatus.StatusCode.CONVERTED_TO_APPLICATION, changeReason);
         this.updateTime = LocalDateTime.now();
@@ -246,7 +249,8 @@ public class Proposal {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "Customer ID cannot be null or empty");
         }
         if (basicInfo.expectedProductCode() == null || basicInfo.expectedProductCode().isEmpty()) {
-            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "Expected product code cannot be null or empty");
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION",
+                    "Expected product code cannot be null or empty");
         }
     }
 

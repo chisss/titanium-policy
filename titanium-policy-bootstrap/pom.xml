@@ -67,6 +67,26 @@
             <groupId>com.titanium</groupId>
             <artifactId>titanium-common</artifactId>
         </dependency>
+
+        <!-- ============ 架构守护测试（仅 test 作用域，不进运行时） ============ -->
+        <!-- 共享 ArchUnit 基类制品：提供 AbstractArchitectureGuardTest -->
+        <dependency>
+            <groupId>com.titanium</groupId>
+            <artifactId>titanium-build-tools</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- ArchUnit：以 JUnit 测试形式校验 CLAUDE.md 的分层/命名/依赖约束（版本由 parent 管理） -->
+        <dependency>
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit-junit5</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- Spring Boot Test：提供 JUnit5 运行环境 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>

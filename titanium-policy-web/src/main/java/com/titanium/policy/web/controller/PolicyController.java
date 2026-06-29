@@ -1,19 +1,26 @@
 package com.titanium.policy.web.controller;
 
+import java.util.List;
+
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
 import com.titanium.policy.api.PolicyApi;
 import com.titanium.policy.api.dto.CreatePolicyDTO;
 import com.titanium.policy.api.dto.PolicyDTO;
 import com.titanium.policy.api.response.ApiResponse;
 import com.titanium.policy.application.command.PolicyApplicationService;
 import com.titanium.policy.application.query.PolicyAppQueryService;
-import com.titanium.policy.command.*;
+import com.titanium.policy.command.CancelPolicyCommand;
+import com.titanium.policy.command.CreatePolicyCommand;
+import com.titanium.policy.command.CreatePolicyDirectlyCommand;
+import com.titanium.policy.command.ResumePolicyCommand;
+import com.titanium.policy.command.SuspendPolicyCommand;
+import com.titanium.policy.command.TerminatePolicyCommand;
 import com.titanium.policy.service.IssuanceRequest;
 import com.titanium.policy.service.IssuanceResult;
-import com.titanium.policy.valueobject.IssuanceProcessConfig;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
+import lombok.RequiredArgsConstructor;
 
 /**
  * 保单控制器
@@ -21,13 +28,12 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/web/policies")
+@RequiredArgsConstructor
 public class PolicyController implements PolicyApi {
 
-    @Autowired
-    private PolicyApplicationService policyApplicationService;
+    private final PolicyApplicationService policyApplicationService;
 
-    @Autowired
-    private PolicyAppQueryService policyAppQueryService;
+    private final PolicyAppQueryService policyAppQueryService;
 
     @Override
     public ApiResponse<String> createPolicy(CreatePolicyDTO createPolicyDTO) {
@@ -72,8 +78,8 @@ public class PolicyController implements PolicyApi {
 
     @Override
     public ApiResponse<Object> issueByConfig(Object request, String tenantId) {
-        IssuanceProcessConfig config = IssuanceProcessConfig.oneStep(((IssuanceRequest) request).productCode());
-        IssuanceResult result = policyApplicationService.issueByConfig(config, (IssuanceRequest) request);
+        // 出单模式由产品域配置决定，不再硬编码步数
+        IssuanceResult result = policyApplicationService.issue((IssuanceRequest) request);
         return ApiResponse.success(result);
     }
 

@@ -14,7 +14,7 @@ public class PolicyUtils {
 
     /**
      * 生成唯一的保单号 格式: 年份(4位) + 月份(2位) + 日期(2位) + 时间(9位) + 随机数(6位)
-     * 
+     *
      * @return 唯一的保单号
      */
     public static String generatePolicyNumber() {
@@ -28,7 +28,7 @@ public class PolicyUtils {
 
     /**
      * 验证保单号格式是否正确
-     * 
+     *
      * @param policyNumber 保单号
      * @return 是否有效
      */
@@ -50,7 +50,7 @@ public class PolicyUtils {
 
     /**
      * 生成唯一的保单ID
-     * 
+     *
      * @return 唯一的保单ID
      */
     public static String generatePolicyId() {

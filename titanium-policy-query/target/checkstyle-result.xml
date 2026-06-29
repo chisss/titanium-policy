@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<checkstyle version="10.20.1">
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-query/src/main/java/com/titanium/policy/query/handler/PolicyProjectionEventHandler.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-query/src/main/java/com/titanium/policy/query/handler/PolicyRelationCascadeHandler.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-query/src/main/java/com/titanium/policy/query/handler/EndorsementProjectionEventHandler.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-query/src/main/java/com/titanium/policy/query/handler/PolicyQueryHandler.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-query/src/main/java/com/titanium/policy/query/repository/PolicyRelationViewRepository.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-query/src/main/java/com/titanium/policy/query/repository/PolicyEndorsementViewRepository.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-query/src/main/java/com/titanium/policy/query/repository/PolicyViewRepository.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-query/src/main/java/com/titanium/policy/query/config/PolicyQueryCacheConfig.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-query/src/main/java/com/titanium/policy/query/entity/PolicyEndorsementView.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-query/src/main/java/com/titanium/policy/query/entity/PolicyQueryResult.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-query/src/main/java/com/titanium/policy/query/entity/PolicyView.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-query/src/main/java/com/titanium/policy/query/entity/PolicyRelationView.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-query/src/main/java/com/titanium/policy/query/service/impl/PolicyQueryServiceImpl.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-query/src/main/java/com/titanium/policy/query/service/PolicyQueryService.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-query/src/main/java/com/titanium/policy/query/query/FindPoliciesByMultipleConditionsQuery.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-query/src/main/java/com/titanium/policy/query/query/FindPoliciesByCustomerQuery.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-query/src/main/java/com/titanium/policy/query/query/FindPolicyByIdQuery.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-query/src/main/java/com/titanium/policy/query/scheduled/DeadLetterQueueService.java">
+</file>
+</checkstyle>

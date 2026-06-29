@@ -1,0 +1,19 @@
+AeP56YgQ85kr+FITn9MWfk+Kk+2xk6InfGuQJqxt2lE=
+src/main/java/com/titanium/policy/application/command/InsuranceApplicationService.java 2026-02-11T09:29:21.934427133Z
+src/main/java/com/titanium/policy/application/command/PolicyApplicationService.java 2026-06-27T04:52:34.386594137Z
+src/main/java/com/titanium/policy/application/command/ProposalApplicationService.java 2026-02-11T09:29:21.897186702Z
+src/main/java/com/titanium/policy/application/query/InsuranceAppQueryService.java 2026-01-26T08:40:24.750508201Z
+src/main/java/com/titanium/policy/application/query/PolicyAppQueryService.java 2026-06-29T05:55:31.509848868Z
+src/main/java/com/titanium/policy/application/query/ProposalAppQueryService.java 2026-01-23T10:33:01.560101227Z
+src/main/java/com/titanium/policy/application/saga/IssuanceSaga.java 2026-06-29T05:55:31.491525790Z
+src/main/java/com/titanium/policy/application/service/ClauseService.java 2026-06-29T05:55:31.506789480Z
+src/main/java/com/titanium/policy/application/service/ClauseServiceAdapter.java 2026-06-29T05:55:31.496143518Z
+src/main/java/com/titanium/policy/application/service/EndorsementNoGeneratorImpl.java 2026-06-27T04:50:24.546540315Z
+src/main/java/com/titanium/policy/application/service/ProductService.java 2026-06-29T05:55:31.501341290Z
+src/main/java/com/titanium/policy/application/service/ProductServiceAdapter.java 2026-06-29T05:55:31.498724112Z
+src/main/java/com/titanium/policy/application/service/RuleEngineService.java 2026-06-29T05:55:31.505922602Z
+src/main/java/com/titanium/policy/application/service/RuleEngineServiceAdapter.java 2026-06-29T05:55:31.502337753Z
+src/main/java/com/titanium/policy/application/service/SyncUnderwritingDecisionAdapter.java 2026-06-25T12:35:20.356848014Z
+src/main/java/com/titanium/policy/application/service/UnderwritingService.java 2026-06-29T05:55:31.504674638Z
+src/main/java/com/titanium/policy/application/service/UnderwritingServiceAdapter.java 2026-06-29T05:55:31.500035535Z
+src/test/java/com/titanium/policy/application/saga/IssuanceSagaTest.java 2026-06-25T12:36:26.706399393Z

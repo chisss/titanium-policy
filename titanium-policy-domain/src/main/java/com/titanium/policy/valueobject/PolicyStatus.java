@@ -99,8 +99,20 @@ public record PolicyStatus(StatusCode statusCode, LocalDateTime statusTime, Stri
                 && newStatusCode == StatusCode.TERMINATED) {
             return;
         }
-        // EFFECTIVE → EXPIRED（到期失效，定时任务触发）
+        // EFFECTIVE → EXPIRED（满期，定时任务触发，止期到达）
         if (this.statusCode == StatusCode.EFFECTIVE && newStatusCode == StatusCode.EXPIRED) {
+            return;
+        }
+        // EFFECTIVE → LAPSED（失效/中止，宽限期满仍未缴费，计费/定时触发）
+        if (this.statusCode == StatusCode.EFFECTIVE && newStatusCode == StatusCode.LAPSED) {
+            return;
+        }
+        // LAPSED → EFFECTIVE（复效，保全域触发，补缴保费+重新核保通过后）
+        if (this.statusCode == StatusCode.LAPSED && newStatusCode == StatusCode.EFFECTIVE) {
+            return;
+        }
+        // LAPSED → TERMINATED（超过复效期限自动终止 / 失效后退保）
+        if (this.statusCode == StatusCode.LAPSED && newStatusCode == StatusCode.TERMINATED) {
             return;
         }
         // 其他状态流转不允许
@@ -121,8 +133,10 @@ public record PolicyStatus(StatusCode statusCode, LocalDateTime statusTime, Stri
         SUSPENDED("SUSPENDED", "暂停"),
         /** 终止（保全域触发/退保） */
         TERMINATED("TERMINATED", "终止"),
-        /** 到期失效（定时任务触发） */
-        EXPIRED("EXPIRED", "失效"),
+        /** 满期（保险期间届满，定时任务触发，终态） */
+        EXPIRED("EXPIRED", "满期"),
+        /** 失效/中止（宽限期满未缴费，可经复效恢复，非终态） */
+        LAPSED("LAPSED", "失效"),
         /** 已取消（仅未生效保单可取消） */
         CANCELLED("CANCELLED", "已取消");
 

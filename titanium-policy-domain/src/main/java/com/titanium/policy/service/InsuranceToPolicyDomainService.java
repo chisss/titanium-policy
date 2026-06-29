@@ -5,9 +5,9 @@ import java.util.UUID;
 import org.axonframework.commandhandling.gateway.CommandGateway;
 import org.springframework.stereotype.Service;
 
+import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.aggregate.Insurance;
 import com.titanium.policy.command.CreatePolicyCommand;
-import com.titanium.policy.valueobject.Amount;
 
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -49,10 +49,10 @@ public class InsuranceToPolicyDomainService {
                 null, // insuredId - 从参与方清单取
                 insurance.getBasicInfo().exactPremium() != null
                         ? insurance.getBasicInfo().exactPremium()
-                        : Amount.of(0, "CNY"),
+                        : Money.zero("CNY"),
                 insurance.getBasicInfo().exactPremium() != null
                         ? insurance.getBasicInfo().exactPremium()
-                        : Amount.of(0, "CNY"),
+                        : Money.zero("CNY"),
                 insurance.getBasicInfo().insurancePeriodStart(),
                 insurance.getBasicInfo().insurancePeriodEnd(),
                 null, // channel

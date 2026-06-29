@@ -1,14 +1,14 @@
 package com.titanium.policy.service;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import org.springframework.stereotype.Service;
 
 import com.titanium.policy.valueobject.RiskAssessmentStep;
 
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
-
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * 风控校验执行器
@@ -77,7 +77,7 @@ public class RiskAssessmentExecutor {
             variables.put("productCode", request.productCode());
             variables.put("totalPremium", request.totalPremium());
             variables.put("insuredCount", request.insuredCount());
-            
+
             // 调用规则引擎执行核保规则
             Object result = ruleEngineServicePort.executeRule("UNDERWRITING_BASIC", variables, request.tenantId());
             log.info("基础自动核保通过");

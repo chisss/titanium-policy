@@ -1,11 +1,11 @@
 package com.titanium.policy.infrastructure.repository.jpa;
 
+import java.util.Optional;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+
 import com.titanium.policy.infrastructure.entity.ProposalEntity;
 import com.titanium.policy.valueobject.proposal.ProposalStatus;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
-
-import java.util.Optional;
 
 /**
  * 投保意向单JPA仓库接口

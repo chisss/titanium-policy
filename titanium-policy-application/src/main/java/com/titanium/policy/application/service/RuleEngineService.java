@@ -1,15 +1,16 @@
 package com.titanium.policy.application.service;
 
+import java.util.Map;
+
+import org.springframework.stereotype.Service;
+
 import com.titanium.ruleengine.api.RuleEngineApi;
 import com.titanium.ruleengine.api.dto.RuleExecutionResultDTO;
 import com.titanium.ruleengine.api.dto.ValidationResultDTO;
 import com.titanium.ruleengine.api.response.ApiResponse;
-import org.springframework.stereotype.Service;
 
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
-
-import java.util.Map;
 
 /**
  * 规则引擎服务客户端

@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<checkstyle version="10.20.1">
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/repository/ProposalRepositoryImpl.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/repository/PolicyRepositoryImpl.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/repository/InsuranceRepositoryImpl.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/repository/jpa/JpaPolicyRepository.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/repository/jpa/JpaInsuranceRepository.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/repository/jpa/JpaProposalRepository.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/config/KafkaConfig.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/config/AxonConfig.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/entity/InsuranceEntity.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/entity/InsuranceProductEntity.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/entity/PolicyEntity.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/entity/PolicyDocumentEntity.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/entity/ProposalHolderEntity.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/entity/ProposalEntity.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/entity/ProposalSubjectEntity.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/mapper/ProposalMapper.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/mapper/PolicyMapper.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/mapper/InsuranceMapper.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/messaging/handler/TerminatePolicyWriteBackHandler.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/messaging/handler/ReinstatePolicyWriteBackHandler.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/messaging/handler/ResumePolicyWriteBackHandler.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/messaging/handler/SuspendPolicyWriteBackHandler.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/messaging/handler/GenericEndorsementWriteBackHandler.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/messaging/MaintenanceWriteBackHandler.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/messaging/MaintenanceExecutedEventListener.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/messaging/MaintenanceWriteBackContext.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/event/KafkaEventPublisher.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/projection/ProposalProjection.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/projection/PolicyProjection.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/projection/InsuranceProjection.java">
+</file>
+</checkstyle>

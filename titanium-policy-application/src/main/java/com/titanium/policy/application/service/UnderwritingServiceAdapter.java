@@ -1,14 +1,15 @@
 package com.titanium.policy.application.service;
 
+import java.util.List;
+
+import org.springframework.stereotype.Service;
+
 import com.titanium.policy.service.UnderwritingServicePort;
 import com.titanium.underwriting.api.request.CreateUnderwritingRequest;
 import com.titanium.underwriting.api.request.UnderwriteRequest;
-import org.springframework.stereotype.Service;
 
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
-
-import java.util.List;
 
 /**
  * 核保服务适配器

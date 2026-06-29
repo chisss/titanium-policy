@@ -1,6 +1,6 @@
 package com.titanium.policy.entity.insurance;
 
-import com.titanium.policy.valueobject.Amount;
+import com.titanium.metadata.valueobject.Money;
 
 /**
  * 投保险种实体
@@ -24,7 +24,7 @@ public record InsuranceProduct(
         /**
          * 保额
          */
-        Amount sumInsured,
+        Money sumInsured,
         /**
          * 保费系数
          */
@@ -49,7 +49,7 @@ public record InsuranceProduct(
      * @return 投保险种实体
      */
     public static InsuranceProduct addInsuranceLine(String lineId, String productCode, String productName,
-                                                    Amount sumInsured, double premiumFactor, boolean isMainLine) {
+                                                    Money sumInsured, double premiumFactor, boolean isMainLine) {
         return new InsuranceProduct(lineId, productCode, productName, sumInsured, premiumFactor, isMainLine);
     }
 

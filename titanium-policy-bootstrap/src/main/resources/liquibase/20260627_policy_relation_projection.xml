@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.1.xsd">
+
+    <!-- 父子保单关系读模型表：由 SubPolicyLinkedEvent 投影维护，支撑团单父→子状态级联 -->
+    <changeSet id="20260627-policy-relation-projection" author="titanium-cqrs">
+        <createTable tableName="t_policy_relation" remarks="保单父子关系读模型表（团单主子联动）">
+            <column name="child_policy_id" type="VARCHAR(36)" remarks="子保单ID（读模型主键，一子单唯一归属一父单）">
+                <constraints primaryKey="true" nullable="false" primaryKeyName="pk_t_policy_relation"/>
+            </column>
+            <column name="parent_policy_id" type="VARCHAR(36)" remarks="父保单ID">
+                <constraints nullable="false"/>
+            </column>
+            <column name="group_id" type="VARCHAR(36)" remarks="集团ID（团单专属）"/>
+            <column name="tenant_id" type="VARCHAR(36)" remarks="租户ID（多租户隔离）">
+                <constraints nullable="false"/>
+            </column>
+            <column name="linked_at" type="DATETIME" remarks="挂载时间">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <!-- 级联查询索引：按父保单+租户查全部子保单 -->
+        <createIndex tableName="t_policy_relation" indexName="idx_policy_relation_parent">
+            <column name="parent_policy_id"/>
+            <column name="tenant_id"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

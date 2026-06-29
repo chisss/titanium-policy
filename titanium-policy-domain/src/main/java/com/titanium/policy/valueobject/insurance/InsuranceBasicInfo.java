@@ -3,7 +3,7 @@ package com.titanium.policy.valueobject.insurance;
 import java.time.LocalDateTime;
 import java.util.List;
 
-import com.titanium.policy.valueobject.Amount;
+import com.titanium.metadata.valueobject.Money;
 
 /**
  * 投保单基本信息值对象
@@ -23,7 +23,7 @@ public record InsuranceBasicInfo(
                                  /*
                                   * 精确保费
                                   */
-                                 Amount exactPremium,
+                                 Money exactPremium,
                                  /*
                                   * 精确保障期限起期
                                   */
@@ -48,7 +48,7 @@ public record InsuranceBasicInfo(
      *
      * @return 精确保费
      */
-    public Amount calculateExactPremium() {
+    public Money calculateExactPremium() {
         // 这里应该调用产品域的保费计算规则
         // 暂时返回当前精确保费
         return this.exactPremium;

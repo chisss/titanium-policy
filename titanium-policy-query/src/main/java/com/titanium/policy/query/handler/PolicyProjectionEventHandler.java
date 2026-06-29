@@ -14,6 +14,8 @@ import com.titanium.policy.event.PolicyCancelledEvent;
 import com.titanium.policy.event.PolicyCreatedEvent;
 import com.titanium.policy.event.PolicyExpiredEvent;
 import com.titanium.policy.event.PolicyIssuedEvent;
+import com.titanium.policy.event.PolicyLapsedEvent;
+import com.titanium.policy.event.PolicyReinstatedEvent;
 import com.titanium.policy.event.PolicyResumedEvent;
 import com.titanium.policy.event.PolicySuspendedEvent;
 import com.titanium.policy.event.PolicyTerminatedEvent;
@@ -133,6 +135,24 @@ public class PolicyProjectionEventHandler {
     }
 
     /**
+     * 投影保单失效事件（宽限期满未缴费）
+     */
+    @EventHandler
+    @Transactional
+    public void on(PolicyLapsedEvent event) {
+        applyStatus(event.policyId(), event.tenantId(), PolicyStatus.StatusCode.LAPSED);
+    }
+
+    /**
+     * 投影保单复效事件（补缴+核保通过后恢复生效）
+     */
+    @EventHandler
+    @Transactional
+    public void on(PolicyReinstatedEvent event) {
+        applyStatus(event.policyId(), event.tenantId(), PolicyStatus.StatusCode.EFFECTIVE);
+    }
+
+    /**
      * 投影保单取消事件
      */
     @EventHandler
@@ -170,6 +190,7 @@ public class PolicyProjectionEventHandler {
             case SUSPENDED -> PolicyEnum.PolicyStatus.SUSPENDED;
             case TERMINATED -> PolicyEnum.PolicyStatus.TERMINATED;
             case EXPIRED -> PolicyEnum.PolicyStatus.EXPIRED;
+            case LAPSED -> PolicyEnum.PolicyStatus.LAPSED;
             case CANCELLED -> PolicyEnum.PolicyStatus.CANCELLED;
         };
     }

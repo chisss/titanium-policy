@@ -13,7 +13,6 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
-
 import lombok.Getter;
 import lombok.Setter;
 
@@ -100,6 +99,10 @@ public class PolicyView {
     /** 读模型更新时间（最近一次投影时间） */
     @Column(name = "update_time", nullable = false)
     private LocalDateTime updateTime;
+
+    /** 保单当前业务版本号（批改后递增；区别于下方乐观锁 version） */
+    @Column(name = "current_version")
+    private Integer       currentVersion;
 
     /** 乐观锁版本，防止并发投影覆盖 */
     @Version

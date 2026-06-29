@@ -2,12 +2,12 @@ package com.titanium.policy.infrastructure.mapper;
 
 
 
-import com.titanium.policy.aggregate.Insurance;
-import com.titanium.policy.infrastructure.entity.InsuranceEntity;
 import org.mapstruct.Mapper;
-import org.mapstruct.Mapping;
 import org.mapstruct.ReportingPolicy;
 import org.mapstruct.factory.Mappers;
+
+import com.titanium.policy.aggregate.Insurance;
+import com.titanium.policy.infrastructure.entity.InsuranceEntity;
 
 /**
  * 投保单映射接口
@@ -42,7 +42,7 @@ public interface InsuranceMapper {
 //    @Mapping(source = "underwritingResult.underwritingTime", target = "underwritingTime")
 //    @Mapping(source = "underwritingResult.condition", target = "underwritingCondition")
     InsuranceEntity toEntity(Insurance insurance);
-    
+
     /**
      * 将投保单数据库实体转换为聚合根
      *

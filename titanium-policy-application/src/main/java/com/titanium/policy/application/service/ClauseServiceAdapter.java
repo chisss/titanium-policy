@@ -1,13 +1,13 @@
 package com.titanium.policy.application.service;
 
-import com.titanium.clause.api.dto.ClauseDTO;
-import com.titanium.policy.service.ClauseServicePort;
+import java.util.List;
+
 import org.springframework.stereotype.Service;
+
+import com.titanium.policy.service.ClauseServicePort;
 
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
-
-import java.util.List;
 
 /**
  * 条款服务适配器

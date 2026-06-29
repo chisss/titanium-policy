@@ -14,16 +14,16 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.enums.underwriting.UnderwritingEnum.ConclusionType;
+import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.command.CreatePolicyCommand;
 import com.titanium.policy.command.ReceiveUnderwritingResultCommand;
+import com.titanium.policy.command.TriggerIssuanceCommand;
 import com.titanium.policy.event.insurance.InsuranceCreatedEvent;
 import com.titanium.policy.event.insurance.InsuranceIssuedEvent;
 import com.titanium.policy.event.insurance.InsuranceSubmittedForUnderwritingEvent;
 import com.titanium.policy.event.insurance.UnderwritingResultReceivedEvent;
-import com.titanium.policy.command.TriggerIssuanceCommand;
-import com.titanium.policy.service.UnderwritingDecisionGateway;
 import com.titanium.policy.service.PolicyNoGenerator;
-import com.titanium.policy.valueobject.Amount;
+import com.titanium.policy.service.UnderwritingDecisionGateway;
 import com.titanium.policy.valueobject.insurance.UnderwritingDecisionRequest;
 import com.titanium.policy.valueobject.insurance.UnderwritingResult;
 
@@ -129,7 +129,7 @@ public class IssuanceSaga {
     public void on(InsuranceIssuedEvent event) {
         String policyId = UUID.randomUUID().toString();
         String policyNo = policyNoGenerator.generatePolicyNo();
-        Amount premium = exactPremium != null ? Amount.of(exactPremium, "CNY") : Amount.of(BigDecimal.ZERO, "CNY");
+        Money premium = exactPremium != null ? Money.of(exactPremium, "CNY") : Money.zero("CNY");
 
         CreatePolicyCommand command = new CreatePolicyCommand(
                 policyId,

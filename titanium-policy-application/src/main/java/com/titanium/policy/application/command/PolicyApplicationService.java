@@ -4,6 +4,7 @@ import org.axonframework.commandhandling.gateway.CommandGateway;
 import org.springframework.stereotype.Service;
 
 import com.titanium.policy.command.ActivatePolicyCommand;
+import com.titanium.policy.command.ApplyPolicyEndorsementCommand;
 import com.titanium.policy.command.CancelPolicyCommand;
 import com.titanium.policy.command.CreatePolicyCommand;
 import com.titanium.policy.command.CreatePolicyDirectlyCommand;
@@ -42,6 +43,27 @@ public class PolicyApplicationService {
      */
     public IssuanceResult issueByConfig(IssuanceProcessConfig config, IssuanceRequest request) {
         return issuanceOrchestrator.orchestrate(config, request);
+    }
+
+    /**
+     * 产品驱动智能出单：出单模式由产品域配置决定，调用方无需指定步数。
+     *
+     * @param request 出单请求
+     * @return 出单结果
+     */
+    public IssuanceResult issue(IssuanceRequest request) {
+        return issuanceOrchestrator.orchestrate(request);
+    }
+
+    /**
+     * 应用保单批改（数据/要素类批改回写编排）
+     *
+     * @param command 批改命令
+     * @return 保单ID
+     */
+    public String applyEndorsement(ApplyPolicyEndorsementCommand command) {
+        commandGateway.sendAndWait(command);
+        return command.policyId();
     }
 
     /**

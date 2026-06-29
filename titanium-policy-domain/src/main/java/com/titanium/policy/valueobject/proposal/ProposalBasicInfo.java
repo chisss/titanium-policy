@@ -1,8 +1,8 @@
 package com.titanium.policy.valueobject.proposal;
 
-import com.titanium.policy.valueobject.Amount;
-
 import java.time.LocalDateTime;
+
+import com.titanium.metadata.valueobject.Money;
 
 /**
  * 投保意向单基本信息值对象
@@ -18,11 +18,11 @@ public record ProposalBasicInfo(
         /**
          * 意向保额
          */
-        Amount intendedSumInsured,
+        Money intendedSumInsured,
         /**
          * 意向保费
          */
-        Amount intendedPremium,
+        Money intendedPremium,
         /**
          * 保障期限起期
          */

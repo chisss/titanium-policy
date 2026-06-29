@@ -1,9 +1,9 @@
 package com.titanium.policy.repository;
 
+import java.util.Optional;
+
 import com.titanium.policy.aggregate.Proposal;
 import com.titanium.policy.valueobject.proposal.ProposalStatus;
-
-import java.util.Optional;
 
 /**
  * 投保意向单仓库接口

@@ -1,18 +1,20 @@
 package com.titanium.policy.infrastructure.repository;
 
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+import org.springframework.stereotype.Repository;
+
+import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.aggregate.Proposal;
 import com.titanium.policy.infrastructure.entity.ProposalEntity;
 import com.titanium.policy.infrastructure.mapper.ProposalMapper;
 import com.titanium.policy.infrastructure.repository.jpa.JpaProposalRepository;
 import com.titanium.policy.repository.ProposalRepository;
-import com.titanium.policy.valueobject.Amount;
 import com.titanium.policy.valueobject.proposal.ProposalBasicInfo;
 import com.titanium.policy.valueobject.proposal.ProposalStatus;
-import org.springframework.stereotype.Repository;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
 
 /**
  * 投保意向单仓库实现
@@ -118,8 +120,8 @@ public class ProposalRepositoryImpl implements ProposalRepository {
     private Proposal convertToAggregate(ProposalEntity entity) {
         ProposalBasicInfo basicInfo = new ProposalBasicInfo(
                 entity.getCustomerId(),
-                Amount.of(entity.getIntendedSumInsured(), entity.getCurrency()),
-                Amount.of(entity.getIntendedPremium(), entity.getCurrency()),
+                Money.of(BigDecimal.valueOf(entity.getIntendedSumInsured()), entity.getCurrency()),
+                Money.of(BigDecimal.valueOf(entity.getIntendedPremium()), entity.getCurrency()),
                 entity.getInsurancePeriodStart(),
                 entity.getInsurancePeriodEnd(),
                 entity.getExpectedProductCode()

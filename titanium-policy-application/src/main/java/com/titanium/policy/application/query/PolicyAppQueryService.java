@@ -20,7 +20,7 @@ import jakarta.annotation.Resource;
 public class PolicyAppQueryService {
     @Resource
     private PolicyRepository policyRepository;
-    
+
     /**
      * 根据ID查询保单
      *
@@ -31,7 +31,7 @@ public class PolicyAppQueryService {
     public Optional<Policy> findById(String policyId, String tenantId) {
         return policyRepository.findById(policyId, tenantId);
     }
-    
+
     /**
      * 根据状态查询保单
      *
@@ -42,7 +42,7 @@ public class PolicyAppQueryService {
     public Iterable<Policy> findByStatus(String tenantId, PolicyStatus.StatusCode statusCode) {
         return policyRepository.findByStatus(tenantId, statusCode);
     }
-    
+
     /**
      * 根据保单编号查询保单
      *
@@ -53,7 +53,7 @@ public class PolicyAppQueryService {
     public Optional<Policy> findByPolicyNo(String policyNo, String tenantId) {
         return policyRepository.findByPolicyNo(policyNo, tenantId);
     }
-    
+
     /**
      * 根据关联投保单ID查询保单
      *
@@ -64,7 +64,7 @@ public class PolicyAppQueryService {
     public Optional<Policy> findByApplicationId(String applicationId, String tenantId) {
         return policyRepository.findByApplicationId(applicationId, tenantId);
     }
-    
+
     /**
      * 根据投保人ID查询保单
      *

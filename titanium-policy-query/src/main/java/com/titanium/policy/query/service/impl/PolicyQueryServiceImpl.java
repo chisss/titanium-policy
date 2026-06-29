@@ -11,8 +11,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.titanium.metadata.enums.policy.PolicyEnum;
-import com.titanium.policy.query.entity.PolicyView;
 import com.titanium.policy.query.entity.PolicyQueryResult;
+import com.titanium.policy.query.entity.PolicyView;
 import com.titanium.policy.query.repository.PolicyViewRepository;
 import com.titanium.policy.query.service.PolicyQueryService;
 

@@ -14,7 +14,7 @@ public interface PolicyRepository {
 
     /**
      * 根据状态查询保单
-     * 
+     *
      * @param tenantId 租户ID
      * @param statusCode 状态编码
      * @return 保单迭代器
@@ -23,7 +23,7 @@ public interface PolicyRepository {
 
     /**
      * 根据保单编号查询保单
-     * 
+     *
      * @param policyNo 保单编号
      * @param tenantId 租户ID
      * @return 保单聚合根
@@ -32,7 +32,7 @@ public interface PolicyRepository {
 
     /**
      * 根据关联投保单ID查询保单
-     * 
+     *
      * @param applicationId 投保单ID
      * @param tenantId 租户ID
      * @return 保单聚合根
@@ -41,7 +41,7 @@ public interface PolicyRepository {
 
     /**
      * 根据投保人ID查询保单
-     * 
+     *
      * @param policyHolderId 投保人ID
      * @param tenantId 租户ID
      * @return 保单迭代器
