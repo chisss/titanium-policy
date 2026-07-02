@@ -11,11 +11,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import com.titanium.policy.command.ApplyPolicyEndorsementCommand;
+import com.titanium.policy.common.enums.PolicyDataUpdateType;
 import com.titanium.policy.event.PolicyActivatedEvent;
 import com.titanium.policy.event.PolicyCreatedEvent;
 import com.titanium.policy.event.PolicyEndorsedEvent;
 import com.titanium.policy.exception.PolicyBusinessRuleException;
-import com.titanium.policy.valueobject.PolicyDataUpdateType;
 import com.titanium.policy.valueobject.PolicyNo;
 import com.titanium.policy.valueobject.PolicyStatus;
 

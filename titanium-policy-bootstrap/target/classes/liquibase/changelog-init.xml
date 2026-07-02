@@ -168,4 +168,6 @@
     <include file="liquibase/20260627_policy_relation_projection.xml"/>
     <!-- 批单读模型表 + 保单读模型当前版本号列（数据/要素类批改） -->
     <include file="liquibase/20260628_policy_endorsement_projection.xml"/>
+    <!-- 投保单/意向单读模型表（补齐 Insurance/Proposal CQRS 读写分离） -->
+    <include file="liquibase/20260701_insurance_proposal_view_projection.xml"/>
 </databaseChangeLog>

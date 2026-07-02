@@ -1,3 +1,11 @@
-com/titanium/policy/web/controller/ProposalController.class
+com/titanium/policy/web/mapper/ProposalWebMapperImpl.class
+com/titanium/policy/web/request/CreateProposalRequest.class
 com/titanium/policy/web/controller/PolicyController.class
+com/titanium/policy/web/response/ProposalVO.class
+com/titanium/policy/web/mapper/InsuranceWebMapper.class
+com/titanium/policy/web/controller/ProposalController.class
 com/titanium/policy/web/controller/InsuranceController.class
+com/titanium/policy/web/response/InsuranceVO.class
+com/titanium/policy/web/mapper/InsuranceWebMapperImpl.class
+com/titanium/policy/web/mapper/ProposalWebMapper.class
+com/titanium/policy/web/request/ConvertToInsuranceRequest.class

@@ -2,7 +2,7 @@ package com.titanium.policy.infrastructure.entity;
 
 import java.time.LocalDateTime;
 
-import com.titanium.policy.valueobject.PolicyDocumentType;
+import com.titanium.policy.common.enums.PolicyDocumentType;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

@@ -26,21 +26,14 @@
             <artifactId>titanium-policy-domain</artifactId>
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
-        
-        <!-- 基础设施层 -->
-        <dependency>
-            <groupId>com.titanium</groupId>
-            <artifactId>titanium-policy-infrastructure</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
-        </dependency>
-        
+
         <!-- 查询模块 -->
         <dependency>
             <groupId>com.titanium</groupId>
             <artifactId>titanium-policy-query</artifactId>
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
-        
+
         <!-- Axon Framework -->
         <dependency>
             <groupId>org.axonframework</groupId>
@@ -65,51 +58,11 @@
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
         </dependency>
-        
-        <!-- Fastjson -->
-        <dependency>
-            <groupId>com.alibaba.fastjson2</groupId>
-            <artifactId>fastjson2</artifactId>
-        </dependency>
-        
+
         <!-- Common Project -->
         <dependency>
             <groupId>com.titanium</groupId>
             <artifactId>titanium-common</artifactId>
-        </dependency>
-        
-        <!-- 产品系统API -->
-        <dependency>
-            <groupId>com.titanium</groupId>
-            <artifactId>titanium-product-api</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
-        </dependency>
-        
-        <!-- 条款系统API -->
-        <dependency>
-            <groupId>com.titanium</groupId>
-            <artifactId>titanium-clause-api</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
-        </dependency>
-        
-        <!-- 规则引擎API -->
-        <dependency>
-            <groupId>com.titanium</groupId>
-            <artifactId>titanium-rule-engine-api</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
-        </dependency>
-        
-        <!-- 核保系统API -->
-        <dependency>
-            <groupId>com.titanium</groupId>
-            <artifactId>titanium-underwriting-api</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
-        </dependency>
-        
-        <!-- OpenFeign -->
-        <dependency>
-            <groupId>org.springframework.cloud</groupId>
-            <artifactId>spring-cloud-starter-openfeign</artifactId>
         </dependency>
 
         <dependency>
@@ -122,11 +75,11 @@
             <artifactId>mockito-core</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- API 层（应用服务以对外 DTO 作为 Web 入口契约，命令构造下沉于此） -->
         <dependency>
             <groupId>com.titanium</groupId>
             <artifactId>titanium-policy-api</artifactId>
             <version>1.0.0-SNAPSHOT</version>
-            <scope>test</scope>
         </dependency>
     </dependencies>
 

@@ -1,78 +1,57 @@
 package com.titanium.policy.application.query;
 
+import java.util.List;
 import java.util.Optional;
 
+import org.axonframework.messaging.responsetypes.ResponseTypes;
+import org.axonframework.queryhandling.QueryGateway;
 import org.springframework.stereotype.Service;
 
-import com.titanium.policy.aggregate.Policy;
-import com.titanium.policy.repository.PolicyRepository;
-import com.titanium.policy.valueobject.PolicyStatus;
+import com.titanium.policy.query.query.FindPoliciesByCustomerQuery;
+import com.titanium.policy.query.query.FindPolicyByIdQuery;
+import com.titanium.policy.query.result.PolicyQueryResult;
 
 import jakarta.annotation.Resource;
 
 /**
- * 保单查询服务
+ * 保单查询服务（CQRS 读侧入口）
  * <p>
- * 处理保单相关的查询，协调领域层和基础设施层
+ * 读写分离落地：经 {@link QueryGateway} 派发查询到读侧 {@code PolicyQueryHandler}，
+ * 查询 {@code PolicyView} 读模型，<b>不再回退到写模型聚合 {@code Policy}</b>。
+ * 读侧与写侧彻底解耦，查询走独立优化的读模型表 {@code t_policy_view}。
  * </p>
  */
 @Service
 public class PolicyAppQueryService {
+
     @Resource
-    private PolicyRepository policyRepository;
+    private QueryGateway queryGateway;
 
     /**
-     * 根据ID查询保单
+     * 根据ID查询保单（读模型）
      *
      * @param policyId 保单ID
      * @param tenantId 租户ID
-     * @return 保单
+     * @return 保单查询结果，不存在时为空
      */
-    public Optional<Policy> findById(String policyId, String tenantId) {
-        return policyRepository.findById(policyId, tenantId);
+    public Optional<PolicyQueryResult> findById(String policyId, String tenantId) {
+        PolicyQueryResult result = queryGateway
+                .query(new FindPolicyByIdQuery(policyId, tenantId), ResponseTypes.instanceOf(PolicyQueryResult.class))
+                .join();
+        return Optional.ofNullable(result);
     }
 
     /**
-     * 根据状态查询保单
+     * 根据客户ID分页查询保单（读模型）
      *
+     * @param customerId 客户ID
      * @param tenantId 租户ID
-     * @param statusCode 状态编码
-     * @return 保单列表
+     * @param page 页码（从0开始）
+     * @param size 每页条数
+     * @return 保单查询结果列表
      */
-    public Iterable<Policy> findByStatus(String tenantId, PolicyStatus.StatusCode statusCode) {
-        return policyRepository.findByStatus(tenantId, statusCode);
-    }
-
-    /**
-     * 根据保单编号查询保单
-     *
-     * @param policyNo 保单编号
-     * @param tenantId 租户ID
-     * @return 保单
-     */
-    public Optional<Policy> findByPolicyNo(String policyNo, String tenantId) {
-        return policyRepository.findByPolicyNo(policyNo, tenantId);
-    }
-
-    /**
-     * 根据关联投保单ID查询保单
-     *
-     * @param applicationId 投保单ID
-     * @param tenantId 租户ID
-     * @return 保单
-     */
-    public Optional<Policy> findByApplicationId(String applicationId, String tenantId) {
-        return policyRepository.findByApplicationId(applicationId, tenantId);
-    }
-
-    /**
-     * 根据投保人ID查询保单
-     *
-     * @param policyHolderId 投保人ID
-     * @param tenantId 租户ID
-     * @return 保单列表
-     */
-    public Iterable<Policy> findByPolicyHolderId(String policyHolderId, String tenantId) {
-        return policyRepository.findByPolicyHolderId(policyHolderId, tenantId);
+    public List<PolicyQueryResult> findByCustomerId(String customerId, String tenantId, int page, int size) {
+        return queryGateway.query(new FindPoliciesByCustomerQuery(customerId, tenantId, page, size),
+                ResponseTypes.multipleInstancesOf(PolicyQueryResult.class)).join();
     }
 }

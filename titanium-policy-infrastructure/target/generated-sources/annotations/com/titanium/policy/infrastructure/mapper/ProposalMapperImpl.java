@@ -7,8 +7,8 @@ import org.springframework.stereotype.Component;
 
 @Generated(
     value = "org.mapstruct.ap.MappingProcessor",
-    date = "2026-06-29T17:25:47+0800",
-    comments = "version: 1.5.5.Final, compiler: javac, environment: Java 21.0.4 (Amazon.com Inc.)"
+    date = "2026-07-02T09:28:37+0800",
+    comments = "version: 1.5.5.Final, compiler: Eclipse JDT (IDE) 3.46.100.v20260624-0231, environment: Java 21.0.11 (Eclipse Adoptium)"
 )
 @Component
 public class ProposalMapperImpl implements ProposalMapper {
@@ -21,14 +21,14 @@ public class ProposalMapperImpl implements ProposalMapper {
 
         ProposalEntity proposalEntity = new ProposalEntity();
 
-        proposalEntity.setProposalId( proposal.getProposalId() );
-        proposalEntity.setProposalNo( proposal.getProposalNo() );
-        proposalEntity.setPolicyForm( proposal.getPolicyForm() );
-        proposalEntity.setParentProposalId( proposal.getParentProposalId() );
-        proposalEntity.setChannel( proposal.getChannel() );
+        proposalEntity.setTenantId( proposal.getTenantId() );
         proposalEntity.setCreateTime( proposal.getCreateTime() );
         proposalEntity.setUpdateTime( proposal.getUpdateTime() );
-        proposalEntity.setTenantId( proposal.getTenantId() );
+        proposalEntity.setChannel( proposal.getChannel() );
+        proposalEntity.setParentProposalId( proposal.getParentProposalId() );
+        proposalEntity.setPolicyForm( proposal.getPolicyForm() );
+        proposalEntity.setProposalId( proposal.getProposalId() );
+        proposalEntity.setProposalNo( proposal.getProposalNo() );
 
         return proposalEntity;
     }
@@ -39,16 +39,16 @@ public class ProposalMapperImpl implements ProposalMapper {
             return null;
         }
 
-        Proposal.ProposalBuilder proposal = Proposal.builder();
+        Proposal.ProposalBuilder<?, ?> proposal = Proposal.builder();
 
+        proposal.tenantId( entity.getTenantId() );
+        proposal.createTime( entity.getCreateTime() );
+        proposal.updateTime( entity.getUpdateTime() );
         proposal.proposalId( entity.getProposalId() );
         proposal.proposalNo( entity.getProposalNo() );
         proposal.policyForm( entity.getPolicyForm() );
         proposal.parentProposalId( entity.getParentProposalId() );
         proposal.channel( entity.getChannel() );
-        proposal.createTime( entity.getCreateTime() );
-        proposal.updateTime( entity.getUpdateTime() );
-        proposal.tenantId( entity.getTenantId() );
 
         return proposal.build();
     }

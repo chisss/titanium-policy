@@ -10,6 +10,7 @@ import org.axonframework.modelling.command.AggregateIdentifier;
 import org.axonframework.modelling.command.AggregateLifecycle;
 import org.axonframework.spring.stereotype.Aggregate;
 
+import com.titanium.common.domain.BaseAggregate;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.enums.product.ProductEnum.SalesChannel;
 import com.titanium.metadata.valueobject.Money;
@@ -26,10 +27,8 @@ import com.titanium.policy.exception.PolicyBusinessRuleException;
 import com.titanium.policy.valueobject.proposal.ProposalBasicInfo;
 import com.titanium.policy.valueobject.proposal.ProposalStatus;
 
-import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Getter;
+import lombok.experimental.SuperBuilder;
 
 /**
  * 投保意向单聚合根
@@ -40,9 +39,8 @@ import lombok.Getter;
  */
 @Aggregate
 @Getter
-@Builder(toBuilder = true)
-@AllArgsConstructor(access = AccessLevel.PRIVATE)
-public class Proposal {
+@SuperBuilder(toBuilder = true)
+public class Proposal extends BaseAggregate {
     /** 聚合根唯一标识 */
     @AggregateIdentifier
     private String                proposalId;
@@ -54,10 +52,6 @@ public class Proposal {
     private String                parentProposalId;
     /** 销售渠道 */
     private SalesChannel          channel;
-    /** 创建时间 */
-    private LocalDateTime         createTime;
-    /** 更新时间 */
-    private LocalDateTime         updateTime;
     /** 意向单基本信息 */
     private ProposalBasicInfo     basicInfo;
     /** 申请人列表 */
@@ -66,8 +60,6 @@ public class Proposal {
     private List<ProposalSubject> subjects;
     /** 意向单状态 */
     private ProposalStatus        status;
-    /** 租户ID */
-    private String                tenantId;
 
     // ==================== CommandHandler ====================
 

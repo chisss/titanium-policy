@@ -1,7 +1,7 @@
 package com.titanium.policy.entity.proposal;
 
 import com.titanium.metadata.enums.underwriting.UnderwritingEnum;
-import com.titanium.policy.valueobject.SubjectType;
+import com.titanium.policy.common.enums.SubjectType;
 
 /**
  * 投保意向单标的实体

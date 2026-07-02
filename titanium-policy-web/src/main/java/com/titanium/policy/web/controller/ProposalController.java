@@ -13,16 +13,21 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.titanium.policy.aggregate.Proposal;
 import com.titanium.policy.application.command.ProposalApplicationService;
 import com.titanium.policy.application.query.ProposalAppQueryService;
-import com.titanium.policy.command.CreateProposalCommand;
-import com.titanium.policy.command.SubmitProposalCommand;
+import com.titanium.policy.web.mapper.ProposalWebMapper;
+import com.titanium.policy.web.request.CreateProposalRequest;
+import com.titanium.policy.web.response.ProposalVO;
 
 import jakarta.annotation.Resource;
 
 /**
  * 投保意向单控制器
+ * <p>
+ * 表现层仅依赖 Web 层 Request/VO 与应用层 command/query 服务，不直接依赖领域命令/聚合根： 写入口经
+ * {@link ProposalApplicationService}（应用层构造命令），读入口经 {@link ProposalAppQueryService}
+ * 查询读模型并由 {@link ProposalWebMapper} 转 VO。
+ * </p>
  */
 @RestController
 @RequestMapping("/api/proposals")
@@ -34,15 +39,23 @@ public class ProposalController {
     @Resource
     private ProposalAppQueryService    proposalAppQueryService;
 
+    @Resource
+    private ProposalWebMapper          proposalWebMapper;
+
     /**
      * 创建投保意向单
      *
-     * @param command 创建投保意向单命令
-     * @return 响应结果
+     * @param request 创建请求
+     * @param tenantId 租户ID
+     * @return 意向单ID
      */
     @PostMapping
-    public ResponseEntity<String> createProposal(@RequestBody CreateProposalCommand command) {
-        String proposalId = proposalApplicationService.createProposal(command);
+    public ResponseEntity<String> createProposal(@RequestBody CreateProposalRequest request,
+                                                 @RequestHeader("X-Tenant-Id") String tenantId) {
+        String proposalId = proposalApplicationService.createProposal(request.getProposalId(), request.getProposalNo(),
+                request.getPolicyForm(), request.getChannel(), request.getCustomerId(), request.getIntendedSumInsured(),
+                request.getIntendedPremium(), request.getCurrency(), request.getInsurancePeriodStart(),
+                request.getInsurancePeriodEnd(), request.getExpectedProductCode(), tenantId);
         return new ResponseEntity<>(proposalId, HttpStatus.CREATED);
     }
 
@@ -54,10 +67,11 @@ public class ProposalController {
      * @return 投保意向单详情
      */
     @GetMapping("/{proposalId}")
-    public ResponseEntity<Proposal> getProposal(@PathVariable String proposalId,
-                                                @RequestHeader("X-Tenant-Id") String tenantId) {
-        Optional<Proposal> proposal = proposalAppQueryService.findByProposalNo(proposalId, tenantId);
-        return proposal.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
+    public ResponseEntity<ProposalVO> getProposal(@PathVariable String proposalId,
+                                                  @RequestHeader("X-Tenant-Id") String tenantId) {
+        Optional<ProposalVO> vo = proposalAppQueryService.findByProposalNo(proposalId, tenantId)
+                .map(proposalWebMapper::toVO);
+        return vo.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     /**
@@ -70,8 +84,7 @@ public class ProposalController {
     @PutMapping("/{proposalId}/submit")
     public ResponseEntity<Void> submitProposal(@PathVariable String proposalId,
                                                @RequestHeader("X-Tenant-Id") String tenantId) {
-        SubmitProposalCommand command = new SubmitProposalCommand(proposalId, "提交投保意向单", tenantId);
-        proposalApplicationService.submitProposal(command);
+        proposalApplicationService.submitProposal(proposalId, "提交投保意向单", tenantId);
         return ResponseEntity.noContent().build();
     }
 }

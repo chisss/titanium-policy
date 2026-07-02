@@ -3,6 +3,7 @@ package com.titanium.policy.valueobject;
 import java.util.List;
 
 import com.titanium.metadata.enums.product.ProductEnum;
+import com.titanium.policy.common.enums.RiskAssessmentStep;
 
 /**
  * 出单流程配置值对象

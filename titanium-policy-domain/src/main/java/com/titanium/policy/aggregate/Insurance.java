@@ -10,6 +10,7 @@ import org.axonframework.modelling.command.AggregateIdentifier;
 import org.axonframework.modelling.command.AggregateLifecycle;
 import org.axonframework.spring.stereotype.Aggregate;
 
+import com.titanium.common.domain.BaseAggregate;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.enums.underwriting.UnderwritingEnum.ConclusionType;
 import com.titanium.metadata.valueobject.Money;
@@ -29,10 +30,8 @@ import com.titanium.policy.valueobject.insurance.InsuranceBasicInfo;
 import com.titanium.policy.valueobject.insurance.InsuranceStatus;
 import com.titanium.policy.valueobject.insurance.UnderwritingResult;
 
-import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Getter;
+import lombok.experimental.SuperBuilder;
 
 /**
  * 投保单聚合根
@@ -42,9 +41,8 @@ import lombok.Getter;
  */
 @Aggregate
 @Getter
-@Builder(toBuilder = true)
-@AllArgsConstructor(access = AccessLevel.PRIVATE)
-public class Insurance {
+@SuperBuilder(toBuilder = true)
+public class Insurance extends BaseAggregate {
     /** 聚合根唯一标识 */
     @AggregateIdentifier
     private String                 insuranceId;
@@ -56,10 +54,6 @@ public class Insurance {
     private PolicyForm             policyForm;
     /** 父投保单ID */
     private String                 parentInsuranceId;
-    /** 创建时间 */
-    private LocalDateTime          createTime;
-    /** 更新时间 */
-    private LocalDateTime          updateTime;
     /** 投保单基本信息 */
     private InsuranceBasicInfo     basicInfo;
     /** 投保险种列表 */
@@ -70,8 +64,6 @@ public class Insurance {
     private UnderwritingResult     underwritingResult;
     /** 投保单状态 */
     private InsuranceStatus        status;
-    /** 租户ID */
-    private String                 tenantId;
 
     // ==================== CommandHandler ====================
 

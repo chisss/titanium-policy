@@ -19,8 +19,9 @@ import com.titanium.policy.event.insurance.InsuranceCreatedEvent;
 import com.titanium.policy.event.insurance.InsuranceIssuedEvent;
 import com.titanium.policy.event.insurance.InsuranceSubmittedForUnderwritingEvent;
 import com.titanium.policy.event.insurance.UnderwritingResultReceivedEvent;
-import com.titanium.policy.service.PolicyNoGenerator;
-import com.titanium.policy.service.UnderwritingDecisionGateway;
+import com.titanium.policy.generator.PolicyNoGenerator;
+import com.titanium.policy.port.UnderwritingDecisionGateway;
+import com.titanium.policy.service.impl.PolicyIssuanceDomainServiceImpl;
 import com.titanium.policy.valueobject.insurance.UnderwritingDecisionRequest;
 import com.titanium.policy.valueobject.insurance.UnderwritingResult;
 
@@ -53,6 +54,8 @@ public class IssuanceSagaTest {
         fixture.registerCommandGateway(CommandGateway.class);
         fixture.registerResource(underwritingGateway);
         fixture.registerResource(new PolicyNoGenerator());
+        // 注册承保领域服务真实实现（纯领域计算、无依赖），承保准入裁决口径与生产一致
+        fixture.registerResource(new PolicyIssuanceDomainServiceImpl());
     }
 
     /**

@@ -7,8 +7,8 @@ import org.springframework.stereotype.Component;
 
 @Generated(
     value = "org.mapstruct.ap.MappingProcessor",
-    date = "2026-06-29T17:25:47+0800",
-    comments = "version: 1.5.5.Final, compiler: javac, environment: Java 21.0.4 (Amazon.com Inc.)"
+    date = "2026-07-02T09:28:37+0800",
+    comments = "version: 1.5.5.Final, compiler: Eclipse JDT (IDE) 3.46.100.v20260624-0231, environment: Java 21.0.11 (Eclipse Adoptium)"
 )
 @Component
 public class InsuranceMapperImpl implements InsuranceMapper {
@@ -21,14 +21,14 @@ public class InsuranceMapperImpl implements InsuranceMapper {
 
         InsuranceEntity insuranceEntity = new InsuranceEntity();
 
-        insuranceEntity.setInsuranceId( insurance.getInsuranceId() );
-        insuranceEntity.setInsuranceNo( insurance.getInsuranceNo() );
-        insuranceEntity.setProposalId( insurance.getProposalId() );
-        insuranceEntity.setPolicyForm( insurance.getPolicyForm() );
-        insuranceEntity.setParentInsuranceId( insurance.getParentInsuranceId() );
+        insuranceEntity.setTenantId( insurance.getTenantId() );
         insuranceEntity.setCreateTime( insurance.getCreateTime() );
         insuranceEntity.setUpdateTime( insurance.getUpdateTime() );
-        insuranceEntity.setTenantId( insurance.getTenantId() );
+        insuranceEntity.setInsuranceId( insurance.getInsuranceId() );
+        insuranceEntity.setInsuranceNo( insurance.getInsuranceNo() );
+        insuranceEntity.setParentInsuranceId( insurance.getParentInsuranceId() );
+        insuranceEntity.setPolicyForm( insurance.getPolicyForm() );
+        insuranceEntity.setProposalId( insurance.getProposalId() );
 
         return insuranceEntity;
     }
@@ -39,16 +39,16 @@ public class InsuranceMapperImpl implements InsuranceMapper {
             return null;
         }
 
-        Insurance.InsuranceBuilder insurance = Insurance.builder();
+        Insurance.InsuranceBuilder<?, ?> insurance = Insurance.builder();
 
+        insurance.tenantId( entity.getTenantId() );
+        insurance.createTime( entity.getCreateTime() );
+        insurance.updateTime( entity.getUpdateTime() );
         insurance.insuranceId( entity.getInsuranceId() );
         insurance.insuranceNo( entity.getInsuranceNo() );
         insurance.proposalId( entity.getProposalId() );
         insurance.policyForm( entity.getPolicyForm() );
         insurance.parentInsuranceId( entity.getParentInsuranceId() );
-        insurance.createTime( entity.getCreateTime() );
-        insurance.updateTime( entity.getUpdateTime() );
-        insurance.tenantId( entity.getTenantId() );
 
         return insurance.build();
     }

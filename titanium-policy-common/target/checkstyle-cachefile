@@ -1,4 +1,12 @@
-#Mon Jun 29 17:25:44 CST 2026
-/Users/sunwei/titanium-project/titanium-policy/titanium-policy-common/src/main/java/com/titanium/policy/common/constant/PolicyConstants.java=1782363949620
-/Users/sunwei/titanium-project/titanium-policy/titanium-policy-common/src/main/java/com/titanium/policy/common/utils/PolicyUtils.java=1782712531215
+#Wed Jul 01 19:44:28 CST 2026
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-common/src/main/java/com/titanium/policy/common/constant/PolicyConstants.java=1782905576804
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-common/src/main/java/com/titanium/policy/common/enums/EndorsementCategory.java=1782905576803
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-common/src/main/java/com/titanium/policy/common/enums/EndorsementEffectiveType.java=1782905576803
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-common/src/main/java/com/titanium/policy/common/enums/PolicyDataUpdateType.java=1782905576801
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-common/src/main/java/com/titanium/policy/common/enums/PolicyDocumentType.java=1782905576801
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-common/src/main/java/com/titanium/policy/common/enums/PolicyEventType.java=1782905576802
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-common/src/main/java/com/titanium/policy/common/enums/PolicyItemType.java=1782905576802
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-common/src/main/java/com/titanium/policy/common/enums/RiskAssessmentStep.java=1782905576803
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-common/src/main/java/com/titanium/policy/common/enums/SubjectType.java=1782905576802
+/Users/sunwei/titanium-project/titanium-policy/titanium-policy-common/src/main/java/com/titanium/policy/common/utils/PolicyUtils.java=1782905576804
 configuration*?=770F4A74F18391C518A31F0E0548453D9407E5E5

@@ -1,3 +1,11 @@
+com/titanium/policy/common/enums/PolicyDataUpdateType.class
 com/titanium/policy/common/constant/PolicyConstants$KafkaTopic.class
 com/titanium/policy/common/constant/PolicyConstants.class
 com/titanium/policy/common/utils/PolicyUtils.class
+com/titanium/policy/common/enums/RiskAssessmentStep.class
+com/titanium/policy/common/enums/PolicyDocumentType.class
+com/titanium/policy/common/enums/EndorsementEffectiveType.class
+com/titanium/policy/common/enums/EndorsementCategory.class
+com/titanium/policy/common/enums/PolicyItemType.class
+com/titanium/policy/common/enums/PolicyEventType.class
+com/titanium/policy/common/enums/SubjectType.class

@@ -1,19 +1,16 @@
 package com.titanium.policy.infrastructure.repository;
 
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
 import org.springframework.stereotype.Repository;
 
-import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.aggregate.Proposal;
 import com.titanium.policy.infrastructure.entity.ProposalEntity;
 import com.titanium.policy.infrastructure.mapper.ProposalMapper;
 import com.titanium.policy.infrastructure.repository.jpa.JpaProposalRepository;
 import com.titanium.policy.repository.ProposalRepository;
-import com.titanium.policy.valueobject.proposal.ProposalBasicInfo;
 import com.titanium.policy.valueobject.proposal.ProposalStatus;
 
 /**
@@ -61,7 +58,7 @@ public class ProposalRepositoryImpl implements ProposalRepository {
         Iterable<ProposalEntity> entities = jpaProposalRepository.findByStatusCodeAndTenantId(statusCode, tenantId);
         List<Proposal> proposals = new ArrayList<>();
         for (ProposalEntity entity : entities) {
-            proposals.add(convertToAggregate(entity));
+            proposals.add(proposalMapper.toAggregate(entity));
         }
         return proposals;
     }
@@ -69,7 +66,7 @@ public class ProposalRepositoryImpl implements ProposalRepository {
     @Override
     public Optional<Proposal> findByProposalNo(String proposalNo, String tenantId) {
         Optional<ProposalEntity> entityOpt = jpaProposalRepository.findByProposalNoAndTenantId(proposalNo, tenantId);
-        return entityOpt.map(this::convertToAggregate);
+        return entityOpt.map(proposalMapper::toAggregate);
     }
 
     @Override
@@ -77,75 +74,8 @@ public class ProposalRepositoryImpl implements ProposalRepository {
         Iterable<ProposalEntity> entities = jpaProposalRepository.findByCustomerIdAndTenantId(customerId, tenantId);
         List<Proposal> proposals = new ArrayList<>();
         for (ProposalEntity entity : entities) {
-            proposals.add(convertToAggregate(entity));
+            proposals.add(proposalMapper.toAggregate(entity));
         }
         return proposals;
-    }
-
-    /**
-     * 将聚合根转换为数据库实体
-     *
-     * @param proposal 投保意向单聚合根
-     * @return 投保意向单数据库实体
-     */
-    private ProposalEntity convertToEntity(Proposal proposal) {
-        ProposalEntity entity = new ProposalEntity();
-        entity.setProposalId(proposal.getProposalId());
-        entity.setProposalNo(proposal.getProposalNo());
-        entity.setPolicyForm(proposal.getPolicyForm());
-        entity.setParentProposalId(proposal.getParentProposalId());
-        entity.setChannel(proposal.getChannel());
-        entity.setCustomerId(proposal.getBasicInfo().customerId());
-        entity.setIntendedSumInsured(proposal.getBasicInfo().intendedSumInsured().value().doubleValue());
-        entity.setIntendedPremium(proposal.getBasicInfo().intendedPremium().value().doubleValue());
-        entity.setCurrency(proposal.getBasicInfo().intendedPremium().currency());
-        entity.setInsurancePeriodStart(proposal.getBasicInfo().insurancePeriodStart());
-        entity.setInsurancePeriodEnd(proposal.getBasicInfo().insurancePeriodEnd());
-        entity.setExpectedProductCode(proposal.getBasicInfo().expectedProductCode());
-        entity.setStatusCode(proposal.getStatus().statusCode());
-        entity.setStatusTime(proposal.getStatus().statusTime());
-        entity.setChangeReason(proposal.getStatus().changeReason());
-        entity.setCreateTime(proposal.getCreateTime());
-        entity.setUpdateTime(proposal.getUpdateTime());
-        entity.setTenantId(proposal.getTenantId());
-        return entity;
-    }
-
-    /**
-     * 将数据库实体转换为聚合根
-     *
-     * @param entity 投保意向单数据库实体
-     * @return 投保意向单聚合根
-     */
-    private Proposal convertToAggregate(ProposalEntity entity) {
-        ProposalBasicInfo basicInfo = new ProposalBasicInfo(
-                entity.getCustomerId(),
-                Money.of(BigDecimal.valueOf(entity.getIntendedSumInsured()), entity.getCurrency()),
-                Money.of(BigDecimal.valueOf(entity.getIntendedPremium()), entity.getCurrency()),
-                entity.getInsurancePeriodStart(),
-                entity.getInsurancePeriodEnd(),
-                entity.getExpectedProductCode()
-        );
-
-        ProposalStatus status = new ProposalStatus(
-                entity.getStatusCode(),
-                entity.getStatusTime(),
-                entity.getChangeReason()
-        );
-
-        Proposal proposal = Proposal.createDraft(
-                entity.getProposalId(),
-                entity.getProposalNo(),
-                entity.getPolicyForm(),
-                entity.getChannel(),
-                basicInfo,
-                entity.getTenantId()
-        );
-
-        // 设置其他属性
-        // 这里需要添加申请人和标的信息，但目前的设计中没有对应的实体关系，
-        // 后续需要完善这部分逻辑，添加申请人和标的的关联实体和转换逻辑
-
-        return proposal;
     }
 }

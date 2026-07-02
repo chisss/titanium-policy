@@ -9,7 +9,7 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
 
 import com.titanium.metadata.enums.policy.PolicyEnum;
-import com.titanium.policy.query.entity.PolicyView;
+import com.titanium.policy.query.view.PolicyView;
 
 /**
  * 保单读模型仓储

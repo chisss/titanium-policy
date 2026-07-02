@@ -2,66 +2,52 @@ package com.titanium.policy.application.query;
 
 import java.util.Optional;
 
+import org.axonframework.messaging.responsetypes.ResponseTypes;
+import org.axonframework.queryhandling.QueryGateway;
 import org.springframework.stereotype.Service;
 
-import com.titanium.policy.aggregate.Proposal;
-import com.titanium.policy.repository.ProposalRepository;
-import com.titanium.policy.valueobject.proposal.ProposalStatus;
+import com.titanium.policy.query.query.FindProposalByIdQuery;
+import com.titanium.policy.query.query.FindProposalByNoQuery;
+import com.titanium.policy.query.result.ProposalQueryResult;
 
 import jakarta.annotation.Resource;
 
 /**
- * 投保意向单查询服务
+ * 投保意向单查询服务（CQRS 读侧入口）
  * <p>
- * 处理投保意向单相关的查询，协调领域层和基础设施层
+ * 读写分离落地：经 {@link QueryGateway} 派发查询到读侧 {@code ProposalQueryHandler}，
+ * 查询 {@code ProposalView} 读模型，<b>不再回退到写模型聚合 {@code Proposal}</b>。
  * </p>
  */
 @Service
 public class ProposalAppQueryService {
+
     @Resource
-    private ProposalRepository proposalRepository;
+    private QueryGateway queryGateway;
 
     /**
-     * 根据ID查询投保意向单
+     * 根据ID查询意向单（读模型）
      *
      * @param proposalId 意向单ID
      * @param tenantId 租户ID
-     * @return 投保意向单
+     * @return 意向单查询结果，不存在时为空
      */
-    public Optional<Proposal> findById(String proposalId, String tenantId) {
-        return proposalRepository.findById(proposalId, tenantId);
+    public Optional<ProposalQueryResult> findById(String proposalId, String tenantId) {
+        ProposalQueryResult result = queryGateway.query(new FindProposalByIdQuery(proposalId, tenantId),
+                ResponseTypes.instanceOf(ProposalQueryResult.class)).join();
+        return Optional.ofNullable(result);
     }
 
     /**
-     * 根据状态查询投保意向单
-     *
-     * @param tenantId 租户ID
-     * @param statusCode 状态编码
-     * @return 投保意向单列表
-     */
-    public Iterable<Proposal> findByStatus(String tenantId, ProposalStatus.StatusCode statusCode) {
-        return proposalRepository.findByStatus(tenantId, statusCode);
-    }
-
-    /**
-     * 根据意向单编号查询投保意向单
+     * 根据编号查询意向单（读模型）
      *
      * @param proposalNo 意向单编号
      * @param tenantId 租户ID
-     * @return 投保意向单
+     * @return 意向单查询结果，不存在时为空
      */
-    public Optional<Proposal> findByProposalNo(String proposalNo, String tenantId) {
-        return proposalRepository.findByProposalNo(proposalNo, tenantId);
-    }
-
-    /**
-     * 根据客户ID查询投保意向单
-     *
-     * @param customerId 客户ID
-     * @param tenantId 租户ID
-     * @return 投保意向单列表
-     */
-    public Iterable<Proposal> findByCustomerId(String customerId, String tenantId) {
-        return proposalRepository.findByCustomerId(customerId, tenantId);
+    public Optional<ProposalQueryResult> findByProposalNo(String proposalNo, String tenantId) {
+        ProposalQueryResult result = queryGateway.query(new FindProposalByNoQuery(proposalNo, tenantId),
+                ResponseTypes.instanceOf(ProposalQueryResult.class)).join();
+        return Optional.ofNullable(result);
     }
 }

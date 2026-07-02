@@ -2,8 +2,8 @@ package com.titanium.policy.event;
 
 import java.time.LocalDateTime;
 
-import com.titanium.policy.valueobject.EndorsementCategory;
-import com.titanium.policy.valueobject.PolicyDataUpdateType;
+import com.titanium.policy.common.enums.EndorsementCategory;
+import com.titanium.policy.common.enums.PolicyDataUpdateType;
 
 /**
  * 保单已批改事件（取代孤儿事件 PolicyDataUpdatedEvent）

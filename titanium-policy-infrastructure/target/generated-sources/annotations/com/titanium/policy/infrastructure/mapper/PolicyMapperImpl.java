@@ -8,8 +8,8 @@ import org.springframework.stereotype.Component;
 
 @Generated(
     value = "org.mapstruct.ap.MappingProcessor",
-    date = "2026-06-29T17:25:47+0800",
-    comments = "version: 1.5.5.Final, compiler: javac, environment: Java 21.0.4 (Amazon.com Inc.)"
+    date = "2026-07-02T09:28:37+0800",
+    comments = "version: 1.5.5.Final, compiler: Eclipse JDT (IDE) 3.46.100.v20260624-0231, environment: Java 21.0.11 (Eclipse Adoptium)"
 )
 @Component
 public class PolicyMapperImpl implements PolicyMapper {
@@ -31,6 +31,7 @@ public class PolicyMapperImpl implements PolicyMapper {
         policyEntity.setPolicyStatus( map( policyStatusStatusCode( policy ) ) );
         policyEntity.setCreateTime( policy.getCreateTime() );
         policyEntity.setIssueTime( policy.getIssueTime() );
+        policyEntity.setUpdateTime( policy.getUpdateTime() );
         policyEntity.setPolicyNo( map( policy.getPolicyNo() ) );
 
         return policyEntity;
@@ -42,7 +43,7 @@ public class PolicyMapperImpl implements PolicyMapper {
             return null;
         }
 
-        Policy.PolicyBuilder policy = Policy.builder();
+        Policy.PolicyBuilder<?, ?> policy = Policy.builder();
 
         policy.policyId( entity.getPolicyId() );
         policy.tenantId( entity.getTenantId() );
@@ -52,6 +53,7 @@ public class PolicyMapperImpl implements PolicyMapper {
         policy.issueOrg( entity.getIssueOrg() );
         policy.createTime( entity.getCreateTime() );
         policy.issueTime( entity.getIssueTime() );
+        policy.updateTime( entity.getUpdateTime() );
         policy.policyNo( map( entity.getPolicyNo() ) );
 
         return policy.build();

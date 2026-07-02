@@ -3,7 +3,7 @@ package com.titanium.policy.query.service;
 import java.time.LocalDateTime;
 import java.util.List;
 
-import com.titanium.policy.query.entity.PolicyQueryResult;
+import com.titanium.policy.query.result.PolicyQueryResult;
 
 /**
  * 保单查询服务

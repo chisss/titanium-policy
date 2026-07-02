@@ -1,7 +1,7 @@
 package com.titanium.policy.infrastructure.entity;
 
 import com.titanium.metadata.enums.underwriting.UnderwritingEnum.RiskLevel;
-import com.titanium.policy.valueobject.SubjectType;
+import com.titanium.policy.common.enums.SubjectType;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

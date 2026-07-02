@@ -49,4 +49,21 @@
         </addColumn>
     </changeSet>
 
+    <!-- 读模型基类 BaseView 公共列：投影创建/更新时间 + 乐观锁版本（PolicyEndorsementView 继承 BaseView 后补齐） -->
+    <changeSet id="20260701-policy-endorsement-baseview-columns" author="titanium-cqrs">
+        <addColumn tableName="t_policy_endorsement_view">
+            <column name="create_time" type="DATETIME" defaultValueComputed="CURRENT_TIMESTAMP"
+                    remarks="读模型创建时间">
+                <constraints nullable="false"/>
+            </column>
+            <column name="update_time" type="DATETIME" defaultValueComputed="CURRENT_TIMESTAMP"
+                    remarks="读模型更新时间">
+                <constraints nullable="false"/>
+            </column>
+            <column name="version" type="BIGINT" defaultValueNumeric="0" remarks="乐观锁版本">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
 </databaseChangeLog>

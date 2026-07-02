@@ -15,27 +15,27 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
+import com.titanium.policy.application.orchestration.GenericEndorsementWriteBackStrategy;
+import com.titanium.policy.application.orchestration.ReinstatePolicyWriteBackStrategy;
+import com.titanium.policy.application.orchestration.ResumePolicyWriteBackStrategy;
+import com.titanium.policy.application.orchestration.SuspendPolicyWriteBackStrategy;
+import com.titanium.policy.application.orchestration.TerminatePolicyWriteBackStrategy;
 import com.titanium.policy.command.ApplyPolicyEndorsementCommand;
 import com.titanium.policy.command.ReinstatePolicyCommand;
 import com.titanium.policy.command.ResumePolicyCommand;
 import com.titanium.policy.command.SuspendPolicyCommand;
 import com.titanium.policy.command.TerminatePolicyCommand;
-import com.titanium.policy.infrastructure.messaging.handler.GenericEndorsementWriteBackHandler;
-import com.titanium.policy.infrastructure.messaging.handler.ReinstatePolicyWriteBackHandler;
-import com.titanium.policy.infrastructure.messaging.handler.ResumePolicyWriteBackHandler;
-import com.titanium.policy.infrastructure.messaging.handler.SuspendPolicyWriteBackHandler;
-import com.titanium.policy.infrastructure.messaging.handler.TerminatePolicyWriteBackHandler;
-import com.titanium.policy.valueobject.PolicyDataUpdateType;
+import com.titanium.policy.common.enums.PolicyDataUpdateType;
 
 /**
- * 保全执行事件监听器测试
+ * 保全执行事件监听器测试（infra 入站适配器）
  * <p>
- * 验证保全→保单回写闭环的核心：JSON 解析 → 按保全类型策略分发 → 构造正确的保单命令。
+ * 验证保全→保单回写闭环的核心：JSON 解析 → 按保全类型策略分发（application 策略）→ 构造正确的保单命令。
  * </p>
  */
 class MaintenanceExecutedEventListenerTest {
 
-    private CommandGateway                  commandGateway;
+    private CommandGateway                   commandGateway;
     private MaintenanceExecutedEventListener listener;
 
     @BeforeEach
@@ -43,11 +43,11 @@ class MaintenanceExecutedEventListenerTest {
         commandGateway = Mockito.mock(CommandGateway.class);
         when(commandGateway.sendAndWait(any())).thenReturn(null);
         listener = new MaintenanceExecutedEventListener(List.of(
-                new SuspendPolicyWriteBackHandler(commandGateway),
-                new ResumePolicyWriteBackHandler(commandGateway),
-                new TerminatePolicyWriteBackHandler(commandGateway),
-                new ReinstatePolicyWriteBackHandler(commandGateway),
-                new GenericEndorsementWriteBackHandler(commandGateway, policyId -> "ED-1")));
+                new SuspendPolicyWriteBackStrategy(commandGateway),
+                new ResumePolicyWriteBackStrategy(commandGateway),
+                new TerminatePolicyWriteBackStrategy(commandGateway),
+                new ReinstatePolicyWriteBackStrategy(commandGateway),
+                new GenericEndorsementWriteBackStrategy(commandGateway, policyId -> "ED-1")));
     }
 
     private String payload(String maintenanceType) {
@@ -96,7 +96,7 @@ class MaintenanceExecutedEventListenerTest {
 
     @Test
     void shouldDispatchEndorsementForDataChange() {
-        // 数据/要素类保全（受益人变更）回退到通用批改处理器，下发 ApplyPolicyEndorsementCommand
+        // 数据/要素类保全（受益人变更）回退到通用批改策略，下发 ApplyPolicyEndorsementCommand
         listener.onMaintenanceExecuted(payload("BENEFICIARY_CHANGE"));
         ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
         verify(commandGateway).sendAndWait(captor.capture());

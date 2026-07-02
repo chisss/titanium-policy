@@ -13,7 +13,6 @@ import org.axonframework.spring.stereotype.Saga;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import com.titanium.metadata.enums.policy.PolicyForm;
-import com.titanium.metadata.enums.underwriting.UnderwritingEnum.ConclusionType;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.command.CreatePolicyCommand;
 import com.titanium.policy.command.ReceiveUnderwritingResultCommand;
@@ -22,8 +21,9 @@ import com.titanium.policy.event.insurance.InsuranceCreatedEvent;
 import com.titanium.policy.event.insurance.InsuranceIssuedEvent;
 import com.titanium.policy.event.insurance.InsuranceSubmittedForUnderwritingEvent;
 import com.titanium.policy.event.insurance.UnderwritingResultReceivedEvent;
-import com.titanium.policy.service.PolicyNoGenerator;
-import com.titanium.policy.service.UnderwritingDecisionGateway;
+import com.titanium.policy.generator.PolicyNoGenerator;
+import com.titanium.policy.port.UnderwritingDecisionGateway;
+import com.titanium.policy.service.PolicyIssuanceDomainService;
 import com.titanium.policy.valueobject.insurance.UnderwritingDecisionRequest;
 import com.titanium.policy.valueobject.insurance.UnderwritingResult;
 
@@ -61,6 +61,9 @@ public class IssuanceSaga {
 
     @Autowired
     private transient UnderwritingDecisionGateway underwritingDecisionGateway;
+
+    @Autowired
+    private transient PolicyIssuanceDomainService policyIssuanceDomainService;
 
     /** 保单形态 */
     private PolicyForm    policyForm;
@@ -109,14 +112,24 @@ public class IssuanceSaga {
     /**
      * 【承保】核保结果接收 → 核保通过推进承保出单；拒绝/暂缓结束 Saga
      */
+    /**
+     * 【承保】核保结果接收 → 核保通过推进承保出单；拒绝/暂缓结束 Saga
+     * <p>
+     * 「哪些核保结论算通过」的<b>承保准入规则</b>委托 {@link PolicyIssuanceDomainService#canIssueByConclusion}
+     * 裁决，Saga 本身只依裁决结果做<b>流程路由</b>（通过则发命令推进，否则结束流程），不含业务判断。
+     * </p>
+     */
     @SagaEventHandler(associationProperty = "insuranceId")
     public void on(UnderwritingResultReceivedEvent event) {
-        ConclusionType resultCode = event.resultCode();
-        if (resultCode == ConclusionType.ACCEPT || resultCode == ConclusionType.MODIFY) {
+        // 以核保事件构造核保结果值对象，交领域服务裁决承保准入（业务规则不落在 Saga）
+        UnderwritingResult result = new UnderwritingResult(event.underwritingId(), event.resultCode(), event.opinion(),
+                event.underwriterId(), event.underwritingTime(), event.underwritingCondition());
+
+        if (policyIssuanceDomainService.canIssueByConclusion(result)) {
             log.info("[IssuanceSaga] 核保通过，触发承保出单: insuranceId={}", event.insuranceId());
             commandGateway.sendAndWait(new TriggerIssuanceCommand(event.insuranceId(), event.tenantId()));
         } else {
-            log.warn("[IssuanceSaga] 核保未通过（{}），结束 Saga: insuranceId={}", resultCode, event.insuranceId());
+            log.warn("[IssuanceSaga] 核保未通过（{}），结束 Saga: insuranceId={}", event.resultCode(), event.insuranceId());
             SagaLifecycle.end();
         }
     }

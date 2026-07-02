@@ -16,7 +16,7 @@ import com.titanium.policy.infrastructure.repository.jpa.JpaPolicyRepository;
 import com.titanium.policy.repository.PolicyRepository;
 import com.titanium.policy.valueobject.PolicyStatus;
 
-import jakarta.annotation.Resource;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 
 /**
@@ -31,12 +31,12 @@ import lombok.extern.log4j.Log4j2;
  */
 @Repository
 @Log4j2
+@RequiredArgsConstructor
 public class PolicyRepositoryImpl implements PolicyRepository {
-    @Resource
-    private JpaPolicyRepository jpaPolicyRepository;
 
-    @Resource
-    private PolicyMapper        policyMapper;
+    private final JpaPolicyRepository jpaPolicyRepository;
+
+    private final PolicyMapper        policyMapper;
 
     /**
      * 按ID+租户ID查询保单聚合根

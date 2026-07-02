@@ -5,7 +5,7 @@ import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
-import com.titanium.policy.query.entity.PolicyRelationView;
+import com.titanium.policy.query.view.PolicyRelationView;
 
 /**
  * 保单父子关系读模型仓储

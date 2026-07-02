@@ -1,6 +1,8 @@
 com/titanium/policy/aggregate/proposal/ProposalTest.class
 com/titanium/policy/valueobject/IssuanceProcessConfigTest.class
+com/titanium/policy/service/RiskAssessmentDomainServiceTest.class
 com/titanium/policy/aggregate/PolicyLinkSubPolicyTest.class
+com/titanium/policy/service/PolicyIssuanceDomainServiceTest.class
 com/titanium/policy/aggregate/PolicyEndorsementTest$1.class
 com/titanium/policy/valueobject/PolicyStatusTest.class
 com/titanium/policy/aggregate/PolicyLinkSubPolicyTest$1.class

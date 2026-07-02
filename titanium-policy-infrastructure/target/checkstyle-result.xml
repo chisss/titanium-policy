@@ -14,8 +14,6 @@
 </file>
 <file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/config/KafkaConfig.java">
 </file>
-<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/config/AxonConfig.java">
-</file>
 <file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/entity/InsuranceEntity.java">
 </file>
 <file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/entity/InsuranceProductEntity.java">
@@ -36,28 +34,20 @@
 </file>
 <file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/mapper/InsuranceMapper.java">
 </file>
-<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/messaging/handler/TerminatePolicyWriteBackHandler.java">
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/adapter/ClauseServiceAdapter.java">
 </file>
-<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/messaging/handler/ReinstatePolicyWriteBackHandler.java">
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/adapter/ProductServiceAdapter.java">
 </file>
-<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/messaging/handler/ResumePolicyWriteBackHandler.java">
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/adapter/UnderwritingServiceAdapter.java">
 </file>
-<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/messaging/handler/SuspendPolicyWriteBackHandler.java">
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/adapter/RuleEngineServiceAdapter.java">
 </file>
-<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/messaging/handler/GenericEndorsementWriteBackHandler.java">
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/adapter/SyncUnderwritingDecisionAdapter.java">
 </file>
-<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/messaging/MaintenanceWriteBackHandler.java">
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/generator/EndorsementNoGeneratorImpl.java">
 </file>
 <file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/messaging/MaintenanceExecutedEventListener.java">
 </file>
-<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/messaging/MaintenanceWriteBackContext.java">
-</file>
 <file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/event/KafkaEventPublisher.java">
-</file>
-<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/projection/ProposalProjection.java">
-</file>
-<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/projection/PolicyProjection.java">
-</file>
-<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-infrastructure/src/main/java/com/titanium/policy/infrastructure/projection/InsuranceProjection.java">
 </file>
 </checkstyle>

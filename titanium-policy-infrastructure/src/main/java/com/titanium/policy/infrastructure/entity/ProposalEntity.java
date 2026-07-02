@@ -2,6 +2,7 @@ package com.titanium.policy.infrastructure.entity;
 
 import java.time.LocalDateTime;
 
+import com.titanium.common.jpa.BaseEntity;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.enums.product.ProductEnum.SalesChannel;
 import com.titanium.policy.valueobject.proposal.ProposalStatus;
@@ -18,14 +19,14 @@ import lombok.Setter;
 /**
  * 投保意向单数据库实体
  * <p>
- * 对应t_proposal表，存储投保意向单的基本信息
+ * 对应t_proposal表，存储投保意向单的基本信息。 继承 {@link BaseEntity}，复用租户ID、创建/更新时间、创建/更新人、逻辑删除等公共审计字段。
  * </p>
  */
 @Entity
 @Table(name = "t_proposal")
 @Getter
 @Setter
-public class ProposalEntity {
+public class ProposalEntity extends BaseEntity {
     /**
      * 意向单ID
      */
@@ -119,22 +120,4 @@ public class ProposalEntity {
      */
     @Column(name = "change_reason")
     private String changeReason;
-
-    /**
-     * 创建时间
-     */
-    @Column(name = "create_time", nullable = false)
-    private LocalDateTime createTime;
-
-    /**
-     * 更新时间
-     */
-    @Column(name = "update_time", nullable = false)
-    private LocalDateTime updateTime;
-
-    /**
-     * 租户ID
-     */
-    @Column(name = "tenant_id", nullable = false)
-    private String tenantId;
 }

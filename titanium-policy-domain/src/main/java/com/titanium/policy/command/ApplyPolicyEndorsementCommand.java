@@ -4,7 +4,7 @@ import java.time.LocalDateTime;
 
 import org.axonframework.modelling.command.TargetAggregateIdentifier;
 
-import com.titanium.policy.valueobject.PolicyDataUpdateType;
+import com.titanium.policy.common.enums.PolicyDataUpdateType;
 
 /**
  * 应用保单批改命令（数据/要素类批改回写）

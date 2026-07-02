@@ -52,6 +52,12 @@
             <artifactId>titanium-policy-common</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- 通用内核（读模型基类 BaseView 等共享构件） -->
+        <dependency>
+            <groupId>com.titanium</groupId>
+            <artifactId>titanium-common</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
     </dependencies>
 
     <build>

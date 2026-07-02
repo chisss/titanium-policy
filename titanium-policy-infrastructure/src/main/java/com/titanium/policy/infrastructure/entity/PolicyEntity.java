@@ -3,6 +3,7 @@ package com.titanium.policy.infrastructure.entity;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+import com.titanium.common.jpa.BaseEntity;
 import com.titanium.metadata.enums.InsuranceType;
 import com.titanium.metadata.enums.policy.PolicyEnum;
 import com.titanium.metadata.enums.policy.PolicyForm;
@@ -19,26 +20,20 @@ import lombok.Setter;
 /**
  * 正式保单数据库实体
  * <p>
- * 对应t_policy表，存储正式保单的基本信息
+ * 对应t_policy表，存储正式保单的基本信息。 继承 {@link BaseEntity}，复用租户ID、创建/更新时间、创建/更新人、逻辑删除等公共审计字段。
  * </p>
  */
 @Entity
 @Table(name = "t_policy")
 @Getter
 @Setter
-public class PolicyEntity {
+public class PolicyEntity extends BaseEntity {
     /**
      * 保单ID
      */
     @Id
     @Column(name = "policy_id", nullable = false, length = 32)
     private String        policyId;
-
-    /**
-     * 租户ID
-     */
-    @Column(name = "tenant_id", nullable = false, length = 32)
-    private String        tenantId;
 
     /**
      * 关联投保单ID
@@ -135,38 +130,8 @@ public class PolicyEntity {
     private LocalDateTime endDate;
 
     /**
-     * 创建时间
-     */
-    @Column(name = "create_time", nullable = false)
-    private LocalDateTime createTime;
-
-    /**
      * 签发时间
      */
     @Column(name = "issue_time")
     private LocalDateTime issueTime;
-
-    /**
-     * 更新时间
-     */
-    @Column(name = "update_time", nullable = false)
-    private LocalDateTime updateTime;
-
-    /**
-     * 创建人
-     */
-    @Column(name = "created_by", nullable = false, length = 32)
-    private String        createdBy;
-
-    /**
-     * 更新人
-     */
-    @Column(name = "updated_by", nullable = false, length = 32)
-    private String        updatedBy;
-
-    /**
-     * 是否删除
-     */
-    @Column(name = "is_deleted", nullable = false, columnDefinition = "TINYINT NOT NULL DEFAULT 0")
-    private Integer       isDeleted;
 }

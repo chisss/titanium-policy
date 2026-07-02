@@ -26,6 +26,12 @@
             <artifactId>titanium-policy-common</artifactId>
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
+        <!-- 通用内核（聚合根基类 BaseAggregate 等共享构件） -->
+        <dependency>
+            <groupId>com.titanium</groupId>
+            <artifactId>titanium-common</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
         <!-- 元数据模块 -->
         <dependency>
             <groupId>com.titanium</groupId>

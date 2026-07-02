@@ -2,8 +2,8 @@ package com.titanium.policy.entity;
 
 import java.time.LocalDateTime;
 
-import com.titanium.policy.valueobject.EndorsementCategory;
-import com.titanium.policy.valueobject.PolicyDataUpdateType;
+import com.titanium.policy.common.enums.EndorsementCategory;
+import com.titanium.policy.common.enums.PolicyDataUpdateType;
 
 /**
  * 批单实体（聚合内不可变记录）

@@ -2,19 +2,11 @@
 <checkstyle version="10.20.1">
 <file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/valueobject/DeductibleRule.java">
 </file>
-<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/valueobject/PolicyDataUpdateType.java">
-</file>
 <file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/valueobject/PolicyDocument.java">
 </file>
-<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/valueobject/PolicyDocumentType.java">
-</file>
-<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/valueobject/PolicyItemType.java">
-</file>
-<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/valueobject/PolicyEventType.java">
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/valueobject/IssuanceResult.java">
 </file>
 <file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/valueobject/IssuanceProcessConfig.java">
-</file>
-<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/valueobject/SubjectType.java">
 </file>
 <file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/valueobject/proposal/ProposalStatus.java">
 </file>
@@ -26,11 +18,7 @@
 </file>
 <file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/valueobject/PolicyInsuredInfo.java">
 </file>
-<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/valueobject/EndorsementEffectiveType.java">
-</file>
 <file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/valueobject/PolicyRelation.java">
-</file>
-<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/valueobject/EndorsementCategory.java">
 </file>
 <file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/valueobject/PolicyStatus.java">
 </file>
@@ -38,17 +26,21 @@
 </file>
 <file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/valueobject/PremiumPlan.java">
 </file>
-<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/valueobject/RiskAssessmentStep.java">
-</file>
 <file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/valueobject/insurance/UnderwritingDecisionRequest.java">
 </file>
 <file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/valueobject/insurance/UnderwritingResult.java">
 </file>
 <file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/valueobject/insurance/InsuranceBasicInfo.java">
 </file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/valueobject/insurance/PolicyIssuanceDecision.java">
+</file>
 <file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/valueobject/insurance/InsuranceStatus.java">
 </file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/valueobject/RiskAssessmentDecision.java">
+</file>
 <file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/valueobject/PolicyBeneficiaryInfo.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/valueobject/IssuanceRequest.java">
 </file>
 <file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/repository/ProposalRepository.java">
 </file>
@@ -81,6 +73,10 @@
 <file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/aggregate/Insurance.java">
 </file>
 <file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/aggregate/Policy.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/generator/EndorsementNoGenerator.java">
+</file>
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/generator/PolicyNoGenerator.java">
 </file>
 <file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/command/SuspendPolicyCommand.java">
 </file>
@@ -122,39 +118,23 @@
 </file>
 <file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/command/IssuePolicyCommand.java">
 </file>
-<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/service/impl/PolicyServiceImpl.java">
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/service/impl/PolicyIssuanceDomainServiceImpl.java">
 </file>
-<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/service/UnderwritingServicePort.java">
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/service/impl/RiskAssessmentDomainServiceImpl.java">
 </file>
-<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/service/ClauseServicePort.java">
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/service/PolicyIssuanceDomainService.java">
 </file>
-<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/service/EndorsementNoGenerator.java">
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/service/RiskAssessmentDomainService.java">
 </file>
-<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/service/IssuanceResult.java">
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/port/UnderwritingServicePort.java">
 </file>
-<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/service/ProductServicePort.java">
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/port/ClauseServicePort.java">
 </file>
-<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/service/PolicyService.java">
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/port/ProductServicePort.java">
 </file>
-<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/service/RiskAssessmentExecutor.java">
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/port/UnderwritingDecisionGateway.java">
 </file>
-<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/service/IssuanceOrchestrator.java">
-</file>
-<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/service/PolicyNoGenerator.java">
-</file>
-<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/service/UnderwritingDecisionGateway.java">
-</file>
-<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/service/InsuranceToPolicyDomainService.java">
-</file>
-<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/service/RuleEngineServicePort.java">
-</file>
-<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/service/IssuanceRequest.java">
-</file>
-<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/query/ProposalQuery.java">
-</file>
-<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/query/InsuranceQuery.java">
-</file>
-<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/query/PolicyQuery.java">
+<file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/port/RuleEngineServicePort.java">
 </file>
 <file name="/Users/sunwei/titanium-project/titanium-policy/titanium-policy-domain/src/main/java/com/titanium/policy/exception/PolicyBusinessRuleException.java">
 </file>

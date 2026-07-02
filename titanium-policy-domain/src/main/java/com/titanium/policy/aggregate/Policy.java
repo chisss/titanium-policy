@@ -10,6 +10,7 @@ import org.axonframework.modelling.command.AggregateIdentifier;
 import org.axonframework.modelling.command.AggregateLifecycle;
 import org.axonframework.spring.stereotype.Aggregate;
 
+import com.titanium.common.domain.BaseAggregate;
 import com.titanium.metadata.enums.policy.PolicyEnum;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.policy.command.ActivatePolicyCommand;
@@ -52,22 +53,22 @@ import com.titanium.policy.valueobject.PolicyRelation;
 import com.titanium.policy.valueobject.PolicyStatus;
 import com.titanium.policy.valueobject.PremiumPlan;
 
-import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Getter;
+import lombok.experimental.SuperBuilder;
 
 /**
  * 正式保单聚合根
  * <p>
  * 保单域核心聚合根，管理正式保单全生命周期：创建 → 签发 → 生效 → 暂停/恢复/终止/到期。 保单域是"执行者"，被动接收保全域的状态变更指令。
  * </p>
+ * <p>
+ * 继承 {@link BaseAggregate}，复用租户ID、创建时间、更新时间等领域审计字段。
+ * </p>
  */
 @Aggregate
 @Getter
-@Builder(toBuilder = true)
-@AllArgsConstructor(access = AccessLevel.PRIVATE)
-public class Policy {
+@SuperBuilder(toBuilder = true)
+public class Policy extends BaseAggregate {
     /** 聚合根唯一标识 */
     @AggregateIdentifier
     private String                 policyId;
@@ -81,8 +82,6 @@ public class Policy {
     private String                 parentPolicyId;
     /** 签发机构 */
     private String                 issueOrg;
-    /** 创建时间 */
-    private LocalDateTime          createTime;
     /** 签发时间 */
     private LocalDateTime          issueTime;
     /** 保单基本信息 */
@@ -107,8 +106,6 @@ public class Policy {
     private List<Endorsement>      endorsements;
     /** 保单状态 */
     private PolicyStatus           status;
-    /** 租户ID */
-    private String                 tenantId;
 
     // ==================== CommandHandler ====================
 
@@ -235,8 +232,7 @@ public class Policy {
     /**
      * 应用保单批改（数据/要素类批改回写，事件溯源）
      * <p>
-     * 仅 EFFECTIVE 保单可批改（与保全域创建校验对齐）；批改类型必须不改状态（守恒）。
-     * 落为不可变批单记录并递增版本号，不触碰保单状态机。
+     * 仅 EFFECTIVE 保单可批改（与保全域创建校验对齐）；批改类型必须不改状态（守恒）。 落为不可变批单记录并递增版本号，不触碰保单状态机。
      * </p>
      */
     @CommandHandler
@@ -251,9 +247,8 @@ public class Policy {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "批单号不能为空");
         }
         // 幂等保护：同一来源保全案件不重复批改（Kafka at-least-once 重投兜底）
-        if (command.sourceMaintenanceId() != null && this.endorsements != null
-                && this.endorsements.stream()
-                        .anyMatch(e -> command.sourceMaintenanceId().equals(e.sourceMaintenanceId()))) {
+        if (command.sourceMaintenanceId() != null && this.endorsements != null && this.endorsements.stream()
+                .anyMatch(e -> command.sourceMaintenanceId().equals(e.sourceMaintenanceId()))) {
             throw new PolicyBusinessRuleException("POLICY_ENDORSEMENT_DUPLICATE",
                     "保全案件 " + command.sourceMaintenanceId() + " 已批改，忽略重复请求");
         }
@@ -336,8 +331,7 @@ public class Policy {
 
     @EventSourcingHandler
     public void on(PolicyLapsedEvent event) {
-        this.status = this.status.transitionStatus(PolicyStatus.StatusCode.LAPSED, event.reason(),
-                event.operatorId());
+        this.status = this.status.transitionStatus(PolicyStatus.StatusCode.LAPSED, event.reason(), event.operatorId());
     }
 
     @EventSourcingHandler
@@ -395,8 +389,8 @@ public class Policy {
     /**
      * 更新保单状态（通用方法，供父子保单联动使用）
      * <p>
-     * 仅驱动本聚合状态机。父→子的跨聚合状态级联不在聚合内完成（聚合不可变更兄弟聚合），
-     * 由 PolicyTerminated/Suspended 等事件触发的级联编排器对每个子保单单独下发命令实现。
+     * 仅驱动本聚合状态机。父→子的跨聚合状态级联不在聚合内完成（聚合不可变更兄弟聚合）， 由 PolicyTerminated/Suspended
+     * 等事件触发的级联编排器对每个子保单单独下发命令实现。
      * </p>
      */
     public void updatePolicyStatus(PolicyStatus.StatusCode newStatusCode, String changeReason, String operatorId) {
@@ -435,9 +429,9 @@ public class Policy {
     // ==================== 内部方法 ====================
 
     private void generateDocument() {
-        PolicyDocument document = new PolicyDocument("doc-" + LocalDateTime.now().toString(),
-                "E-" + this.policyNo.value(), "P-" + this.policyNo.value(), LocalDateTime.now(),
-                PolicyEnum.SignatureStatus.UNSIGNED, "http://docs.titanium.com/policies/" + this.policyNo.value());
+        PolicyDocument document = new PolicyDocument("doc-" + LocalDateTime.now(), "E-" + this.policyNo.value(),
+                "P-" + this.policyNo.value(), LocalDateTime.now(), PolicyEnum.SignatureStatus.UNSIGNED,
+                "http://docs.titanium.com/policies/" + this.policyNo.value());
         this.policyDocuments.add(document);
     }
 

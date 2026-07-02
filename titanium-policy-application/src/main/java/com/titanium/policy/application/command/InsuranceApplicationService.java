@@ -1,8 +1,14 @@
 package com.titanium.policy.application.command;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
+
 import org.axonframework.commandhandling.gateway.CommandGateway;
 import org.springframework.stereotype.Service;
 
+import com.titanium.metadata.enums.policy.PolicyForm;
+import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.command.ConvertProposalToInsuranceCommand;
 import com.titanium.policy.command.CreateInsuranceDirectlyCommand;
 import com.titanium.policy.command.ReceiveUnderwritingResultCommand;
@@ -26,6 +32,38 @@ public class InsuranceApplicationService {
     public String convertFromProposal(ConvertProposalToInsuranceCommand command) {
         commandGateway.sendAndWait(command);
         return command.insuranceId();
+    }
+
+    /**
+     * 从投保意向单创建投保单（Web 入口重载：由应用层构造命令，表现层不依赖领域命令）
+     *
+     * @param insuranceId 投保单ID
+     * @param insuranceNo 投保单编号
+     * @param proposalId 关联意向单ID
+     * @param policyForm 保单形态
+     * @param applicantId 投保人ID
+     * @param insuredCount 被保险人数
+     * @param exactPremium 精确保费
+     * @param currency 币种
+     * @param insurancePeriodStart 保险起期
+     * @param insurancePeriodEnd 保险止期
+     * @param productCodes 险种编码列表
+     * @param underwritingPriority 核保优先级
+     * @param changeReason 转换原因
+     * @param tenantId 租户ID
+     * @return 投保单ID
+     */
+    public String convertFromProposal(String insuranceId, String insuranceNo, String proposalId, PolicyForm policyForm,
+                                      String applicantId, int insuredCount, BigDecimal exactPremium, String currency,
+                                      LocalDateTime insurancePeriodStart, LocalDateTime insurancePeriodEnd,
+                                      List<String> productCodes, int underwritingPriority, String changeReason,
+                                      String tenantId) {
+        Money premium = exactPremium != null ? Money.of(exactPremium, currency != null ? currency : "CNY") : null;
+        ConvertProposalToInsuranceCommand command = new ConvertProposalToInsuranceCommand(insuranceId, insuranceNo,
+                proposalId, policyForm, applicantId, insuredCount, premium, insurancePeriodStart, insurancePeriodEnd,
+                productCodes, underwritingPriority, changeReason, tenantId);
+        commandGateway.sendAndWait(command);
+        return insuranceId;
     }
 
     /**

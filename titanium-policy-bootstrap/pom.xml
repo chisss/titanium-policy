@@ -26,6 +26,15 @@
             <artifactId>titanium-policy-web</artifactId>
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
+
+        <!-- 基础设施层：bootstrap 作为组合根(composition root)在运行时提供 Adapter/仓储实现/JPA实体，
+             供 @ComponentScan/@EntityScan/@EnableJpaRepositories 装配。application 等内层不再依赖 infra，
+             依赖倒置由组合根在此收口（标准 DDD 洋葱/六边形：内层依赖抽象，实现由最外层组合根注入）。 -->
+        <dependency>
+            <groupId>com.titanium</groupId>
+            <artifactId>titanium-policy-infrastructure</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
         
         <!-- Spring Boot Starter -->
         <dependency>
