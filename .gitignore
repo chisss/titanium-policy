@@ -1,59 +1,42 @@
-# Maven构建输出
-/target/
-.mvn/
+# ===== Maven / 构建产物（关键：target 绝不入库）=====
+target/
+build/
+*.class
+jacoco.exec
 
-# IDE文件
-.idea/
-*.iml
-*.iws
-*.ipr
-.classpath
-.project
-.settings/
-.vscode/
-*.swp
-*.swo
-*~
-
-# 操作系统文件
-.DS_Store
-Thumbs.db
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-
-# 日志文件
+# ===== 日志 =====
 logs/
 *.log
 *.log.*
 
-# 临时文件
-*.tmp
-*.temp
-*.cache
-*.bak
-*.backup
+# ===== IDE - IntelliJ IDEA =====
+.idea/
+*.iml
+*.ipr
+*.iws
 
-# 环境配置文件
+# ===== IDE - Eclipse =====
+.project
+.classpath
+.settings/
+.factorypath
+
+# ===== IDE - VS Code =====
+.vscode/
+
+# ===== 操作系统 =====
+.DS_Store
+Thumbs.db
+._*
+
+# ===== 临时文件 =====
+*.bak
+*.tmp
+*.swp
+*.swo
+*~
+
+# ===== 环境变量（敏感，不入库）=====
 .env
 .env.local
 .env.*.local
-application-dev.yml
-application-test.yml
-application-prod.yml
-
-# 数据库文件
-*.db
-*.sqlite
-*.sqlite3
-
-# 其他
-*.jar
-*.war
-*.ear
-*.zip
-*.tar.gz
-*.rar
-*.md
