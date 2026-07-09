@@ -1,12 +1,10 @@
 package com.titanium.policy.application.command;
 
+
 import org.axonframework.commandhandling.gateway.CommandGateway;
 import org.springframework.stereotype.Service;
 
 import com.titanium.metadata.enums.policy.PolicyEnum;
-import com.titanium.metadata.valueobject.Money;
-import com.titanium.policy.api.dto.AmountDTO;
-import com.titanium.policy.api.dto.CreatePolicyDTO;
 import com.titanium.policy.application.orchestration.IssuanceOrchestrator;
 import com.titanium.policy.command.ActivatePolicyCommand;
 import com.titanium.policy.command.ApplyPolicyEndorsementCommand;
@@ -43,23 +41,6 @@ public class PolicyApplicationService {
     }
 
     /**
-     * 创建保单（Web 入口重载：由应用层据 API DTO 构造命令，表现层不依赖领域命令）
-     * <p>
-     * DTO 未承载的字段（投保单/形态/机构/保额/被保险人/渠道）暂置 null，与既有行为一致。
-     * </p>
-     *
-     * @param dto 创建保单 DTO
-     * @return 保单ID
-     */
-    public String createPolicy(CreatePolicyDTO dto) {
-        CreatePolicyCommand command = new CreatePolicyCommand(dto.getPolicyId(), dto.getPolicyNumber(), null, null, null,
-                dto.getCustomerId(), null, null, toMoney(dto.getPremium()), dto.getEffectiveDate(), dto.getExpiryDate(),
-                null, dto.getTenantId());
-        commandGateway.sendAndWait(command);
-        return dto.getPolicyId();
-    }
-
-    /**
      * 智能出单（根据出单配置编排）
      */
     public IssuanceResult issueByConfig(IssuanceProcessConfig config, IssuanceRequest request) {
@@ -93,20 +74,6 @@ public class PolicyApplicationService {
     public String createPolicyDirectly(CreatePolicyDirectlyCommand command) {
         commandGateway.sendAndWait(command);
         return command.policyId();
-    }
-
-    /**
-     * 一步出单（Web 入口重载：由应用层据 API DTO 构造命令，表现层不依赖领域命令）
-     *
-     * @param dto 创建保单 DTO
-     * @return 保单ID
-     */
-    public String createPolicyDirectly(CreatePolicyDTO dto) {
-        CreatePolicyDirectlyCommand command = new CreatePolicyDirectlyCommand(dto.getPolicyId(), dto.getPolicyNumber(),
-                dto.getProductId(), null, null, dto.getCustomerId(), 0, null, dto.getEffectiveDate(),
-                dto.getExpiryDate(), null, dto.getTenantId());
-        commandGateway.sendAndWait(command);
-        return dto.getPolicyId();
     }
 
     /**
@@ -200,14 +167,5 @@ public class PolicyApplicationService {
      */
     public void cancelPolicy(String policyId, String reason, String operatorId, String tenantId) {
         commandGateway.sendAndWait(new CancelPolicyCommand(policyId, reason, operatorId, tenantId));
-    }
-
-    /**
-     * API 金额 DTO → Money 值对象（金额为空时返回 null）
-     */
-    private Money toMoney(AmountDTO amount) {
-        return amount != null && amount.getValue() != null
-                ? Money.of(amount.getValue(), amount.getCurrency() != null ? amount.getCurrency() : "CNY")
-                : null;
     }
 }

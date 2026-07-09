@@ -17,16 +17,56 @@ class PolicyArchitectureTest extends AbstractArchitectureGuardTest {
     }
 
     /**
-     * 启用「Web 层不得直接依赖领域命令/聚合根」严格隔离规则。
+     * 启用「application 层不得依赖 api 的 DTO」。
      * <p>
-     * 基类默认 {@code @Disabled} 该规则（多数域 Controller 仍直接吃 domain command/aggregate）。 保单域已完成 Web
-     * 层 Request/VO + Mapper 隔离改造（三个 Controller 只依赖 Web 层 Request/VO 与 应用层 command/query
-     * 服务），故在本子类覆盖启用（不加 {@code @Disabled}），作为全域严格隔离的样板。
+     * 保单域 api/web 已按《API层与Web层职责边界及协作规范》整改：DTO→Command 的翻译在 web 完成，
+     * application 门面入参即 CQRS 的 Command/Query，不依赖 api DTO。故在本子类覆盖启用。
      * </p>
      */
     @Test
     @Override
-    protected void webShouldNotDependOnDomainCommandsOrAggregates() {
-        super.webShouldNotDependOnDomainCommandsOrAggregates();
+    protected void applicationMustNotDependOnApiDto() {
+        super.applicationMustNotDependOnApiDto();
     }
+
+    /**
+     * 启用「API 契约实现（Provider）须位于 web.provider 且以 Provider 结尾」。
+     * <p>
+     * 保单域三聚合根契约实现为 {@code PolicyApiProvider}/{@code InsuranceApiProvider}/{@code ProposalApiProvider}，
+     * 统一落在 web/provider。故在本子类覆盖启用。
+     * </p>
+     */
+    @Test
+    @Override
+    protected void apiContractImplMustResideInProviderPackage() {
+        super.apiContractImplMustResideInProviderPackage();
+    }
+
+    /**
+     * 启用「Controller 不得实现 api 契约接口」。
+     * <p>
+     * 保单域三个 Controller 已去掉 {@code implements XxxApi}，契约实现下沉 web/provider 的 Provider。故覆盖启用。
+     * </p>
+     */
+    @Test
+    @Override
+    protected void controllerMustNotImplementApi() {
+        super.controllerMustNotImplementApi();
+    }
+
+    /**
+     * 启用「api 层 Feign 契约接口须以 Api 结尾（命名主键为聚合根）」。
+     * <p>
+     * 保单域按聚合根切分为 {@code PolicyApi}/{@code InsuranceApi}/{@code ProposalApi}。故覆盖启用。
+     * </p>
+     */
+    @Test
+    @Override
+    protected void apiInterfacesMustBeNamedByAggregate() {
+        super.apiInterfacesMustBeNamedByAggregate();
+    }
+
+    // 注：早期严格隔离断言 webShouldNotDependOnDomainCommandsOrAggregates 不再启用。
+    // 现行 api/web 规范改为 web 直接构造 domain Command / 读侧 FindXxxQuery 作 application 门面入参
+    // （主流 Axon/CQRS 做法），web 允许依赖 command/query（但不碰 aggregate），故回退为基类默认 @Disabled。
 }

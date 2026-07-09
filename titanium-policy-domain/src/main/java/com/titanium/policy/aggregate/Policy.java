@@ -13,15 +13,19 @@ import org.axonframework.spring.stereotype.Aggregate;
 import com.titanium.common.domain.BaseAggregate;
 import com.titanium.metadata.enums.policy.PolicyEnum;
 import com.titanium.metadata.enums.policy.PolicyForm;
+import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.command.ActivatePolicyCommand;
+import com.titanium.policy.command.AddInsuredMemberCommand;
 import com.titanium.policy.command.ApplyPolicyEndorsementCommand;
 import com.titanium.policy.command.CancelPolicyCommand;
 import com.titanium.policy.command.CreatePolicyCommand;
 import com.titanium.policy.command.CreatePolicyDirectlyCommand;
 import com.titanium.policy.command.IssuePolicyCommand;
 import com.titanium.policy.command.LapsePolicyCommand;
+import com.titanium.policy.command.LinkInvestmentAccountCommand;
 import com.titanium.policy.command.LinkSubPolicyCommand;
 import com.titanium.policy.command.ReinstatePolicyCommand;
+import com.titanium.policy.command.RemoveInsuredMemberCommand;
 import com.titanium.policy.command.ResumePolicyCommand;
 import com.titanium.policy.command.SuspendPolicyCommand;
 import com.titanium.policy.command.TerminatePolicyCommand;
@@ -31,6 +35,9 @@ import com.titanium.policy.entity.InsuranceProduct;
 import com.titanium.policy.entity.PaymentRecord;
 import com.titanium.policy.entity.Subject;
 import com.titanium.policy.entity.insurance.InsuredPartyList;
+import com.titanium.policy.event.InsuredMemberAddedEvent;
+import com.titanium.policy.event.InsuredMemberRemovedEvent;
+import com.titanium.policy.event.InvestmentAccountLinkedEvent;
 import com.titanium.policy.event.PolicyActivatedEvent;
 import com.titanium.policy.event.PolicyCancelledEvent;
 import com.titanium.policy.event.PolicyCreatedEvent;
@@ -98,6 +105,12 @@ public class Policy extends BaseAggregate {
     private List<DeductibleRule>   deductibleRules;
     /** 投保参与方清单 */
     private InsuredPartyList       insuredPartyList;
+    /** 关联投资账户ID（投连/万能保单出单后挂接，investment 域生成） */
+    private String                 investmentAccountId;
+    /** 产品ID（承保载体，供签发事件透传下游监管采集/自动分保） */
+    private String                 productId;
+    /** 保额（承保关键要素，供签发事件透传下游） */
+    private Money                  sumInsured;
     /** 缴费记录列表 */
     private List<PaymentRecord>    paymentRecords;
     /** 保单单证列表 */
@@ -115,8 +128,10 @@ public class Policy extends BaseAggregate {
     @CommandHandler
     public Policy(CreatePolicyCommand command) {
         AggregateLifecycle
-                .apply(new PolicyCreatedEvent(command.policyId(), new PolicyNo(command.policyNo()), command.startDate(),
-                        command.endDate(), command.premium(), new PolicyStatus(PolicyStatus.StatusCode.NOT_EFFECTIVE,
+                .apply(new PolicyCreatedEvent(command.policyId(), new PolicyNo(command.policyNo()),
+                        command.policyForm(), command.productId(), command.startDate(),
+                        command.endDate(), command.premium(), command.sumInsured(),
+                        new PolicyStatus(PolicyStatus.StatusCode.NOT_EFFECTIVE,
                                 LocalDateTime.now(), "创建保单", PolicyConstants.POLICY_SYSTEM),
                         new ArrayList<>(), command.tenantId()));
     }
@@ -127,7 +142,8 @@ public class Policy extends BaseAggregate {
     @CommandHandler
     public Policy(CreatePolicyDirectlyCommand command) {
         AggregateLifecycle.apply(new PolicyCreatedEvent(command.policyId(), new PolicyNo(command.policyNo()),
-                command.insurancePeriodStart(), command.insurancePeriodEnd(), command.totalPremium(),
+                command.policyForm(), command.productId(), command.insurancePeriodStart(),
+                command.insurancePeriodEnd(), command.totalPremium(), command.sumInsured(),
                 new PolicyStatus(PolicyStatus.StatusCode.NOT_EFFECTIVE, LocalDateTime.now(), "一步出单创建保单",
                         PolicyConstants.POLICY_SYSTEM),
                 new ArrayList<>(), command.tenantId()));
@@ -142,8 +158,9 @@ public class Policy extends BaseAggregate {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "Only NOT_EFFECTIVE policies can be issued");
         }
         generateDocument();
-        AggregateLifecycle.apply(new PolicyIssuedEvent(this.policyId, this.policyNo.value(), LocalDateTime.now(),
-                command.operatorId(), this.tenantId));
+        Money issuedPremium = this.basicInfo != null ? this.basicInfo.totalPremium() : null;
+        AggregateLifecycle.apply(new PolicyIssuedEvent(this.policyId, this.policyNo.value(), this.productId,
+                issuedPremium, this.sumInsured, LocalDateTime.now(), command.operatorId(), this.tenantId));
     }
 
     /**
@@ -278,6 +295,9 @@ public class Policy extends BaseAggregate {
     public void on(PolicyCreatedEvent event) {
         this.policyId = event.policyId();
         this.policyNo = event.policyNo();
+        this.policyForm = event.policyForm();
+        this.productId = event.productId();
+        this.sumInsured = event.sumInsured();
         this.tenantId = event.tenantId();
         this.createTime = LocalDateTime.now();
         this.insuranceProducts = new ArrayList<>();
@@ -290,6 +310,8 @@ public class Policy extends BaseAggregate {
         this.policyRelation = new PolicyRelation(PolicyEnum.PolicyLevel.INDEPENDENT, null, 0, null);
         this.basicInfo = new PolicyBasicInfo(null, 0, event.premium(), event.effectiveDate(), event.expiryDate(), 0,
                 null);
+        // 初始化空被保险人清单，支撑团单/家庭险出单后的成员动态增减（4.5/4.6）
+        this.insuredPartyList = new InsuredPartyList(this.policyId, null, new ArrayList<>(), new ArrayList<>());
     }
 
     @EventSourcingHandler
@@ -415,6 +437,105 @@ public class Policy extends BaseAggregate {
     public void on(SubPolicyLinkedEvent event) {
         PolicyRelation current = this.policyRelation != null ? this.policyRelation : PolicyRelation.independent();
         this.policyRelation = current.linkChild();
+    }
+
+    /**
+     * 挂接投资账户（投连/万能保单出单后关联投资账户，事件溯源）
+     * <p>
+     * 仅投连类形态可挂接（{@code PolicyForm.isInvestmentLinked()}）；重复挂接幂等返回。
+     * </p>
+     */
+    @CommandHandler
+    public void handle(LinkInvestmentAccountCommand command) {
+        ensureInvestmentLinked();
+        if (this.investmentAccountId != null) {
+            return;
+        }
+        AggregateLifecycle.apply(new InvestmentAccountLinkedEvent(this.policyId, command.investmentAccountId(),
+                LocalDateTime.now(), command.operatorId(), this.tenantId));
+    }
+
+    @EventSourcingHandler
+    public void on(InvestmentAccountLinkedEvent event) {
+        this.investmentAccountId = event.investmentAccountId();
+    }
+
+    /**
+     * 新增被保险人（团单加保 / 家庭险增员，事件溯源）
+     * <p>
+     * 仅团单/家庭险可增减成员；被保单须处于有效态（EFFECTIVE）方可加保。家庭险须提供家庭成员关系。
+     * </p>
+     */
+    @CommandHandler
+    public void handle(AddInsuredMemberCommand command) {
+        ensureMemberModifiable();
+        if (command.member() == null) {
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "新增被保险人信息不能为空");
+        }
+        if (this.policyForm == PolicyForm.FAMILY && command.familyRelation() == null) {
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "家庭险新增成员必须指定家庭成员关系");
+        }
+        AggregateLifecycle.apply(new InsuredMemberAddedEvent(this.policyId, command.member(), command.familyRelation(),
+                LocalDateTime.now(), command.operatorId(), this.tenantId));
+    }
+
+    @EventSourcingHandler
+    public void on(InsuredMemberAddedEvent event) {
+        InsuredPartyList.InsuredInfo member = event.member();
+        // 家庭险场景以事件携带的家庭关系覆盖成员关系，保证清单内关系一致
+        if (event.familyRelation() != null) {
+            member = new InsuredPartyList.InsuredInfo(member.insuredId(), member.name(), member.certType(),
+                    member.certNo(), member.age(), member.gender(), event.familyRelation());
+        }
+        if (this.insuredPartyList != null) {
+            this.insuredPartyList = this.insuredPartyList.addInsured(member);
+        }
+    }
+
+    /**
+     * 移除被保险人（团单减保 / 家庭险减员，事件溯源）
+     */
+    @CommandHandler
+    public void handle(RemoveInsuredMemberCommand command) {
+        ensureMemberModifiable();
+        // 清单增删的不变量（存在性/非空）由 InsuredPartyList 守护，转译为业务异常
+        try {
+            if (this.insuredPartyList != null) {
+                this.insuredPartyList.removeInsured(command.insuredId());
+            }
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", ex.getMessage());
+        }
+        AggregateLifecycle.apply(new InsuredMemberRemovedEvent(this.policyId, command.insuredId(), command.reason(),
+                LocalDateTime.now(), command.operatorId(), this.tenantId));
+    }
+
+    @EventSourcingHandler
+    public void on(InsuredMemberRemovedEvent event) {
+        if (this.insuredPartyList != null) {
+            this.insuredPartyList = this.insuredPartyList.removeInsured(event.insuredId());
+        }
+    }
+
+    /**
+     * 形态校验：仅投连/万能保单可挂接投资账户。
+     */
+    private void ensureInvestmentLinked() {
+        if (this.policyForm == null || !this.policyForm.isInvestmentLinked()) {
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "非投连/万能保单不可挂接投资账户");
+        }
+    }
+
+    /**
+     * 形态 + 状态校验：仅团单/家庭险的有效保单可动态增减被保险人。
+     */
+    private void ensureMemberModifiable() {
+        if (this.policyForm == null || !(this.policyForm.isGroup() || this.policyForm.isFamily())) {
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "仅团单/家庭险可动态增减被保险人");
+        }
+        if (this.status.statusCode() != PolicyStatus.StatusCode.EFFECTIVE) {
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "仅生效保单可增减被保险人");
+        }
     }
 
     /**

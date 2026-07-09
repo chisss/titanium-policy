@@ -2,6 +2,7 @@ package com.titanium.policy.valueobject;
 
 import java.time.LocalDateTime;
 
+import com.titanium.metadata.enums.BaseEnum;
 import com.titanium.policy.exception.PolicyStatusTransitionException;
 
 import lombok.Getter;
@@ -124,26 +125,28 @@ public record PolicyStatus(StatusCode statusCode, LocalDateTime statusTime, Stri
      * 状态编码枚举 - 对齐 metadata 层 PolicyEnum.PolicyStatus
      */
     @Getter
-    public enum StatusCode {
+    public enum StatusCode implements BaseEnum {
         /** 未生效（对应 metadata PENDING_EFFECTIVE） */
-        NOT_EFFECTIVE("NOT_EFFECTIVE", "未生效"),
+        NOT_EFFECTIVE(1, "NOT_EFFECTIVE", "未生效"),
         /** 生效 */
-        EFFECTIVE("EFFECTIVE", "生效"),
+        EFFECTIVE(2, "EFFECTIVE", "生效"),
         /** 暂停（保全域触发） */
-        SUSPENDED("SUSPENDED", "暂停"),
+        SUSPENDED(3, "SUSPENDED", "暂停"),
         /** 终止（保全域触发/退保） */
-        TERMINATED("TERMINATED", "终止"),
+        TERMINATED(4, "TERMINATED", "终止"),
         /** 满期（保险期间届满，定时任务触发，终态） */
-        EXPIRED("EXPIRED", "满期"),
+        EXPIRED(5, "EXPIRED", "满期"),
         /** 失效/中止（宽限期满未缴费，可经复效恢复，非终态） */
-        LAPSED("LAPSED", "失效"),
+        LAPSED(6, "LAPSED", "失效"),
         /** 已取消（仅未生效保单可取消） */
-        CANCELLED("CANCELLED", "已取消");
+        CANCELLED(7, "CANCELLED", "已取消");
 
-        private final String code;
-        private final String name;
+        private final Integer enumCode;
+        private final String  code;
+        private final String  name;
 
-        StatusCode(String code, String name) {
+        StatusCode(Integer enumCode, String code, String name) {
+            this.enumCode = enumCode;
             this.code = code;
             this.name = name;
         }

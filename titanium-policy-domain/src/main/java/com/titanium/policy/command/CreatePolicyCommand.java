@@ -30,6 +30,10 @@ public record CreatePolicyCommand(
                                    */
                                   PolicyForm policyForm,
                                   /*
+                                   * 产品ID（承保载体，透传至签发事件供下游监管采集/自动分保）
+                                   */
+                                  String productId,
+                                  /*
                                    * 签发机构
                                    */
                                   String issueOrg,

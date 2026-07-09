@@ -17,6 +17,7 @@ public class PolicyConstants {
         public static final String POLICY_EVENTS = "titanium.policy.events"; // 保单事件主题
         public static final String POLICY_CREATED = "titanium.policy.created"; // 保单创建事件主题
         public static final String POLICY_ACTIVATED = "titanium.policy.activated"; // 保单激活事件主题
+        public static final String POLICY_ISSUED = "titanium.policy.issued"; // 保单签发事件主题（供监管采集/自动分保消费）
         public static final String POLICY_EXPIRED = "titanium.policy.expired"; // 保单过期事件主题
         public static final String POLICY_CANCELLED = "titanium.policy.cancelled"; // 保单取消事件主题
     }

@@ -10,6 +10,7 @@ import org.hamcrest.TypeSafeMatcher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.policy.command.ApplyPolicyEndorsementCommand;
 import com.titanium.policy.common.enums.PolicyDataUpdateType;
 import com.titanium.policy.event.PolicyActivatedEvent;
@@ -41,7 +42,8 @@ class PolicyEndorsementTest {
 
     private PolicyCreatedEvent createdEvent() {
         LocalDateTime now = LocalDateTime.now();
-        return new PolicyCreatedEvent(POLICY_ID, new PolicyNo("POL-2024-0001"), now.minusDays(1), now.plusYears(1), null,
+        return new PolicyCreatedEvent(POLICY_ID, new PolicyNo("POL-2024-0001"), PolicyForm.INDIVIDUAL, null,
+                now.minusDays(1), now.plusYears(1), null, null,
                 new PolicyStatus(PolicyStatus.StatusCode.NOT_EFFECTIVE, now, "创建", "system"),
                 Collections.emptyList(), TENANT_ID);
     }

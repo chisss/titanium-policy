@@ -2,6 +2,7 @@ package com.titanium.policy.valueobject.proposal;
 
 import java.time.LocalDateTime;
 
+import com.titanium.metadata.enums.BaseEnum;
 import com.titanium.policy.exception.PolicyStatusTransitionException;
 
 import lombok.Getter;
@@ -58,28 +59,30 @@ public record ProposalStatus(StatusCode statusCode, LocalDateTime statusTime, St
      * 状态编码枚举
      */
     @Getter
-    public enum StatusCode {
+    public enum StatusCode implements BaseEnum {
         /**
          * 草稿
          */
-        DRAFT("DRAFT", "草稿"),
+        DRAFT(1, "DRAFT", "草稿"),
         /**
          * 已提交
          */
-        SUBMITTED("SUBMITTED", "已提交"),
+        SUBMITTED(2, "SUBMITTED", "已提交"),
         /**
          * 已转投保单
          */
-        CONVERTED_TO_APPLICATION("CONVERTED_TO_APPLICATION", "已转投保单"),
+        CONVERTED_TO_APPLICATION(3, "CONVERTED_TO_APPLICATION", "已转投保单"),
         /**
          * 作废
          */
-        VOIDED("VOIDED", "作废");
+        VOIDED(4, "VOIDED", "作废");
 
-        private final String code;
-        private final String name;
+        private final Integer enumCode;
+        private final String  code;
+        private final String  name;
 
-        StatusCode(String code, String name) {
+        StatusCode(Integer enumCode, String code, String name) {
+            this.enumCode = enumCode;
             this.code = code;
             this.name = name;
         }

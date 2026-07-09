@@ -1,5 +1,7 @@
 package com.titanium.policy.common.enums;
 
+import com.titanium.metadata.enums.BaseEnum;
+
 import lombok.Getter;
 
 /**
@@ -15,50 +17,51 @@ import lombok.Getter;
  * </p>
  */
 @Getter
-public enum PolicyDataUpdateType {
+public enum PolicyDataUpdateType implements BaseEnum {
     /** 投保人变更 */
-    HOLDER_CHANGE("HOLDER_CHANGE", "投保人变更", EndorsementCategory.PARTY, false, false,
+    HOLDER_CHANGE(1, "HOLDER_CHANGE", "投保人变更", EndorsementCategory.PARTY, false, false,
             EndorsementEffectiveType.IMMEDIATE),
     /** 受益人变更 */
-    BENEFICIARY_CHANGE("BENEFICIARY_CHANGE", "受益人变更", EndorsementCategory.PARTY, false, false,
+    BENEFICIARY_CHANGE(2, "BENEFICIARY_CHANGE", "受益人变更", EndorsementCategory.PARTY, false, false,
             EndorsementEffectiveType.IMMEDIATE),
     /** 缴费方式变更 */
-    PAYMENT_METHOD_CHANGE("PAYMENT_METHOD_CHANGE", "缴费方式变更", EndorsementCategory.PREMIUM_TERMS, false, true,
+    PAYMENT_METHOD_CHANGE(3, "PAYMENT_METHOD_CHANGE", "缴费方式变更", EndorsementCategory.PREMIUM_TERMS, false, true,
             EndorsementEffectiveType.NEXT_PERIOD),
     /** 加保 */
-    COVERAGE_INCREASE("COVERAGE_INCREASE", "加保", EndorsementCategory.SUM_INSURED, true, true,
+    COVERAGE_INCREASE(4, "COVERAGE_INCREASE", "加保", EndorsementCategory.SUM_INSURED, true, true,
             EndorsementEffectiveType.SPECIFIED_DATE),
     /** 减保 */
-    COVERAGE_DECREASE("COVERAGE_DECREASE", "减保", EndorsementCategory.SUM_INSURED, false, true,
+    COVERAGE_DECREASE(5, "COVERAGE_DECREASE", "减保", EndorsementCategory.SUM_INSURED, false, true,
             EndorsementEffectiveType.IMMEDIATE),
     /** 加额缴费 */
-    ADDITIONAL_PAYMENT("ADDITIONAL_PAYMENT", "加额缴费", EndorsementCategory.PREMIUM_TERMS, false, true,
+    ADDITIONAL_PAYMENT(6, "ADDITIONAL_PAYMENT", "加额缴费", EndorsementCategory.PREMIUM_TERMS, false, true,
             EndorsementEffectiveType.NEXT_PERIOD),
     /** 减额缴费 */
-    REDUCTION_PAYMENT("REDUCTION_PAYMENT", "减额缴费", EndorsementCategory.PREMIUM_TERMS, false, true,
+    REDUCTION_PAYMENT(7, "REDUCTION_PAYMENT", "减额缴费", EndorsementCategory.PREMIUM_TERMS, false, true,
             EndorsementEffectiveType.NEXT_PERIOD),
     /** 保单信息变更 */
-    POLICY_INFO_CHANGE("POLICY_INFO_CHANGE", "保单信息变更", EndorsementCategory.INFO, false, false,
+    POLICY_INFO_CHANGE(8, "POLICY_INFO_CHANGE", "保单信息变更", EndorsementCategory.INFO, false, false,
             EndorsementEffectiveType.IMMEDIATE),
     /** 保险期间变更 */
-    POLICY_PERIOD_CHANGE("POLICY_PERIOD_CHANGE", "保险期间变更", EndorsementCategory.PERIOD, true, true,
+    POLICY_PERIOD_CHANGE(9, "POLICY_PERIOD_CHANGE", "保险期间变更", EndorsementCategory.PERIOD, true, true,
             EndorsementEffectiveType.SPECIFIED_DATE),
     /** 保额变更 */
-    COVERAGE_AMOUNT_CHANGE("COVERAGE_AMOUNT_CHANGE", "保额变更", EndorsementCategory.SUM_INSURED, true, true,
+    COVERAGE_AMOUNT_CHANGE(10, "COVERAGE_AMOUNT_CHANGE", "保额变更", EndorsementCategory.SUM_INSURED, true, true,
             EndorsementEffectiveType.SPECIFIED_DATE),
     /** 被保人信息变更 */
-    INSURED_INFO_CHANGE("INSURED_INFO_CHANGE", "被保人信息变更", EndorsementCategory.PARTY, false, false,
+    INSURED_INFO_CHANGE(11, "INSURED_INFO_CHANGE", "被保人信息变更", EndorsementCategory.PARTY, false, false,
             EndorsementEffectiveType.IMMEDIATE),
     /** 标的变更 */
-    SUBJECT_CHANGE("SUBJECT_CHANGE", "标的变更", EndorsementCategory.SUBJECT, true, true,
+    SUBJECT_CHANGE(12, "SUBJECT_CHANGE", "标的变更", EndorsementCategory.SUBJECT, true, true,
             EndorsementEffectiveType.SPECIFIED_DATE),
     /** 吸烟状态变更 */
-    SMOKING_STATUS_CHANGE("SMOKING_STATUS_CHANGE", "吸烟状态变更", EndorsementCategory.SUBJECT, true, true,
+    SMOKING_STATUS_CHANGE(13, "SMOKING_STATUS_CHANGE", "吸烟状态变更", EndorsementCategory.SUBJECT, true, true,
             EndorsementEffectiveType.SPECIFIED_DATE),
     /** 保障责任变更 */
-    COVERAGE_CHANGE("COVERAGE_CHANGE", "保障责任变更", EndorsementCategory.COVERAGE, true, true,
+    COVERAGE_CHANGE(14, "COVERAGE_CHANGE", "保障责任变更", EndorsementCategory.COVERAGE, true, true,
             EndorsementEffectiveType.SPECIFIED_DATE);
 
+    private final Integer                  enumCode;
     private final String                   code;
     private final String                   name;
     private final EndorsementCategory      category;
@@ -66,8 +69,10 @@ public enum PolicyDataUpdateType {
     private final boolean                  requiresPremiumRecalc;
     private final EndorsementEffectiveType effectiveType;
 
-    PolicyDataUpdateType(String code, String name, EndorsementCategory category, boolean requiresUnderwriting,
-                         boolean requiresPremiumRecalc, EndorsementEffectiveType effectiveType) {
+    PolicyDataUpdateType(Integer enumCode, String code, String name, EndorsementCategory category,
+                         boolean requiresUnderwriting, boolean requiresPremiumRecalc,
+                         EndorsementEffectiveType effectiveType) {
+        this.enumCode = enumCode;
         this.code = code;
         this.name = name;
         this.category = category;
@@ -110,12 +115,7 @@ public enum PolicyDataUpdateType {
      * @return 匹配的枚举，未匹配返回 null
      */
     public static PolicyDataUpdateType fromCode(String code) {
-        for (PolicyDataUpdateType type : values()) {
-            if (type.code.equals(code)) {
-                return type;
-            }
-        }
-        return null;
+        return BaseEnum.fromCode(PolicyDataUpdateType.class, code);
     }
 
     /**

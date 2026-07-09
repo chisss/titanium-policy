@@ -98,7 +98,21 @@
             <artifactId>titanium-underwriting-api</artifactId>
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
-        
+
+        <!-- 计费系统API（承保出单后经 BillingServicePort 开立首期保费账单） -->
+        <dependency>
+            <groupId>com.titanium</groupId>
+            <artifactId>titanium-billing-api</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+
+        <!-- 投资系统API（投连/万能保单出单后经 InvestmentAccountPort 开立投资账户） -->
+        <dependency>
+            <groupId>com.titanium</groupId>
+            <artifactId>titanium-investment-api</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+
         <!-- Liquibase -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

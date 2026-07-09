@@ -15,32 +15,34 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.titanium.policy.application.command.ProposalApplicationService;
 import com.titanium.policy.application.query.ProposalAppQueryService;
+import com.titanium.policy.command.CreateProposalCommand;
 import com.titanium.policy.web.mapper.ProposalWebMapper;
 import com.titanium.policy.web.request.CreateProposalRequest;
 import com.titanium.policy.web.response.ProposalVO;
 
-import jakarta.annotation.Resource;
+import lombok.RequiredArgsConstructor;
 
 /**
- * 投保意向单控制器
+ * 投保意向单控制器（后台/端上 HTTP 入口）
  * <p>
- * 表现层仅依赖 Web 层 Request/VO 与应用层 command/query 服务，不直接依赖领域命令/聚合根： 写入口经
- * {@link ProposalApplicationService}（应用层构造命令），读入口经 {@link ProposalAppQueryService}
- * 查询读模型并由 {@link ProposalWebMapper} 转 VO。
+ * 面向管理后台/端上，路径 {@code /web/v1/proposals}，<b>不 implements ProposalApi</b>（远程契约由
+ * {@code ProposalApiProvider} 承接）。表现层经 {@link ProposalWebMapper} 把 Request 转成
+ * CQRS 命令/查询： 写入口构造 {@link CreateProposalCommand} 交
+ * {@link ProposalApplicationService}，读入口经 {@link ProposalAppQueryService}
+ * 查读模型并转 VO。web 可依赖 command/query，但不碰聚合根。 与 {@code ProposalApiProvider}
+ * 平行收敛到同一应用层门面。
  * </p>
  */
 @RestController
-@RequestMapping("/api/proposals")
+@RequestMapping("/web/v1/proposals")
+@RequiredArgsConstructor
 public class ProposalController {
 
-    @Resource
-    private ProposalApplicationService proposalApplicationService;
+    private final ProposalApplicationService proposalApplicationService;
 
-    @Resource
-    private ProposalAppQueryService    proposalAppQueryService;
+    private final ProposalAppQueryService    proposalAppQueryService;
 
-    @Resource
-    private ProposalWebMapper          proposalWebMapper;
+    private final ProposalWebMapper          proposalWebMapper;
 
     /**
      * 创建投保意向单
@@ -52,10 +54,9 @@ public class ProposalController {
     @PostMapping
     public ResponseEntity<String> createProposal(@RequestBody CreateProposalRequest request,
                                                  @RequestHeader("X-Tenant-Id") String tenantId) {
-        String proposalId = proposalApplicationService.createProposal(request.getProposalId(), request.getProposalNo(),
-                request.getPolicyForm(), request.getChannel(), request.getCustomerId(), request.getIntendedSumInsured(),
-                request.getIntendedPremium(), request.getCurrency(), request.getInsurancePeriodStart(),
-                request.getInsurancePeriodEnd(), request.getExpectedProductCode(), tenantId);
+        // 协议转换：HTTP Request → 领域命令，收敛到同一应用层门面
+        CreateProposalCommand command = proposalWebMapper.toCommand(request, tenantId);
+        String proposalId = proposalApplicationService.createProposal(command);
         return new ResponseEntity<>(proposalId, HttpStatus.CREATED);
     }
 
@@ -67,7 +68,7 @@ public class ProposalController {
      * @return 投保意向单详情
      */
     @GetMapping("/{proposalId}")
-    public ResponseEntity<ProposalVO> getProposal(@PathVariable String proposalId,
+    public ResponseEntity<ProposalVO> getProposal(@PathVariable("proposalId") String proposalId,
                                                   @RequestHeader("X-Tenant-Id") String tenantId) {
         Optional<ProposalVO> vo = proposalAppQueryService.findByProposalNo(proposalId, tenantId)
                 .map(proposalWebMapper::toVO);
@@ -82,7 +83,7 @@ public class ProposalController {
      * @return 响应结果
      */
     @PutMapping("/{proposalId}/submit")
-    public ResponseEntity<Void> submitProposal(@PathVariable String proposalId,
+    public ResponseEntity<Void> submitProposal(@PathVariable("proposalId") String proposalId,
                                                @RequestHeader("X-Tenant-Id") String tenantId) {
         proposalApplicationService.submitProposal(proposalId, "提交投保意向单", tenantId);
         return ResponseEntity.noContent().build();

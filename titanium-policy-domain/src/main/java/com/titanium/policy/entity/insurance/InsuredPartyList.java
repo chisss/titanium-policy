@@ -1,10 +1,12 @@
 package com.titanium.policy.entity.insurance;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import com.titanium.metadata.enums.customer.CustomerEnum.CustomerGender;
 import com.titanium.metadata.enums.customer.CustomerEnum.IdCardType;
 import com.titanium.metadata.enums.customer.CustomerEnum.InsuranceRole;
+import com.titanium.policy.common.enums.FamilyRelation;
 
 /**
  * 投保参与方清单实体
@@ -50,6 +52,40 @@ public record InsuredPartyList(
         // 调用客户域校验投保人/被保险人身份、资质合法性
         // 暂时返回true
         return true;
+    }
+
+    /**
+     * 新增一名被保险人，返回新清单实例（record 不可变，增删返回副本）。
+     *
+     * @param insured 新增的被保险人
+     * @return 追加后的新清单
+     */
+    public InsuredPartyList addInsured(InsuredInfo insured) {
+        List<InsuredInfo> newList = new ArrayList<>(this.insuredList != null ? this.insuredList : List.of());
+        newList.add(insured);
+        return new InsuredPartyList(this.listId, this.holderInfo, newList, this.beneficiaryList);
+    }
+
+    /**
+     * 移除指定被保险人，返回新清单实例。移除后至少保留 1 名被保险人，否则抛异常由聚合捕获转业务异常。
+     *
+     * @param insuredId 被移除的被保险人ID
+     * @return 移除后的新清单
+     */
+    public InsuredPartyList removeInsured(String insuredId) {
+        if (this.insuredList == null) {
+            throw new IllegalStateException("被保险人清单为空，无法移除");
+        }
+        List<InsuredInfo> newList = new ArrayList<>(this.insuredList.stream()
+                .filter(i -> !i.insuredId().equals(insuredId))
+                .toList());
+        if (newList.size() == this.insuredList.size()) {
+            throw new IllegalArgumentException("被保险人不存在: " + insuredId);
+        }
+        if (newList.isEmpty()) {
+            throw new IllegalStateException("移除后被保险人清单不能为空");
+        }
+        return new InsuredPartyList(this.listId, this.holderInfo, newList, this.beneficiaryList);
     }
 
     /**
@@ -105,7 +141,11 @@ public record InsuredPartyList(
                               /*
                                * 性别
                                */
-                              CustomerGender gender) {
+                              CustomerGender gender,
+                              /*
+                               * 家庭成员关系（家庭险场景标识与投保人的关系；个险/团单可为 null）
+                               */
+                              FamilyRelation familyRelation) {
     }
 
     /**

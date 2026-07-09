@@ -105,8 +105,8 @@ public class IssuanceOrchestrator {
 
         CreatePolicyDirectlyCommand command = new CreatePolicyDirectlyCommand(policyId, policyNo, request.productId(),
                 request.productCode(), request.policyForm(), request.policyHolderId(), request.insuredCount(),
-                request.totalPremium(), request.insurancePeriodStart(), request.insurancePeriodEnd(), request.channel(),
-                request.tenantId());
+                request.totalPremium(), null, request.insurancePeriodStart(), request.insurancePeriodEnd(),
+                request.channel(), request.tenantId());
 
         commandGateway.sendAndWait(command);
         log.info("一步出单完成, policyId={}, policyNo={}", policyId, policyNo);

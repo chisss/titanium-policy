@@ -1,10 +1,13 @@
 package com.titanium.policy.infrastructure.mapper;
 
+import java.math.BigDecimal;
+
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.ReportingPolicy;
 
 import com.titanium.metadata.enums.policy.PolicyEnum;
+import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.aggregate.Policy;
 import com.titanium.policy.infrastructure.entity.PolicyEntity;
 import com.titanium.policy.valueobject.PolicyNo;
@@ -69,6 +72,26 @@ public interface PolicyMapper {
      */
     default PolicyNo map(String value) {
         return value == null ? null : new PolicyNo(value);
+    }
+
+    /**
+     * 金额值对象 → 数值（读侧实体按数值列存储金额，币种维度暂由实体其它列/默认处理）
+     *
+     * @param money 金额值对象
+     * @return 金额数值
+     */
+    default BigDecimal map(Money money) {
+        return money == null ? null : money.value();
+    }
+
+    /**
+     * 数值 → 金额值对象（重建聚合时按默认币种 CNY 包装；精确币种由事件溯源权威重放，实体转换为兜底路径）
+     *
+     * @param value 金额数值
+     * @return 金额值对象
+     */
+    default Money mapToMoney(BigDecimal value) {
+        return value == null ? null : Money.of(value, "CNY");
     }
 
     /**

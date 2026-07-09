@@ -15,15 +15,21 @@ import org.springframework.beans.factory.annotation.Autowired;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.command.CreatePolicyCommand;
+import com.titanium.policy.command.LinkInvestmentAccountCommand;
 import com.titanium.policy.command.ReceiveUnderwritingResultCommand;
 import com.titanium.policy.command.TriggerIssuanceCommand;
+import com.titanium.policy.common.constant.PolicyConstants;
 import com.titanium.policy.event.insurance.InsuranceCreatedEvent;
 import com.titanium.policy.event.insurance.InsuranceIssuedEvent;
 import com.titanium.policy.event.insurance.InsuranceSubmittedForUnderwritingEvent;
 import com.titanium.policy.event.insurance.UnderwritingResultReceivedEvent;
 import com.titanium.policy.generator.PolicyNoGenerator;
+import com.titanium.policy.port.BillingServicePort;
+import com.titanium.policy.port.InvestmentAccountPort;
 import com.titanium.policy.port.UnderwritingDecisionGateway;
 import com.titanium.policy.service.PolicyIssuanceDomainService;
+import com.titanium.policy.valueobject.billing.BillingResult;
+import com.titanium.policy.valueobject.billing.PremiumBillRequest;
 import com.titanium.policy.valueobject.insurance.UnderwritingDecisionRequest;
 import com.titanium.policy.valueobject.insurance.UnderwritingResult;
 
@@ -65,10 +71,18 @@ public class IssuanceSaga {
     @Autowired
     private transient PolicyIssuanceDomainService policyIssuanceDomainService;
 
+    @Autowired
+    private transient BillingServicePort billingServicePort;
+
+    @Autowired
+    private transient InvestmentAccountPort investmentAccountPort;
+
     /** 保单形态 */
     private PolicyForm    policyForm;
     /** 投保人ID */
     private String        holderId;
+    /** 产品ID（取投保险种编码列表首个，承保载体，透传签发事件供下游采集/分保） */
+    private String        productId;
     /** 精确保费 */
     private BigDecimal    exactPremium;
     /** 保障起期 */
@@ -87,6 +101,9 @@ public class IssuanceSaga {
         log.info("[IssuanceSaga] 启动: insuranceId={}, tenantId={}", event.insuranceId(), event.tenantId());
         this.policyForm = event.policyForm();
         this.holderId = event.holderId();
+        // 取投保险种编码列表首个作为产品ID（承保载体），供出单事件透传下游
+        this.productId = event.productCodes() != null && !event.productCodes().isEmpty()
+                ? event.productCodes().get(0) : null;
         this.exactPremium = event.exactPremium();
         this.insurancePeriodStart = event.insurancePeriodStart();
         this.insurancePeriodEnd = event.insurancePeriodEnd();
@@ -149,6 +166,7 @@ public class IssuanceSaga {
                 policyNo,
                 event.insuranceId(),
                 policyForm,
+                productId,
                 null,
                 holderId,
                 null,
@@ -162,5 +180,33 @@ public class IssuanceSaga {
         commandGateway.sendAndWait(command);
         log.info("[IssuanceSaga] 承保出单完成，已创建保单: insuranceId={}, policyId={}, policyNo={}",
                 event.insuranceId(), policyId, policyNo);
+
+        // 出单后触发计费：经 BillingServicePort 为保单开立首期保费账单（跨服务同步，账单失败不回滚保单）
+        try {
+            BillingResult billingResult = billingServicePort.createPremiumBill(
+                    new PremiumBillRequest(policyId, holderId, premium, null, tenantId));
+            log.info("[IssuanceSaga] 首期保费账单开立结果: policyId={}, success={}, billId={}", policyId,
+                    billingResult.success(), billingResult.billId());
+        } catch (Exception ex) {
+            log.error("[IssuanceSaga] 开立首期保费账单失败（不阻断出单，待补偿）: policyId={}", policyId, ex);
+        }
+
+        // 投连/万能保单：出单后经 InvestmentAccountPort 开立投资账户并挂接到保单（账户失败不阻断出单，待补偿）
+        if (policyForm != null && policyForm.isInvestmentLinked()) {
+            try {
+                String accountId = investmentAccountPort.openAccount(policyId, policyForm, premium, tenantId);
+                if (accountId != null) {
+                    commandGateway.sendAndWait(
+                            new LinkInvestmentAccountCommand(policyId, accountId, PolicyConstants.POLICY_SYSTEM,
+                                    tenantId));
+                    log.info("[IssuanceSaga] 投连/万能保单已挂接投资账户: policyId={}, accountId={}", policyId,
+                            accountId);
+                } else {
+                    log.error("[IssuanceSaga] 开立投资账户返回空（不阻断出单，待补偿）: policyId={}", policyId);
+                }
+            } catch (Exception ex) {
+                log.error("[IssuanceSaga] 开立/挂接投资账户失败（不阻断出单，待补偿）: policyId={}", policyId, ex);
+            }
+        }
     }
 }

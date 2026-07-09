@@ -1,5 +1,7 @@
 package com.titanium.policy.common.enums;
 
+import com.titanium.metadata.enums.BaseEnum;
+
 import lombok.Getter;
 
 /**
@@ -10,26 +12,28 @@ import lombok.Getter;
  * </p>
  */
 @Getter
-public enum EndorsementCategory {
+public enum EndorsementCategory implements BaseEnum {
     /** 当事人类：投保人/被保险人/受益人等主体变更 */
-    PARTY("PARTY", "当事人变更"),
+    PARTY(1, "PARTY", "当事人变更"),
     /** 标的类：车辆/不动产/货物等保险标的变更 */
-    SUBJECT("SUBJECT", "标的变更"),
+    SUBJECT(2, "SUBJECT", "标的变更"),
     /** 保障责任类：责任增减、限额、免赔、特约 */
-    COVERAGE("COVERAGE", "保障责任变更"),
+    COVERAGE(3, "COVERAGE", "保障责任变更"),
     /** 保额类：加保/减保/保额调整 */
-    SUM_INSURED("SUM_INSURED", "保额变更"),
+    SUM_INSURED(4, "SUM_INSURED", "保额变更"),
     /** 缴费/财务要素类：缴费方式/频次/追加/减额 */
-    PREMIUM_TERMS("PREMIUM_TERMS", "缴费财务要素变更"),
+    PREMIUM_TERMS(5, "PREMIUM_TERMS", "缴费财务要素变更"),
     /** 保险期间类：起止期延长/缩短 */
-    PERIOD("PERIOD", "保险期间变更"),
+    PERIOD(6, "PERIOD", "保险期间变更"),
     /** 信息登记类：不影响要素的纯信息更正 */
-    INFO("INFO", "信息变更");
+    INFO(7, "INFO", "信息变更");
 
-    private final String code;
-    private final String name;
+    private final Integer enumCode;
+    private final String  code;
+    private final String  name;
 
-    EndorsementCategory(String code, String name) {
+    EndorsementCategory(Integer enumCode, String code, String name) {
+        this.enumCode = enumCode;
         this.code = code;
         this.name = name;
     }

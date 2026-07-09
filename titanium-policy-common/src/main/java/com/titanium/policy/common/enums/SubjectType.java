@@ -1,5 +1,7 @@
 package com.titanium.policy.common.enums;
 
+import com.titanium.metadata.enums.BaseEnum;
+
 import lombok.Getter;
 
 /**
@@ -10,38 +12,35 @@ import lombok.Getter;
  * </p>
  */
 @Getter
-public enum SubjectType {
+public enum SubjectType implements BaseEnum {
     /** 车辆 */
-    VEHICLE("VEHICLE", "车辆"),
+    VEHICLE(1, "VEHICLE", "车辆"),
     /** 房屋 */
-    HOUSE("HOUSE", "房屋"),
+    HOUSE(2, "HOUSE", "房屋"),
     /** 人身 */
-    PERSON("PERSON", "人身"),
+    PERSON(3, "PERSON", "人身"),
     /** 财产 */
-    PROPERTY("PROPERTY", "财产"),
+    PROPERTY(4, "PROPERTY", "财产"),
     /** 宠物 */
-    PET("PET", "宠物");
+    PET(5, "PET", "宠物");
 
-    private final String code;
-    private final String name;
+    private final Integer enumCode;
+    private final String  code;
+    private final String  name;
 
-    SubjectType(String code, String name) {
+    SubjectType(Integer enumCode, String code, String name) {
+        this.enumCode = enumCode;
         this.code = code;
         this.name = name;
     }
 
     /**
-     * 根据编码反查枚举
+     * 根据编码反查枚举（统一范式入口，委托 {@link BaseEnum}）
      *
      * @param code 标的类型编码
      * @return 匹配的枚举，未匹配返回 null
      */
     public static SubjectType fromCode(String code) {
-        for (SubjectType type : values()) {
-            if (type.code.equals(code)) {
-                return type;
-            }
-        }
-        return null;
+        return BaseEnum.fromCode(SubjectType.class, code);
     }
 }

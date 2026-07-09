@@ -15,32 +15,35 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.titanium.policy.application.command.InsuranceApplicationService;
 import com.titanium.policy.application.query.InsuranceAppQueryService;
+import com.titanium.policy.command.ConvertProposalToInsuranceCommand;
 import com.titanium.policy.web.mapper.InsuranceWebMapper;
 import com.titanium.policy.web.request.ConvertToInsuranceRequest;
 import com.titanium.policy.web.response.InsuranceVO;
 
-import jakarta.annotation.Resource;
+import lombok.RequiredArgsConstructor;
 
 /**
  * 投保单控制器
  * <p>
- * 表现层仅依赖 Web 层 Request/VO 与应用层 command/query 服务，不直接依赖领域命令/聚合根： 写入口经
- * {@link InsuranceApplicationService}（应用层构造命令），读入口经 {@link InsuranceAppQueryService}
- * 查询读模型并由 {@link InsuranceWebMapper} 转 VO。
+ * 面向后台/端上，路径 {@code /web/v1/insurances}，入参 {@code ConvertToInsuranceRequest}、出参
+ * {@code InsuranceVO}，<b>不 implements InsuranceApi</b>（远程契约由
+ * {@code InsuranceApiProvider} 承接）。 表现层经 {@link InsuranceWebMapper} 把 Request
+ * 直接转成领域命令 {@link ConvertProposalToInsuranceCommand} 交
+ * {@link InsuranceApplicationService}，读入口经 {@link InsuranceAppQueryService}
+ * 查读模型并转 VO。 web 可依赖 command/query，但不碰聚合根。与 {@code InsuranceApiProvider}
+ * 平行收敛到同一应用层门面。
  * </p>
  */
 @RestController
-@RequestMapping("/api/insurances")
+@RequestMapping("/web/v1/insurances")
+@RequiredArgsConstructor
 public class InsuranceController {
 
-    @Resource
-    private InsuranceApplicationService insuranceApplicationService;
+    private final InsuranceApplicationService insuranceApplicationService;
 
-    @Resource
-    private InsuranceAppQueryService    insuranceAppQueryService;
+    private final InsuranceAppQueryService    insuranceAppQueryService;
 
-    @Resource
-    private InsuranceWebMapper          insuranceWebMapper;
+    private final InsuranceWebMapper          insuranceWebMapper;
 
     /**
      * 从投保意向单创建投保单
@@ -52,11 +55,9 @@ public class InsuranceController {
     @PostMapping("/from-proposal")
     public ResponseEntity<String> convertFromProposal(@RequestBody ConvertToInsuranceRequest request,
                                                       @RequestHeader("X-Tenant-Id") String tenantId) {
-        String insuranceId = insuranceApplicationService.convertFromProposal(request.getInsuranceId(),
-                request.getInsuranceNo(), request.getProposalId(), request.getPolicyForm(), request.getApplicantId(),
-                request.getInsuredCount(), request.getExactPremium(), request.getCurrency(),
-                request.getInsurancePeriodStart(), request.getInsurancePeriodEnd(), request.getProductCodes(),
-                request.getUnderwritingPriority(), request.getChangeReason(), tenantId);
+        // 协议转换：HTTP Request → 领域命令，收敛到同一应用层门面
+        ConvertProposalToInsuranceCommand command = insuranceWebMapper.toCommand(request, tenantId);
+        String insuranceId = insuranceApplicationService.convertFromProposal(command);
         return new ResponseEntity<>(insuranceId, HttpStatus.CREATED);
     }
 

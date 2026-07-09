@@ -3,7 +3,10 @@ package com.titanium.policy.valueobject;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+import com.titanium.metadata.enums.BaseEnum;
 import com.titanium.metadata.valueobject.Money;
+
+import lombok.Getter;
 
 /**
  * 保费计划值对象
@@ -59,20 +62,23 @@ public record PremiumPlan(Money premiumAmount, PaymentMethod paymentMethod, Paym
     /**
      * 缴费方式枚举
      */
-    public enum PaymentMethod {
+    @Getter
+    public enum PaymentMethod implements BaseEnum {
         /**
          * 趸缴
          */
-        SINGLE_PAYMENT("SINGLE_PAYMENT", "趸缴"),
+        SINGLE_PAYMENT(1, "SINGLE_PAYMENT", "趸缴"),
         /**
          * 期缴
          */
-        INSTALLMENT_PAYMENT("INSTALLMENT_PAYMENT", "期缴");
+        INSTALLMENT_PAYMENT(2, "INSTALLMENT_PAYMENT", "期缴");
 
-        private final String code;
-        private final String name;
+        private final Integer enumCode;
+        private final String  code;
+        private final String  name;
 
-        PaymentMethod(String code, String name) {
+        PaymentMethod(Integer enumCode, String code, String name) {
+            this.enumCode = enumCode;
             this.code = code;
             this.name = name;
         }
@@ -81,28 +87,31 @@ public record PremiumPlan(Money premiumAmount, PaymentMethod paymentMethod, Paym
     /**
      * 缴费周期枚举
      */
-    public enum PaymentCycle {
+    @Getter
+    public enum PaymentCycle implements BaseEnum {
         /**
          * 月缴
          */
-        MONTHLY("MONTHLY", "月缴"),
+        MONTHLY(1, "MONTHLY", "月缴"),
         /**
          * 季缴
          */
-        QUARTERLY("QUARTERLY", "季缴"),
+        QUARTERLY(2, "QUARTERLY", "季缴"),
         /**
          * 半年缴
          */
-        SEMI_ANNUALLY("SEMI_ANNUALLY", "半年缴"),
+        SEMI_ANNUALLY(3, "SEMI_ANNUALLY", "半年缴"),
         /**
          * 年缴
          */
-        ANNUALLY("ANNUALLY", "年缴");
+        ANNUALLY(4, "ANNUALLY", "年缴");
 
-        private final String code;
-        private final String name;
+        private final Integer enumCode;
+        private final String  code;
+        private final String  name;
 
-        PaymentCycle(String code, String name) {
+        PaymentCycle(Integer enumCode, String code, String name) {
+            this.enumCode = enumCode;
             this.code = code;
             this.name = name;
         }
@@ -111,32 +120,35 @@ public record PremiumPlan(Money premiumAmount, PaymentMethod paymentMethod, Paym
     /**
      * 缴费状态枚举
      */
-    public enum PaymentStatus {
+    @Getter
+    public enum PaymentStatus implements BaseEnum {
         /**
          * 未缴费
          */
-        UNPAID("UNPAID", "未缴费"),
+        UNPAID(1, "UNPAID", "未缴费"),
         /**
          * 已缴费
          */
-        PAID("PAID", "已缴费"),
+        PAID(2, "PAID", "已缴费"),
         /**
          * 部分缴费
          */
-        PARTIALLY_PAID("PARTIALLY_PAID", "部分缴费"),
+        PARTIALLY_PAID(3, "PARTIALLY_PAID", "部分缴费"),
         /**
          * 缴费逾期
          */
-        OVERDUE("OVERDUE", "缴费逾期"),
+        OVERDUE(4, "OVERDUE", "缴费逾期"),
         /**
          * 缴费完成
          */
-        COMPLETED("COMPLETED", "缴费完成");
+        COMPLETED(5, "COMPLETED", "缴费完成");
 
-        private final String code;
-        private final String name;
+        private final Integer enumCode;
+        private final String  code;
+        private final String  name;
 
-        PaymentStatus(String code, String name) {
+        PaymentStatus(Integer enumCode, String code, String name) {
+            this.enumCode = enumCode;
             this.code = code;
             this.name = name;
         }

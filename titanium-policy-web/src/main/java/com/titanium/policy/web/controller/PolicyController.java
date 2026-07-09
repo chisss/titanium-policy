@@ -1,150 +1,122 @@
 package com.titanium.policy.web.controller;
 
-import java.math.BigDecimal;
-import java.util.List;
-
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.titanium.policy.api.PolicyApi;
-import com.titanium.policy.api.dto.AmountDTO;
-import com.titanium.policy.api.dto.CreatePolicyDTO;
-import com.titanium.policy.api.dto.PolicyDTO;
-import com.titanium.policy.api.response.ApiResponse;
 import com.titanium.policy.application.command.PolicyApplicationService;
 import com.titanium.policy.application.query.PolicyAppQueryService;
-import com.titanium.policy.query.result.PolicyQueryResult;
-import com.titanium.policy.valueobject.IssuanceRequest;
-import com.titanium.policy.valueobject.IssuanceResult;
+import com.titanium.policy.command.CreatePolicyCommand;
+import com.titanium.policy.command.CreatePolicyDirectlyCommand;
+import com.titanium.policy.query.query.FindPolicyByIdQuery;
+import com.titanium.policy.web.mapper.PolicyWebMapper;
+import com.titanium.policy.web.request.CreatePolicyRequest;
+import com.titanium.policy.web.response.PolicyDetailVO;
 
 import lombok.RequiredArgsConstructor;
 
 /**
- * 保单控制器
- * 实现PolicyApi接口，为管理后台提供访问
+ * 保单控制器（后台/端上 HTTP 入口）
+ * <p>
+ * 面向管理后台/端上，路径 {@code /web/v1/policies}，入参 {@code CreatePolicyRequest}、出参
+ * {@code PolicyDetailVO}，<b>不再 implements PolicyApi</b>（远程契约由
+ * {@code PolicyApiProvider} 承接）。 表现层经 {@link PolicyWebMapper} 把 Request 转成 CQRS
+ * 命令/查询：写入口构造 {@link CreatePolicyCommand} 交
+ * {@link PolicyApplicationService}，读入口构造 {@link FindPolicyByIdQuery} 交
+ * {@link PolicyAppQueryService} 查读模型并转 VO。web 可依赖 command/query，但不碰聚合根。与
+ * {@code PolicyApiProvider} 平行收敛到同一应用层门面。
+ * </p>
  */
 @RestController
-@RequestMapping("/web/policies")
+@RequestMapping("/web/v1/policies")
 @RequiredArgsConstructor
-public class PolicyController implements PolicyApi {
+public class PolicyController {
 
     private final PolicyApplicationService policyApplicationService;
 
-    private final PolicyAppQueryService policyAppQueryService;
+    private final PolicyAppQueryService    policyAppQueryService;
 
-    @Override
-    public ApiResponse<String> createPolicy(CreatePolicyDTO createPolicyDTO) {
-        // 命令构造下沉应用层，表现层不依赖领域命令
-        String policyId = policyApplicationService.createPolicy(createPolicyDTO);
-        return ApiResponse.success(policyId);
-    }
+    private final PolicyWebMapper          policyWebMapper;
 
-    @Override
-    public ApiResponse<String> createPolicyDirectly(CreatePolicyDTO createPolicyDTO) {
-        // 命令构造下沉应用层，表现层不依赖领域命令
-        String policyId = policyApplicationService.createPolicyDirectly(createPolicyDTO);
-        return ApiResponse.success(policyId);
-    }
-
-    @Override
-    public ApiResponse<Object> issueByConfig(Object request, String tenantId) {
-        // 出单模式由产品域配置决定，不再硬编码步数
-        IssuanceResult result = policyApplicationService.issue((IssuanceRequest) request);
-        return ApiResponse.success(result);
-    }
-
-    @Override
-    public ApiResponse<PolicyDTO> getPolicy(String policyId, String tenantId) {
-        // 走读模型（QueryGateway → PolicyView），命中则组装为对外 PolicyDTO
-        return policyAppQueryService.findById(policyId, tenantId)
-                .map(result -> ApiResponse.success(toDTO(result)))
-                .orElseGet(() -> ApiResponse.success(null));
-    }
-
-    @Override
-    public ApiResponse<Void> issuePolicy(String policyId, String operatorId, String tenantId) {
-        policyApplicationService.issuePolicy(policyId, operatorId, tenantId);
-        return ApiResponse.success();
-    }
-
-    @Override
-    public ApiResponse<Void> activatePolicy(String policyId, String tenantId) {
-        policyApplicationService.activatePolicy(policyId, tenantId);
-        return ApiResponse.success();
-    }
-
-    @Override
-    public ApiResponse<Void> suspendPolicy(String policyId, Object command) {
-        // 注：PolicyApi 的 command 为 Object 且未透传 reason/operator/tenantId（既有契约缺陷），暂以 null 占位；
-        // 命令构造下沉应用层，表现层不依赖领域命令。待 API 契约补齐结构化入参后完善。
-        policyApplicationService.suspendPolicy(policyId, null, null, null);
-        return ApiResponse.success();
-    }
-
-    @Override
-    public ApiResponse<Void> resumePolicy(String policyId, Object command) {
-        policyApplicationService.resumePolicy(policyId, null, null, null);
-        return ApiResponse.success();
-    }
-
-    @Override
-    public ApiResponse<Void> terminatePolicy(String policyId, Object command) {
-        policyApplicationService.terminatePolicy(policyId, null, null, null, null);
-        return ApiResponse.success();
-    }
-
-    @Override
-    public ApiResponse<Void> cancelPolicy(String policyId, Object command) {
-        policyApplicationService.cancelPolicy(policyId, null, null, null);
-        return ApiResponse.success();
-    }
-
-    @Override
-    public ApiResponse<List<PolicyDTO>> getPoliciesByCustomerId(String customerId) {
-        // PolicyApi 未透传 tenantId，而读模型为多租户查询（须带 tenantId），无法在此安全执行；
-        // 待 PolicyApi 补齐 tenantId 参数后接通 policyAppQueryService.findByCustomerId
-        return ApiResponse.success(null);
-    }
-
-    @Override
-    public ApiResponse<List<PolicyDTO>> getPoliciesByStatus(String status) {
-        // 读侧 PolicyQueryHandler 暂未暴露按状态查询，待补充对应 Query 后接通
-        return ApiResponse.success(null);
-    }
-
-    @Override
-    public ApiResponse<List<PolicyDTO>> getAllPolicies() {
-        // 读侧暂未提供全量查询（生产场景应分页），待补充分页 Query 后接通
-        return ApiResponse.success(null);
+    /**
+     * 创建保单（从投保单创建）
+     *
+     * @param request 创建保单请求
+     * @param tenantId 租户ID
+     * @return 保单ID
+     */
+    @PostMapping
+    public ResponseEntity<String> createPolicy(@RequestBody CreatePolicyRequest request,
+                                               @RequestHeader("X-Tenant-Id") String tenantId) {
+        // 协议转换：HTTP Request → 领域命令，收敛到同一应用层门面
+        CreatePolicyCommand command = policyWebMapper.toCommand(request, tenantId);
+        String policyId = policyApplicationService.createPolicy(command);
+        return new ResponseEntity<>(policyId, HttpStatus.CREATED);
     }
 
     /**
-     * 读模型查询结果 → 对外保单 DTO 的表现层组装
-     * <p>
-     * Controller 层的展示组装（读模型结果 → API 契约 DTO），非领域实体跨层转换。
-     * </p>
+     * 一步出单（直接创建并签发）
      *
-     * @param result 读模型查询结果
-     * @return 对外保单 DTO
+     * @param request 创建保单请求
+     * @param tenantId 租户ID
+     * @return 保单ID
      */
-    private PolicyDTO toDTO(PolicyQueryResult result) {
-        PolicyDTO dto = new PolicyDTO();
-        dto.setPolicyId(result.getPolicyId());
-        dto.setPolicyNo(result.getPolicyNo());
-        dto.setCustomerId(result.getPolicyHolderId());
-        dto.setProductId(result.getProductCode());
-        dto.setEffectiveDate(result.getEffectiveDate());
-        dto.setExpiryDate(result.getExpiryDate());
-        dto.setStatus(result.getStatus());
-        dto.setCreatedAt(result.getCreateTime());
-        dto.setUpdatedAt(result.getUpdateTime());
-        dto.setTenantId(result.getTenantId());
-        if (result.getPremium() != null) {
-            AmountDTO premium = new AmountDTO();
-            premium.setValue(BigDecimal.valueOf(result.getPremium()));
-            premium.setCurrency(result.getCurrency() != null ? result.getCurrency().name() : null);
-            dto.setPremium(premium);
-        }
-        return dto;
+    @PostMapping("/direct")
+    public ResponseEntity<String> createPolicyDirectly(@RequestBody CreatePolicyRequest request,
+                                                       @RequestHeader("X-Tenant-Id") String tenantId) {
+        CreatePolicyDirectlyCommand command = policyWebMapper.toDirectCommand(request, tenantId);
+        String policyId = policyApplicationService.createPolicyDirectly(command);
+        return new ResponseEntity<>(policyId, HttpStatus.CREATED);
+    }
+
+    /**
+     * 获取保单详情
+     *
+     * @param policyId 保单ID
+     * @param tenantId 租户ID
+     * @return 保单详情
+     */
+    @GetMapping("/{policyId}")
+    public ResponseEntity<PolicyDetailVO> getPolicy(@PathVariable("policyId") String policyId,
+                                                    @RequestHeader("X-Tenant-Id") String tenantId) {
+        return policyAppQueryService.findById(new FindPolicyByIdQuery(policyId, tenantId)).map(policyWebMapper::toVO)
+                .map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    /**
+     * 签发保单
+     *
+     * @param policyId 保单ID
+     * @param operatorId 操作人ID
+     * @param tenantId 租户ID
+     * @return 空响应
+     */
+    @PutMapping("/{policyId}/issue")
+    public ResponseEntity<Void> issuePolicy(@PathVariable("policyId") String policyId,
+                                            @RequestHeader("X-Operator-Id") String operatorId,
+                                            @RequestHeader("X-Tenant-Id") String tenantId) {
+        policyApplicationService.issuePolicy(policyId, operatorId, tenantId);
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * 激活保单
+     *
+     * @param policyId 保单ID
+     * @param tenantId 租户ID
+     * @return 空响应
+     */
+    @PutMapping("/{policyId}/activate")
+    public ResponseEntity<Void> activatePolicy(@PathVariable("policyId") String policyId,
+                                               @RequestHeader("X-Tenant-Id") String tenantId) {
+        policyApplicationService.activatePolicy(policyId, tenantId);
+        return ResponseEntity.noContent().build();
     }
 }

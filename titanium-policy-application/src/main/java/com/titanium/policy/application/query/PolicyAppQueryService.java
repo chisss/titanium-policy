@@ -12,6 +12,7 @@ import com.titanium.policy.query.query.FindPolicyByIdQuery;
 import com.titanium.policy.query.result.PolicyQueryResult;
 
 import jakarta.annotation.Resource;
+// 读门面入参即读侧查询 record（FindXxxQuery），由 web 直接构造，见 docs/DDD-API层与Web层职责边界及协作规范.md
 
 /**
  * 保单查询服务（CQRS 读侧入口）
@@ -29,14 +30,16 @@ public class PolicyAppQueryService {
 
     /**
      * 根据ID查询保单（读模型）
+     * <p>
+     * 读门面入参即读侧查询 record，由 web 适配器直接构造后传入，经 QueryGateway 派发到读侧处理器。
+     * </p>
      *
-     * @param policyId 保单ID
-     * @param tenantId 租户ID
+     * @param query 保单按ID查询（含 policyId + tenantId）
      * @return 保单查询结果，不存在时为空
      */
-    public Optional<PolicyQueryResult> findById(String policyId, String tenantId) {
+    public Optional<PolicyQueryResult> findById(FindPolicyByIdQuery query) {
         PolicyQueryResult result = queryGateway
-                .query(new FindPolicyByIdQuery(policyId, tenantId), ResponseTypes.instanceOf(PolicyQueryResult.class))
+                .query(query, ResponseTypes.instanceOf(PolicyQueryResult.class))
                 .join();
         return Optional.ofNullable(result);
     }

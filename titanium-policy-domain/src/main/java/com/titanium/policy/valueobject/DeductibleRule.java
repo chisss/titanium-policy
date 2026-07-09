@@ -1,5 +1,9 @@
 package com.titanium.policy.valueobject;
 
+import com.titanium.metadata.enums.BaseEnum;
+
+import lombok.Getter;
+
 /**
  * 免赔规则值对象
  * <p>
@@ -16,20 +20,23 @@ public record DeductibleRule(DeductibleType deductibleType, double deductibleVal
     /**
      * 免赔类型枚举
      */
-    public enum DeductibleType {
+    @Getter
+    public enum DeductibleType implements BaseEnum {
         /**
          * 金额免赔
          */
-        AMOUNT("AMOUNT", "金额免赔"),
+        AMOUNT(1, "AMOUNT", "金额免赔"),
         /**
          * 比例免赔
          */
-        PERCENTAGE("PERCENTAGE", "比例免赔");
+        PERCENTAGE(2, "PERCENTAGE", "比例免赔");
 
-        private final String code;
-        private final String name;
+        private final Integer enumCode;
+        private final String  code;
+        private final String  name;
 
-        DeductibleType(String code, String name) {
+        DeductibleType(Integer enumCode, String code, String name) {
+            this.enumCode = enumCode;
             this.code = code;
             this.name = name;
         }

@@ -21,6 +21,7 @@ public record CreatePolicyDirectlyCommand(
         String policyHolderId,
         int insuredCount,
         Money totalPremium,
+        Money sumInsured,
         LocalDateTime insurancePeriodStart,
         LocalDateTime insurancePeriodEnd,
         SalesChannel channel,

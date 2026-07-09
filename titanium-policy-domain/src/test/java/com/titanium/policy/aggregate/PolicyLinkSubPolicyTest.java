@@ -10,6 +10,7 @@ import org.hamcrest.TypeSafeMatcher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.policy.command.LinkSubPolicyCommand;
 import com.titanium.policy.event.PolicyCreatedEvent;
 import com.titanium.policy.event.SubPolicyLinkedEvent;
@@ -39,7 +40,8 @@ class PolicyLinkSubPolicyTest {
 
     private PolicyCreatedEvent createdEvent() {
         LocalDateTime now = LocalDateTime.now();
-        return new PolicyCreatedEvent(PARENT_ID, new PolicyNo("POL-2024-0001"), now, now.plusYears(1), null,
+        return new PolicyCreatedEvent(PARENT_ID, new PolicyNo("POL-2024-0001"), PolicyForm.GROUP, null, now,
+                now.plusYears(1), null, null,
                 new PolicyStatus(PolicyStatus.StatusCode.NOT_EFFECTIVE, now, "创建", "system"),
                 Collections.emptyList(), TENANT_ID);
     }

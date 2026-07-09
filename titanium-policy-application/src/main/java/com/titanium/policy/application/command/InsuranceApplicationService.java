@@ -35,7 +35,7 @@ public class InsuranceApplicationService {
     }
 
     /**
-     * 从投保意向单创建投保单（Web 入口重载：由应用层构造命令，表现层不依赖领域命令）
+     * 从投保意向单创建投保单（标量重载：由应用层构造命令，供内部编排复用）
      *
      * @param insuranceId 投保单ID
      * @param insuranceNo 投保单编号

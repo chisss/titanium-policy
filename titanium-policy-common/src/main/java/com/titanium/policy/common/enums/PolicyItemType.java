@@ -1,5 +1,7 @@
 package com.titanium.policy.common.enums;
 
+import com.titanium.metadata.enums.BaseEnum;
+
 import lombok.Getter;
 
 /**
@@ -10,38 +12,35 @@ import lombok.Getter;
  * </p>
  */
 @Getter
-public enum PolicyItemType {
+public enum PolicyItemType implements BaseEnum {
     /** 主险项目 */
-    MAIN("MAIN", "主险", "主险保单项"),
+    MAIN(1, "MAIN", "主险", "主险保单项"),
     /** 附加险项目 */
-    RIDER("RIDER", "附加险", "附加险保单项"),
+    RIDER(2, "RIDER", "附加险", "附加险保单项"),
     /** 责任项目 */
-    LIABILITY("LIABILITY", "责任", "保障责任项"),
+    LIABILITY(3, "LIABILITY", "责任", "保障责任项"),
     /** 费用项目 */
-    FEE("FEE", "费用", "费用项");
+    FEE(4, "FEE", "费用", "费用项");
 
-    private final String code;
-    private final String name;
-    private final String desc;
+    private final Integer enumCode;
+    private final String  code;
+    private final String  name;
+    private final String  desc;
 
-    PolicyItemType(String code, String name, String desc) {
+    PolicyItemType(Integer enumCode, String code, String name, String desc) {
+        this.enumCode = enumCode;
         this.code = code;
         this.name = name;
         this.desc = desc;
     }
 
     /**
-     * 根据编码反查枚举
+     * 根据编码反查枚举（统一范式入口，委托 {@link BaseEnum}）
      *
      * @param code 项目类型编码
      * @return 匹配的枚举，未匹配返回 null
      */
     public static PolicyItemType fromCode(String code) {
-        for (PolicyItemType type : values()) {
-            if (type.code.equals(code)) {
-                return type;
-            }
-        }
-        return null;
+        return BaseEnum.fromCode(PolicyItemType.class, code);
     }
 }

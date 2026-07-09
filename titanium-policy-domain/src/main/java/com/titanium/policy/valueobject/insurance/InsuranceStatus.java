@@ -2,6 +2,7 @@ package com.titanium.policy.valueobject.insurance;
 
 import java.time.LocalDateTime;
 
+import com.titanium.metadata.enums.BaseEnum;
 import com.titanium.policy.exception.PolicyStatusTransitionException;
 
 import lombok.Getter;
@@ -70,28 +71,30 @@ public record InsuranceStatus(StatusCode statusCode, LocalDateTime statusTime, S
     }
 
     @Getter
-    public enum StatusCode {
+    public enum StatusCode implements BaseEnum {
         /** 草稿 */
-        DRAFT("DRAFT", "草稿"),
+        DRAFT(1, "DRAFT", "草稿"),
         /** 已提交 */
-        SUBMITTED("SUBMITTED", "已提交"),
+        SUBMITTED(2, "SUBMITTED", "已提交"),
         /** 核保中 */
-        UNDERWRITING("UNDERWRITING", "核保中"),
+        UNDERWRITING(3, "UNDERWRITING", "核保中"),
         /** 核保通过 */
-        UNDERWRITING_APPROVED("UNDERWRITING_APPROVED", "核保通过"),
+        UNDERWRITING_APPROVED(4, "UNDERWRITING_APPROVED", "核保通过"),
         /** 核保拒绝（终态） */
-        UNDERWRITING_REJECTED("UNDERWRITING_REJECTED", "核保拒绝"),
+        UNDERWRITING_REJECTED(5, "UNDERWRITING_REJECTED", "核保拒绝"),
         /** 核保暂缓 */
-        UNDERWRITING_SUSPENDED("UNDERWRITING_SUSPENDED", "核保暂缓"),
+        UNDERWRITING_SUSPENDED(6, "UNDERWRITING_SUSPENDED", "核保暂缓"),
         /** 已承保（终态） */
-        ISSUED("ISSUED", "已承保"),
+        ISSUED(7, "ISSUED", "已承保"),
         /** 作废（终态） */
-        VOIDED("VOIDED", "作废");
+        VOIDED(8, "VOIDED", "作废");
 
-        private final String code;
-        private final String name;
+        private final Integer enumCode;
+        private final String  code;
+        private final String  name;
 
-        StatusCode(String code, String name) {
+        StatusCode(Integer enumCode, String code, String name) {
+            this.enumCode = enumCode;
             this.code = code;
             this.name = name;
         }
