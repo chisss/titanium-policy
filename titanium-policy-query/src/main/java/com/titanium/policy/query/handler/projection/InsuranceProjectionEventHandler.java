@@ -64,6 +64,7 @@ public class InsuranceProjectionEventHandler {
         view.setExactPremium(event.exactPremium());
         view.setInsurancePeriodStart(event.insurancePeriodStart());
         view.setInsurancePeriodEnd(event.insurancePeriodEnd());
+        view.setInsuranceType(event.insuranceType());
         view.setStatus(InsuranceStatus.StatusCode.DRAFT);
         view.setTenantId(event.tenantId());
         if (view.getCreateTime() == null) {

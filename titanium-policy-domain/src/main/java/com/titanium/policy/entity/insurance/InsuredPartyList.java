@@ -32,10 +32,13 @@ public record InsuredPartyList(
                                 */
                                List<BeneficiaryInfo> beneficiaryList) {
 
+    /** 受益比例总和校验容差（浮点误差容忍，比例以 1.0 表示 100%） */
+    private static final double RATIO_EPSILON = 1e-6;
+
     /**
      * 校验参与方信息
      * <p>
-     * 调用客户域校验投保人/被保险人身份、资质合法性
+     * 校验投保人非空、被保险人清单非空，并在存在受益人时校验受益份额之和为 100%。
      * </p>
      *
      * @return 校验结果，true表示校验通过
@@ -49,9 +52,31 @@ public record InsuredPartyList(
         if (insuredList == null || insuredList.isEmpty()) {
             return false;
         }
-        // 调用客户域校验投保人/被保险人身份、资质合法性
-        // 暂时返回true
-        return true;
+        // 存在受益人时，受益份额之和须为 100%（无受益人则默认法定继承，不校验份额）
+        return isBeneficiaryRatioValid();
+    }
+
+    /**
+     * 受益份额合法性校验：受益人份额之和为 100%（1.0）。
+     * <p>
+     * 未指定受益人时视为法定继承，不做份额约束返回 {@code true}；指定受益人时每人比例须为正，
+     * 且总和等于 1.0（容差 {@link #RATIO_EPSILON}）。份额守恒是寿险身故/满期给付分配的前置不变量。
+     * </p>
+     *
+     * @return 份额合法返回 {@code true}
+     */
+    public boolean isBeneficiaryRatioValid() {
+        if (beneficiaryList == null || beneficiaryList.isEmpty()) {
+            return true;
+        }
+        double sum = 0d;
+        for (BeneficiaryInfo beneficiary : beneficiaryList) {
+            if (beneficiary.beneficiaryRatio() <= 0d) {
+                return false;
+            }
+            sum += beneficiary.beneficiaryRatio();
+        }
+        return Math.abs(sum - 1.0d) <= RATIO_EPSILON;
     }
 
     /**

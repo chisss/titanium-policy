@@ -60,11 +60,11 @@ titanium-policy/
 │   ├── query/                      # *AppQueryService（查询编排）
 │   ├── saga/                       # IssuanceSaga（出单流程编排）
 │   └── service/                    # 外部服务客户端 + Adapter（Clause/Underwriting/Product/RuleEngine）
-├── titanium-policy-infrastructure/ # 基础设施层
-│   ├── entity/                     # JPA 实体（PolicyEntity、InsuranceEntity、ProposalEntity…）
-│   ├── repository/{,jpa}           # 仓储实现 + Spring Data JPA 接口
-│   ├── mapper/                     # MapStruct（PolicyMapper / InsuranceMapper / ProposalMapper）
-│   ├── event/                      # KafkaEventPublisher（领域事件 → Kafka）
+├── titanium-policy-infrastructure/ # 基础设施层（写侧纯事件溯源，无 JPA 写模型）
+│   ├── adapter/                    # 外部域调用 Adapter（Clause/Product/Underwriting/RuleEngine/Billing）
+│   ├── event/                      # KafkaEventPublisher（领域事件 → Kafka 外发）
+│   ├── messaging/                  # 跨域事件监听器
+│   ├── generator/                  # 业务凭证号生成器实现
 │   └── config/                     # AxonConfig / KafkaConfig
 ├── titanium-policy-query/          # CQRS 读侧（读路径垂直切片，依赖 domain+common，不依赖 application/infra）
 │   ├── view/                       # 读模型实体 XxxView（extends BaseView，映射 t_xxx_view）
@@ -135,8 +135,10 @@ InsuranceIssuedEvent   --@EndSaga----> commandGateway.sendAndWait(CreatePolicyCo
 - **命令/查询用 record**：所有 command/event/query 均为 record，如 `public record CreatePolicyCommand(...)`。
 - **命令处理走 Axon**：写操作用 `@CommandHandler`，事件回放用 `@EventSourcingHandler`，发布事件用 `AggregateLifecycle.apply(...)`。禁止在聚合根外直接 new 事件落库。
 - **充血模型**：业务规则（状态校验、状态流转）内聚到聚合根，应用层只做编排，不写业务判断。参考 `Policy.handle(ActivatePolicyCommand)` 的多重前置校验。
-- **构造器注入优先**：QueryHandler/EventHandler 用 `@RequiredArgsConstructor`（见 `PolicyProjectionEventHandler`、`KafkaEventPublisher`）。✅ 全模块已统一构造器注入（原 `infrastructure/projection/*Projection` 三个字段注入的脏投影类已删除，`PolicyRepositoryImpl` 已改 `@RequiredArgsConstructor`）。
-- **跨层转换走 MapStruct**：`InsuranceMapper`/`PolicyMapper`/`ProposalMapper`，禁止手写实体互转。
+- **构造器注入优先**：QueryHandler/EventHandler 用 `@RequiredArgsConstructor`（见 `PolicyProjectionEventHandler`、`KafkaEventPublisher`）。
+- **写侧纯事件溯源（无 JPA 写模型）**：三聚合（Policy/Insurance/Proposal）均为 `@Aggregate`，状态只在 Axon 事件流，命令链路由 Axon 自动装配的 `EventSourcingRepository` 持久化事件。🔴 已删除全部残留 JPA 写侧死码：`infrastructure/{entity,repository,repository.jpa,mapper}` 及 domain 的 `PolicyRepository`/`InsuranceRepository`/`ProposalRepository` 三个无消费者端口（详见 `docs/技术文档/写侧收敛与DO命名收敛手册.md`、`持久化选型规范(JPA与EventSourcing).md`）。写侧不再有 `*Entity`/`Jpa*Repository`/写侧 Mapper。
+- **JPA 仅服务读侧**：`@EntityScan`/`@EnableJpaRepositories` 仅扫描 `query.view`/`query.repository`（读模型 `*View` + `*ViewRepository`）。唯一性/存在性校验如有需要，走读模型 View（最终一致）。
+- **读侧转换走 MapStruct（如有）**：读模型 View↔QueryResult 转换用 MapStruct，禁止手写实体互转。
 - **SLF4J 占位符**：`log.info("[IssuanceSaga] 启动: insuranceId={}", event.insuranceId())`，禁止字符串拼接。
 - **中文注释**：类/方法注释中文，标识符英文（全模块已遵循）。
 - **租户贯穿**：命令、事件、查询、读模型全部携带 `tenantId`；读模型查询用 `findByPolicyIdAndTenantId` 等带租户维度方法。
@@ -205,7 +207,7 @@ mvn -pl titanium-policy/titanium-policy-domain test
 2. ✅ **Insurance/Proposal 读模型投影已补齐**：`InsuranceProjectionEventHandler`/`ProposalProjectionEventHandler`（query 层）以 `@EventHandler` 投影到 `t_insurance_view`/`t_proposal_view`，`*AppQueryService` 走 QueryGateway 查读模型，实现真正读写分离（原直查写侧 JPA 的 `InsuranceProjection`/`ProposalProjection` 脏类已删除）。
 3. ⚠️ **Kafka 仅发布 2 个事件**：`KafkaEventPublisher` 只外发 `PolicyCreatedEvent`、`PolicyActivatedEvent`，其余事件不出域。下游若依赖保单状态需补充发布。
 4. ⚠️ **孤儿事件**：`PolicyDataUpdatedEvent`、`PolicyRenewedEvent` 已定义但无任何命令产生、无 handler 消费（续保/数据变更链路未实现）。
-5. ⚠️ **ProposalConvertedEvent 无命令触发**：仅在 `Proposal` 的 `@EventSourcingHandler` 中被消费，无 `@CommandHandler` 产生该事件（当前靠纯对象方法 `convertToApplication`）。读模型 `ProposalProjectionEventHandler` 已就绪监听该事件，待写侧补齐转换命令后自动生效。
+5. ✅ **ProposalConvertedEvent 写侧已补齐**：新增 `ConvertProposalCommand` + `Proposal.handle(ConvertProposalCommand)`（仅 SUBMITTED 可转，发布 `ProposalConvertedEvent`）。读模型 `ProposalProjectionEventHandler` 投影已就绪，转换命令触发后自动生效。纯对象方法 `convertToApplication` 保留供非事件溯源构建。
 6. ✅ **表现层不再依赖领域命令**：`PolicyController` 等三个 Controller 的命令构造已下沉至 `*ApplicationService`（表现层只传 Request/api-DTO，不持有 domain command），并以 ArchUnit `webShouldNotDependOnDomainCommandsOrAggregates` 固化。
 7. ⚠️ **核保回流未异步化**：Saga 注释说明核保结果跨服务回流依赖消息总线基础设施，尚未落地，当前为同步调用。
 8. ✅ **事件存储与投影脏数据已修**：原 `AxonConfig` 无条件 `InMemoryEventStorageEngine`（事件溯源重启丢事件）已删除，交还 Axon Starter 依 `application.yml` 的 `axon.eventstore.jpa` 装配；原 `PolicyProjection` 向 `t_policy` 写空实体脏数据的投影类已删除（读模型投影统一在 query 层）。

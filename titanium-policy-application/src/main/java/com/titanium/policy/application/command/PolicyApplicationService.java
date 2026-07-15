@@ -11,10 +11,17 @@ import com.titanium.policy.command.ApplyPolicyEndorsementCommand;
 import com.titanium.policy.command.CancelPolicyCommand;
 import com.titanium.policy.command.CreatePolicyCommand;
 import com.titanium.policy.command.CreatePolicyDirectlyCommand;
+import com.titanium.policy.command.DistributeDividendCommand;
 import com.titanium.policy.command.IssuePolicyCommand;
+import com.titanium.policy.command.MatureDuePolicyCommand;
+import com.titanium.policy.command.MaturePolicyCommand;
+import com.titanium.policy.command.PayAnnuityBenefitCommand;
 import com.titanium.policy.command.ResumePolicyCommand;
+import com.titanium.policy.command.StartAnnuityPayoutCommand;
 import com.titanium.policy.command.SuspendPolicyCommand;
 import com.titanium.policy.command.TerminatePolicyCommand;
+import com.titanium.policy.command.UpdateAccountValueCommand;
+import com.titanium.policy.command.WaivePremiumCommand;
 import com.titanium.policy.valueobject.IssuanceProcessConfig;
 import com.titanium.policy.valueobject.IssuanceRequest;
 import com.titanium.policy.valueobject.IssuanceResult;
@@ -167,5 +174,78 @@ public class PolicyApplicationService {
      */
     public void cancelPolicy(String policyId, String reason, String operatorId, String tenantId) {
         commandGateway.sendAndWait(new CancelPolicyCommand(policyId, reason, operatorId, tenantId));
+    }
+
+    // ==================== 寿险给付/给付期命令入口 ====================
+
+    /**
+     * 启动年金给付期（年金险专属）：保单进入给付期，按频率周期性给付生存年金，不终止保单。
+     *
+     * @param command 启动年金给付命令
+     */
+    public void startAnnuityPayout(StartAnnuityPayoutCommand command) {
+        commandGateway.sendAndWait(command);
+    }
+
+    /**
+     * 给付一期年金（给付期内定时触发）：逐期推进已给付期数，给满约定期数后计划完成，不改保单状态。
+     *
+     * @param command 给付年金命令
+     */
+    public void payAnnuityBenefit(PayAnnuityBenefitCommand command) {
+        commandGateway.sendAndWait(command);
+    }
+
+    /**
+     * 保单满期给付（两全险/生存给付型寿险）：给付满期生存保险金并使保单转为满期（EXPIRED，终态）。
+     *
+     * @param command 满期给付命令
+     */
+    public void maturePolicy(MaturePolicyCommand command) {
+        commandGateway.sendAndWait(command);
+    }
+
+    /**
+     * 保单到期满期给付（定时任务专用）：满期金额由聚合自身基本保额推导，无需调用方提供金额。
+     *
+     * @param command 到期满期给付命令
+     */
+    public void matureDuePolicy(MatureDuePolicyCommand command) {
+        commandGateway.sendAndWait(command);
+    }
+
+    /**
+     * 保费豁免（投保人身故/全残等豁免后续保费）：保单持续有效，仅标记后续保费免缴。
+     *
+     * @param command 保费豁免命令
+     */
+    public void waivePremium(WaivePremiumCommand command) {
+        commandGateway.sendAndWait(command);
+    }
+
+    /**
+     * 派发红利（分红险年度红利处理）：按红利领取方式处置，留存类累加累计红利，不改保单状态。
+     *
+     * @param command 红利派发命令
+     */
+    public void distributeDividend(DistributeDividendCommand command) {
+        commandGateway.sendAndWait(command);
+    }
+
+    /**
+     * 回写投资账户价值（投连/万能保单，investment 域账户价值变更后经 Feign 回写）。
+     * <p>
+     * 由应用层构造命令，表现层不依赖领域命令。账户价值为展示型最终一致数据，仅更新聚合内投资账户价值。
+     * </p>
+     *
+     * @param policyId 保单ID
+     * @param accountId 投资账户ID
+     * @param accountValue 最新账户价值金额
+     * @param currency 币种
+     * @param tenantId 租户ID
+     */
+    public void updateAccountValue(String policyId, String accountId, java.math.BigDecimal accountValue, String currency,
+                                   String tenantId) {
+        commandGateway.sendAndWait(new UpdateAccountValueCommand(policyId, accountId, accountValue, currency, tenantId));
     }
 }

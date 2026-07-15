@@ -103,10 +103,11 @@ public class IssuanceOrchestrator {
         String policyId = UUID.randomUUID().toString();
         String policyNo = policyNoGenerator.generatePolicyNo();
 
+        // insuranceType 由出单请求透传（险种三级分类），支撑保单聚合险种化业务规则
         CreatePolicyDirectlyCommand command = new CreatePolicyDirectlyCommand(policyId, policyNo, request.productId(),
                 request.productCode(), request.policyForm(), request.policyHolderId(), request.insuredCount(),
                 request.totalPremium(), null, request.insurancePeriodStart(), request.insurancePeriodEnd(),
-                request.channel(), request.tenantId());
+                request.channel(), request.insuranceType(), request.tenantId());
 
         commandGateway.sendAndWait(command);
         log.info("一步出单完成, policyId={}, policyNo={}", policyId, policyNo);
@@ -126,10 +127,12 @@ public class IssuanceOrchestrator {
         String insuranceId = UUID.randomUUID().toString();
         String insuranceNo = policyNoGenerator.generateInsuranceNo();
 
+        // insuranceType 由出单请求透传（险种三级分类），随 InsuranceCreatedEvent 由 Saga 接力至保单
         CreateInsuranceDirectlyCommand command = new CreateInsuranceDirectlyCommand(insuranceId, insuranceNo,
                 request.policyForm(), request.policyHolderId(), request.insuredCount(),
                 request.totalPremium() != null ? request.totalPremium().value() : null, request.insurancePeriodStart(),
-                request.insurancePeriodEnd(), List.of(request.productCode()), 0, request.tenantId());
+                request.insurancePeriodEnd(), List.of(request.productCode()), 0, request.insuranceType(),
+                request.tenantId());
 
         commandGateway.sendAndWait(command);
         log.info("两步出单 - 投保单创建完成, insuranceId={}, insuranceNo={}；后续核保/承保/出单由 IssuanceSaga 接力",
@@ -150,11 +153,13 @@ public class IssuanceOrchestrator {
         String proposalId = UUID.randomUUID().toString();
         String proposalNo = policyNoGenerator.generateProposalNo();
 
+        // insuranceType 由出单请求透传（险种三级分类），意向单转投保单后随 Saga 接力至保单
         CreateProposalCommand command = CreateProposalCommand.builder().proposalId(proposalId).proposalNo(proposalNo)
                 .policyForm(request.policyForm()).channel(request.channel()).customerId(request.policyHolderId())
                 .intendedSumInsured(request.totalPremium()).intendedPremium(request.totalPremium())
                 .insurancePeriodStart(request.insurancePeriodStart()).insurancePeriodEnd(request.insurancePeriodEnd())
-                .expectedProductCode(request.productCode()).tenantId(request.tenantId()).build();
+                .expectedProductCode(request.productCode()).insuranceType(request.insuranceType())
+                .tenantId(request.tenantId()).build();
 
         commandGateway.sendAndWait(command);
         log.info("三步出单 - 意向单创建完成, proposalId={}, proposalNo={}", proposalId, proposalNo);

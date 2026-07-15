@@ -144,7 +144,7 @@ public class IssuanceSagaTest {
     private InsuranceCreatedEvent insuranceCreatedEvent() {
         return new InsuranceCreatedEvent(INSURANCE_ID, "INS_NO_001", null, PolicyForm.INDIVIDUAL, "HOLDER_001", 1,
                 new BigDecimal("1000.00"), LocalDateTime.now(), LocalDateTime.now().plusYears(1),
-                List.of("PRODUCT_001"), 0, LocalDateTime.now(), TENANT_ID);
+                List.of("PRODUCT_001"), 0, null, LocalDateTime.now(), TENANT_ID);
     }
 
     private InsuranceSubmittedForUnderwritingEvent insuranceSubmittedEvent() {

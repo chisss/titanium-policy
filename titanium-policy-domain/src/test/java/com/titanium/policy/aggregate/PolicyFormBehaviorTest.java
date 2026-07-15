@@ -51,7 +51,7 @@ class PolicyFormBehaviorTest {
         LocalDateTime now = LocalDateTime.now();
         return new PolicyCreatedEvent(POLICY_ID, new PolicyNo("POL-2024-0001"), form, null, now, now.plusYears(1), null,
                 null, new PolicyStatus(PolicyStatus.StatusCode.NOT_EFFECTIVE, now, "创建", "system"), new ArrayList<>(),
-                TENANT_ID);
+                null, TENANT_ID);
     }
 
     private PolicyActivatedEvent activatedEvent() {

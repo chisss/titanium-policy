@@ -11,9 +11,11 @@ import org.axonframework.modelling.command.AggregateLifecycle;
 import org.axonframework.spring.stereotype.Aggregate;
 
 import com.titanium.common.domain.BaseAggregate;
+import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.enums.product.ProductEnum.SalesChannel;
 import com.titanium.metadata.valueobject.Money;
+import com.titanium.policy.command.ConvertProposalCommand;
 import com.titanium.policy.command.CreateProposalCommand;
 import com.titanium.policy.command.SubmitProposalCommand;
 import com.titanium.policy.command.VoidProposalCommand;
@@ -60,6 +62,8 @@ public class Proposal extends BaseAggregate {
     private List<ProposalSubject> subjects;
     /** 意向单状态 */
     private ProposalStatus        status;
+    /** 险种三级分类（源头捕获，可空以兼容存量事件） */
+    private InsuranceProductType  insuranceType;
 
     // ==================== CommandHandler ====================
 
@@ -73,7 +77,7 @@ public class Proposal extends BaseAggregate {
                 command.intendedSumInsured() != null ? command.intendedSumInsured().value() : null,
                 command.intendedPremium() != null ? command.intendedPremium().value() : null,
                 command.insurancePeriodStart(), command.insurancePeriodEnd(), command.expectedProductCode(),
-                LocalDateTime.now(), command.tenantId()));
+                command.insuranceType(), LocalDateTime.now(), command.tenantId()));
     }
 
     /**
@@ -102,6 +106,24 @@ public class Proposal extends BaseAggregate {
                 LocalDateTime.now(), this.tenantId));
     }
 
+    /**
+     * 意向单转投保单 - 命令处理器（事件溯源）
+     * <p>
+     * 仅已提交（SUBMITTED）意向单可转换，发布 {@code ProposalConvertedEvent} 流转为
+     * {@code CONVERTED_TO_APPLICATION}。与纯对象方法 {@link #convertToApplication(String)} 语义一致，
+     * 补齐事件溯源写侧（此前仅有纯对象方法，读模型投影已就绪但无命令触发）。
+     * </p>
+     */
+    @CommandHandler
+    public void handle(ConvertProposalCommand command) {
+        if (this.status.statusCode() != ProposalStatus.StatusCode.SUBMITTED) {
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION",
+                    "Only submitted proposals can be converted to application");
+        }
+        AggregateLifecycle.apply(new ProposalConvertedEvent(command.proposalId(), command.changeReason(),
+                LocalDateTime.now(), this.tenantId));
+    }
+
     // ==================== EventSourcingHandler ====================
 
     @EventSourcingHandler
@@ -110,6 +132,7 @@ public class Proposal extends BaseAggregate {
         this.proposalNo = event.proposalNo();
         this.policyForm = event.policyForm();
         this.channel = event.channel();
+        this.insuranceType = event.insuranceType();
         this.tenantId = event.tenantId();
         this.createTime = event.createTime();
         this.updateTime = event.createTime();

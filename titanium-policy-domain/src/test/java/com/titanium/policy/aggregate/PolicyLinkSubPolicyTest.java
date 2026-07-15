@@ -43,7 +43,7 @@ class PolicyLinkSubPolicyTest {
         return new PolicyCreatedEvent(PARENT_ID, new PolicyNo("POL-2024-0001"), PolicyForm.GROUP, null, now,
                 now.plusYears(1), null, null,
                 new PolicyStatus(PolicyStatus.StatusCode.NOT_EFFECTIVE, now, "创建", "system"),
-                Collections.emptyList(), TENANT_ID);
+                Collections.emptyList(), null, TENANT_ID);
     }
 
     /** 匹配指定 childId 与子单计数的 SubPolicyLinkedEvent（忽略时间戳） */

@@ -5,6 +5,7 @@ import java.util.List;
 
 import org.axonframework.modelling.command.TargetAggregateIdentifier;
 
+import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.valueobject.Money;
 
@@ -28,6 +29,7 @@ import lombok.Builder;
  * @param productCodes 投保险种编码列表
  * @param underwritingPriority 核保优先级
  * @param changeReason 变更原因
+ * @param insuranceType 险种三级分类（可空，向后兼容存量事件）
  * @param tenantId 租户ID
  */
 @Builder
@@ -36,5 +38,6 @@ public record ConvertProposalToInsuranceCommand(@TargetAggregateIdentifier Strin
                                                 int insuredCount, Money exactPremium,
                                                 LocalDateTime insurancePeriodStart, LocalDateTime insurancePeriodEnd,
                                                 List<String> productCodes, int underwritingPriority,
-                                                String changeReason, String tenantId) {
+                                                String changeReason, InsuranceProductType insuranceType,
+                                                String tenantId) {
 }

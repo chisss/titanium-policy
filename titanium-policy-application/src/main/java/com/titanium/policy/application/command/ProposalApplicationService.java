@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 import org.axonframework.commandhandling.gateway.CommandGateway;
 import org.springframework.stereotype.Service;
 
+import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.enums.product.ProductEnum.SalesChannel;
 import com.titanium.metadata.valueobject.Money;
@@ -45,17 +46,18 @@ public class ProposalApplicationService {
      * @param insurancePeriodStart 保险起期
      * @param insurancePeriodEnd 保险止期
      * @param expectedProductCode 期望险种编码
+     * @param insuranceType 险种三级分类（可空）
      * @param tenantId 租户ID
      * @return 意向单ID
      */
     public String createProposal(String proposalId, String proposalNo, PolicyForm policyForm, SalesChannel channel,
                                  String customerId, BigDecimal intendedSumInsured, BigDecimal intendedPremium,
                                  String currency, LocalDateTime insurancePeriodStart, LocalDateTime insurancePeriodEnd,
-                                 String expectedProductCode, String tenantId) {
+                                 String expectedProductCode, InsuranceProductType insuranceType, String tenantId) {
         String resolvedCurrency = currency != null ? currency : "CNY";
         CreateProposalCommand command = new CreateProposalCommand(proposalId, proposalNo, policyForm, channel,
                 customerId, toMoney(intendedSumInsured, resolvedCurrency), toMoney(intendedPremium, resolvedCurrency),
-                insurancePeriodStart, insurancePeriodEnd, expectedProductCode, tenantId);
+                insurancePeriodStart, insurancePeriodEnd, expectedProductCode, insuranceType, tenantId);
         commandGateway.sendAndWait(command);
         return proposalId;
     }

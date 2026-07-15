@@ -6,6 +6,7 @@ import java.util.List;
 
 import org.axonframework.modelling.command.TargetAggregateIdentifier;
 
+import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.policy.PolicyForm;
 
 /**
@@ -23,5 +24,6 @@ public record CreateInsuranceDirectlyCommand(
         LocalDateTime insurancePeriodEnd,
         List<String> productCodes,
         int underwritingPriority,
+        InsuranceProductType insuranceType,
         String tenantId
 ) {}

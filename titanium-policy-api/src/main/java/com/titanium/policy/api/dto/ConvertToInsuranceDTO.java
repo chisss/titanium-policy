@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.policy.PolicyForm;
 
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -60,4 +61,7 @@ public class ConvertToInsuranceDTO {
 
     @Schema(description = "转换原因", example = "客户确认投保")
     private String        changeReason;
+
+    @Schema(description = "险种三级分类", example = "TERM_LIFE")
+    private InsuranceProductType insuranceType;
 }

@@ -3,6 +3,7 @@ package com.titanium.policy.web.provider;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.titanium.policy.api.PolicyApi;
+import com.titanium.policy.api.dto.AccountValueWriteBackDTO;
 import com.titanium.policy.api.dto.CreatePolicyDTO;
 import com.titanium.policy.api.dto.PolicyDTO;
 import com.titanium.policy.api.dto.PolicyStatusDTO;
@@ -77,6 +78,14 @@ public class PolicyApiProvider implements PolicyApi {
     @Override
     public ApiResponse<Void> activatePolicy(String policyId, String tenantId) {
         policyApplicationService.activatePolicy(policyId, tenantId);
+        return ApiResponse.success();
+    }
+
+    @Override
+    public ApiResponse<Void> writeBackAccountValue(String policyId, AccountValueWriteBackDTO dto, String tenantId) {
+        // 协议转换：投资域回写请求 → 更新账户价值命令，收敛到 application 门面
+        policyApplicationService.updateAccountValue(policyId, dto.getAccountId(), dto.getAccountValue(),
+                dto.getCurrency(), tenantId);
         return ApiResponse.success();
     }
 }

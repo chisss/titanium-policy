@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 
+import com.titanium.policy.api.dto.AccountValueWriteBackDTO;
 import com.titanium.policy.api.dto.CreatePolicyDTO;
 import com.titanium.policy.api.dto.PolicyDTO;
 import com.titanium.policy.api.dto.PolicyStatusDTO;
@@ -97,4 +98,17 @@ public interface PolicyApi {
     @PutMapping("/{policyId}/activate")
     ApiResponse<Void> activatePolicy(@PathVariable("policyId") String policyId,
                                      @RequestHeader("X-Tenant-Id") String tenantId);
+
+    /**
+     * 回写投资账户价值（investment 域调用，投连/万能保单账户价值变更后回写）
+     *
+     * @param policyId 保单ID
+     * @param dto 账户价值回写 DTO
+     * @param tenantId 租户ID
+     * @return 空响应
+     */
+    @PutMapping("/{policyId}/account-value")
+    ApiResponse<Void> writeBackAccountValue(@PathVariable("policyId") String policyId,
+                                            @RequestBody AccountValueWriteBackDTO dto,
+                                            @RequestHeader("X-Tenant-Id") String tenantId);
 }

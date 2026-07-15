@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 
 import com.titanium.common.jpa.BaseView;
 import com.titanium.metadata.enums.CurrencyEnum;
+import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.policy.PolicyEnum;
 
 import jakarta.persistence.Column;
@@ -75,6 +76,11 @@ public class PolicyView extends BaseView {
     @Column(name = "issue_time")
     private LocalDateTime issueTime;
 
+    /** 险种三级分类 */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "insurance_type", length = 64)
+    private InsuranceProductType insuranceType;
+
     /** 投保人ID（事件暂未携带，预留） */
     @Column(name = "policy_holder_id", length = 36)
     private String        policyHolderId;
@@ -94,4 +100,32 @@ public class PolicyView extends BaseView {
     /** 保单当前业务版本号（批改后递增；区别于基类乐观锁 version） */
     @Column(name = "current_version")
     private Integer       currentVersion;
+
+    /** 满期给付金额（两全/生存险满期给付后填充） */
+    @Column(name = "maturity_benefit", precision = 18, scale = 2)
+    private BigDecimal    maturityBenefit;
+
+    /** 是否已豁免后续保费（投保人身故/全残豁免后为 true，保单持续有效） */
+    @Column(name = "premium_waived")
+    private Boolean       premiumWaived;
+
+    /** 保费豁免原因码（DISABILITY/DEATH/CRITICAL_ILLNESS，未豁免为空） */
+    @Column(name = "waiver_reason", length = 32)
+    private String        waiverReason;
+
+    /** 累计已派发红利（分红险红利派发累积，非分红险为空） */
+    @Column(name = "accumulated_dividend", precision = 18, scale = 2)
+    private BigDecimal    accumulatedDividend;
+
+    /** 红利领取方式码（CASH/PAID_UP_ADDITION/ACCUMULATE/OFFSET_PREMIUM，非分红险为空） */
+    @Column(name = "dividend_option", length = 32)
+    private String        dividendOption;
+
+    /** 关联投资账户ID（投连/万能保单挂接投资账户，非投连类为空） */
+    @Column(name = "investment_account_id", length = 64)
+    private String        investmentAccountId;
+
+    /** 投资账户最新价值（investment 域回写，展示型最终一致数据，非投连类为空） */
+    @Column(name = "investment_account_value", precision = 18, scale = 2)
+    private BigDecimal    investmentAccountValue;
 }

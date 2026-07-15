@@ -3,6 +3,7 @@ package com.titanium.policy.web.request;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.enums.product.ProductEnum.SalesChannel;
 
@@ -62,6 +63,9 @@ public class CreatePolicyRequest {
 
     @Schema(description = "销售渠道", example = "DIRECT")
     private SalesChannel  channel;
+
+    @Schema(description = "险种三级分类", example = "TERM_LIFE")
+    private InsuranceProductType insuranceType;
 
     @Schema(description = "租户ID", example = "tenant-001")
     private String        tenantId;

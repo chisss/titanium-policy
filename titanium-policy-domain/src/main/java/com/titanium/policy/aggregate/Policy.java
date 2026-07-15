@@ -11,6 +11,7 @@ import org.axonframework.modelling.command.AggregateLifecycle;
 import org.axonframework.spring.stereotype.Aggregate;
 
 import com.titanium.common.domain.BaseAggregate;
+import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.policy.PolicyEnum;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.valueobject.Money;
@@ -20,21 +21,33 @@ import com.titanium.policy.command.ApplyPolicyEndorsementCommand;
 import com.titanium.policy.command.CancelPolicyCommand;
 import com.titanium.policy.command.CreatePolicyCommand;
 import com.titanium.policy.command.CreatePolicyDirectlyCommand;
+import com.titanium.policy.command.DistributeDividendCommand;
 import com.titanium.policy.command.IssuePolicyCommand;
 import com.titanium.policy.command.LapsePolicyCommand;
 import com.titanium.policy.command.LinkInvestmentAccountCommand;
 import com.titanium.policy.command.LinkSubPolicyCommand;
+import com.titanium.policy.command.MatureDuePolicyCommand;
+import com.titanium.policy.command.MaturePolicyCommand;
+import com.titanium.policy.command.PayAnnuityBenefitCommand;
 import com.titanium.policy.command.ReinstatePolicyCommand;
 import com.titanium.policy.command.RemoveInsuredMemberCommand;
 import com.titanium.policy.command.ResumePolicyCommand;
+import com.titanium.policy.command.StartAnnuityPayoutCommand;
 import com.titanium.policy.command.SuspendPolicyCommand;
 import com.titanium.policy.command.TerminatePolicyCommand;
+import com.titanium.policy.command.UpdateAccountValueCommand;
+import com.titanium.policy.command.WaivePremiumCommand;
 import com.titanium.policy.common.constant.PolicyConstants;
+import com.titanium.policy.common.enums.PremiumWaiverReason;
 import com.titanium.policy.entity.Endorsement;
 import com.titanium.policy.entity.InsuranceProduct;
 import com.titanium.policy.entity.PaymentRecord;
 import com.titanium.policy.entity.Subject;
 import com.titanium.policy.entity.insurance.InsuredPartyList;
+import com.titanium.policy.event.AccountValueUpdatedEvent;
+import com.titanium.policy.event.AnnuityBenefitPaidEvent;
+import com.titanium.policy.event.AnnuityPayoutStartedEvent;
+import com.titanium.policy.event.DividendDistributedEvent;
 import com.titanium.policy.event.InsuredMemberAddedEvent;
 import com.titanium.policy.event.InsuredMemberRemovedEvent;
 import com.titanium.policy.event.InvestmentAccountLinkedEvent;
@@ -45,13 +58,16 @@ import com.titanium.policy.event.PolicyEndorsedEvent;
 import com.titanium.policy.event.PolicyExpiredEvent;
 import com.titanium.policy.event.PolicyIssuedEvent;
 import com.titanium.policy.event.PolicyLapsedEvent;
+import com.titanium.policy.event.PolicyMaturedEvent;
 import com.titanium.policy.event.PolicyPaymentRecordedEvent;
 import com.titanium.policy.event.PolicyReinstatedEvent;
 import com.titanium.policy.event.PolicyResumedEvent;
 import com.titanium.policy.event.PolicySuspendedEvent;
 import com.titanium.policy.event.PolicyTerminatedEvent;
+import com.titanium.policy.event.PremiumWaivedEvent;
 import com.titanium.policy.event.SubPolicyLinkedEvent;
 import com.titanium.policy.exception.PolicyBusinessRuleException;
+import com.titanium.policy.valueobject.AnnuityPayoutPlan;
 import com.titanium.policy.valueobject.DeductibleRule;
 import com.titanium.policy.valueobject.PolicyBasicInfo;
 import com.titanium.policy.valueobject.PolicyDocument;
@@ -107,6 +123,8 @@ public class Policy extends BaseAggregate {
     private InsuredPartyList       insuredPartyList;
     /** 关联投资账户ID（投连/万能保单出单后挂接，investment 域生成） */
     private String                 investmentAccountId;
+    /** 投资账户最新价值（投连/万能保单，由 investment 域回写，展示型最终一致数据） */
+    private java.math.BigDecimal   investmentAccountValue;
     /** 产品ID（承保载体，供签发事件透传下游监管采集/自动分保） */
     private String                 productId;
     /** 保额（承保关键要素，供签发事件透传下游） */
@@ -119,6 +137,16 @@ public class Policy extends BaseAggregate {
     private List<Endorsement>      endorsements;
     /** 保单状态 */
     private PolicyStatus           status;
+    /** 险种三级分类（自投保单链路落地，可空以兼容存量事件） */
+    private InsuranceProductType   insuranceType;
+    /** 年金给付计划（仅年金险进入给付期后存在，非年金险为 null） */
+    private AnnuityPayoutPlan      annuityPayoutPlan;
+    /** 保费是否已豁免（豁免后投保人无需再缴费，保单持续有效） */
+    private boolean                premiumWaived;
+    /** 保费豁免原因（未豁免为 null） */
+    private PremiumWaiverReason    premiumWaiverReason;
+    /** 累计红利（分红险留存类领取方式累积，非分红险/现金领取为 null） */
+    private Money                  accumulatedDividend;
 
     // ==================== CommandHandler ====================
 
@@ -133,7 +161,7 @@ public class Policy extends BaseAggregate {
                         command.endDate(), command.premium(), command.sumInsured(),
                         new PolicyStatus(PolicyStatus.StatusCode.NOT_EFFECTIVE,
                                 LocalDateTime.now(), "创建保单", PolicyConstants.POLICY_SYSTEM),
-                        new ArrayList<>(), command.tenantId()));
+                        new ArrayList<>(), command.insuranceType(), command.tenantId()));
     }
 
     /**
@@ -146,7 +174,7 @@ public class Policy extends BaseAggregate {
                 command.insurancePeriodEnd(), command.totalPremium(), command.sumInsured(),
                 new PolicyStatus(PolicyStatus.StatusCode.NOT_EFFECTIVE, LocalDateTime.now(), "一步出单创建保单",
                         PolicyConstants.POLICY_SYSTEM),
-                new ArrayList<>(), command.tenantId()));
+                new ArrayList<>(), command.insuranceType(), command.tenantId()));
     }
 
     /**
@@ -298,6 +326,7 @@ public class Policy extends BaseAggregate {
         this.policyForm = event.policyForm();
         this.productId = event.productId();
         this.sumInsured = event.sumInsured();
+        this.insuranceType = event.insuranceType();
         this.tenantId = event.tenantId();
         this.createTime = LocalDateTime.now();
         this.insuranceProducts = new ArrayList<>();
@@ -366,6 +395,11 @@ public class Policy extends BaseAggregate {
     public void on(PolicyTerminatedEvent event) {
         this.status = this.status.transitionStatus(PolicyStatus.StatusCode.TERMINATED, event.reason(),
                 event.operatorId());
+        // 保单终止（身故给付/退保等）联动中止年金给付计划：被保险人身故后不再有生存年金，
+        // 避免读模型年金计划停留 PAYING 与保单已终止的语义不一致。
+        if (this.annuityPayoutPlan != null) {
+            this.annuityPayoutPlan = this.annuityPayoutPlan.stop();
+        }
     }
 
     @EventSourcingHandler
@@ -461,6 +495,35 @@ public class Policy extends BaseAggregate {
     }
 
     /**
+     * 回写投资账户价值（投连/万能保单账户价值变更后由投资域回写，事件溯源）
+     * <p>
+     * 仅投连类形态且已挂接投资账户可回写；回写账户须与已挂接账户一致。账户价值为最终一致的展示型数据，
+     * 允许 0（清仓/赎回后），故仅校验非空非负。
+     * </p>
+     */
+    @CommandHandler
+    public void handle(UpdateAccountValueCommand command) {
+        ensureInvestmentLinked();
+        if (this.investmentAccountId == null) {
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "保单尚未挂接投资账户，不可回写账户价值");
+        }
+        if (command.accountId() != null && !this.investmentAccountId.equals(command.accountId())) {
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION",
+                    "回写账户与已挂接账户不一致：已挂接=" + this.investmentAccountId + "，回写=" + command.accountId());
+        }
+        if (command.accountValue() == null || command.accountValue().compareTo(java.math.BigDecimal.ZERO) < 0) {
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "账户价值不能为空或负数");
+        }
+        AggregateLifecycle.apply(new AccountValueUpdatedEvent(this.policyId, this.investmentAccountId,
+                command.accountValue(), command.currency(), LocalDateTime.now(), this.tenantId));
+    }
+
+    @EventSourcingHandler
+    public void on(AccountValueUpdatedEvent event) {
+        this.investmentAccountValue = event.accountValue();
+    }
+
+    /**
      * 新增被保险人（团单加保 / 家庭险增员，事件溯源）
      * <p>
      * 仅团单/家庭险可增减成员；被保单须处于有效态（EFFECTIVE）方可加保。家庭险须提供家庭成员关系。
@@ -515,6 +578,189 @@ public class Policy extends BaseAggregate {
         if (this.insuredPartyList != null) {
             this.insuredPartyList = this.insuredPartyList.removeInsured(event.insuredId());
         }
+    }
+
+    /**
+     * 启动年金给付期（年金保险专属，事件溯源）
+     * <p>
+     * 仅年金险种（{@link InsuranceProductType#ANNUITY}）的生效保单可进入给付期；重复启动被拒绝。
+     * 启动后保单进入年金给付期，按频率周期性给付生存年金，<b>保单状态不变</b>（区别于身故给付终止保单）。
+     * </p>
+     */
+    @CommandHandler
+    public void handle(StartAnnuityPayoutCommand command) {
+        if (this.status.statusCode() != PolicyStatus.StatusCode.EFFECTIVE) {
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "仅生效保单可启动年金给付");
+        }
+        if (this.insuranceType != InsuranceProductType.ANNUITY) {
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "非年金险种保单不可启动年金给付");
+        }
+        if (this.annuityPayoutPlan != null) {
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "年金给付期已启动，不可重复启动");
+        }
+        AggregateLifecycle.apply(new AnnuityPayoutStartedEvent(this.policyId, command.startDate(), command.frequency(),
+                command.amountPerInstallment(), command.totalInstallments(), command.startDate(), command.operatorId(),
+                LocalDateTime.now(), this.tenantId));
+    }
+
+    @EventSourcingHandler
+    public void on(AnnuityPayoutStartedEvent event) {
+        this.annuityPayoutPlan = AnnuityPayoutPlan.start(event.startDate(), event.frequency(),
+                event.amountPerInstallment(), event.totalInstallments());
+    }
+
+    /**
+     * 给付一期年金（年金给付期内定时触发，事件溯源）
+     * <p>
+     * 给付计划须处于给付中；每期给付使已给付期数递增、顺延下一给付日，给满约定期数后计划完成。
+     * 年金给付<b>不改变保单状态</b>——保单在给付期内始终有效。
+     * </p>
+     */
+    @CommandHandler
+    public void handle(PayAnnuityBenefitCommand command) {
+        if (this.annuityPayoutPlan == null) {
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "年金给付期未启动，不可给付");
+        }
+        // 计划状态/完成性不变量由 AnnuityPayoutPlan 守护，转译为业务异常
+        AnnuityPayoutPlan paid;
+        try {
+            paid = this.annuityPayoutPlan.payNextInstallment(LocalDateTime.now());
+        } catch (IllegalStateException ex) {
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", ex.getMessage());
+        }
+        AggregateLifecycle.apply(new AnnuityBenefitPaidEvent(this.policyId, paid.paidInstallments(),
+                paid.installmentAmount(), paid.paidInstallments(), paid.nextPayoutDate(), paid.status(),
+                command.operatorId(), LocalDateTime.now(), this.tenantId));
+    }
+
+    @EventSourcingHandler
+    public void on(AnnuityBenefitPaidEvent event) {
+        if (this.annuityPayoutPlan != null) {
+            this.annuityPayoutPlan = this.annuityPayoutPlan.payNextInstallment(event.occurredAt());
+        }
+    }
+
+    /**
+     * 满期给付（两全险/生存给付型寿险专属，事件溯源）
+     * <p>
+     * 被保险人生存至保险期间届满，给付满期生存保险金后保单转满期（EXPIRED，终态）。仅生效保单可满期给付；
+     * 满期给付金额须为正。区别于普通 {@code expire()}（仅止期到达无给付）。
+     * </p>
+     */
+    @CommandHandler
+    public void handle(MaturePolicyCommand command) {
+        if (this.status.statusCode() != PolicyStatus.StatusCode.EFFECTIVE) {
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "仅生效保单可满期给付");
+        }
+        // 满期金仅生存给付型险种具备：两全险（ENDOWMENT）满期给付满期金；年金险满期给付完毕另经年金给付计划。
+        // 定期寿险/终身寿险为身故给付型，无满期金。insuranceType 为 null（存量事件）时放行以兼容。
+        if (this.insuranceType != null && this.insuranceType != InsuranceProductType.ENDOWMENT) {
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION",
+                    "仅两全险(ENDOWMENT)可满期给付满期金，当前险种：" + this.insuranceType.getCode());
+        }
+        if (command.maturityBenefit() == null || command.maturityBenefit().compareTo(java.math.BigDecimal.ZERO) <= 0) {
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "满期给付金额必须大于零");
+        }
+        AggregateLifecycle.apply(new PolicyMaturedEvent(this.policyId, command.maturityBenefit(), command.operatorId(),
+                LocalDateTime.now(), this.tenantId));
+    }
+
+    /**
+     * 到期满期给付（定时任务专用，事件溯源）
+     * <p>
+     * 满期金额取聚合自身基本保额 {@code sumInsured}，其余规则同 {@link #handle(MaturePolicyCommand)}：
+     * 仅生效两全险可满期给付，保额须为正。定时任务在保单止期到达时批量触发，无需调用方提供满期金额。
+     * </p>
+     */
+    @CommandHandler
+    public void handle(MatureDuePolicyCommand command) {
+        if (this.status.statusCode() != PolicyStatus.StatusCode.EFFECTIVE) {
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "仅生效保单可满期给付");
+        }
+        if (this.insuranceType != null && this.insuranceType != InsuranceProductType.ENDOWMENT) {
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION",
+                    "仅两全险(ENDOWMENT)可满期给付满期金，当前险种：" + this.insuranceType.getCode());
+        }
+        if (this.sumInsured == null || this.sumInsured.value().compareTo(java.math.BigDecimal.ZERO) <= 0) {
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "保单基本保额缺失或非正，不可满期给付");
+        }
+        AggregateLifecycle.apply(new PolicyMaturedEvent(this.policyId, this.sumInsured.value(), command.operatorId(),
+                LocalDateTime.now(), this.tenantId));
+    }
+
+    @EventSourcingHandler
+    public void on(PolicyMaturedEvent event) {
+        this.status = this.status.transitionStatus(PolicyStatus.StatusCode.EXPIRED, "满期给付", event.operatorId());
+    }
+
+    /**
+     * 保费豁免（寿险保费豁免条款，事件溯源）
+     * <p>
+     * 投保人/被保险人发生约定事件（身故/全残/重疾），豁免后续应缴保费。保单<b>保持 EFFECTIVE</b>、保障不变；
+     * 重复豁免幂等拒绝。仅生效保单可豁免。
+     * </p>
+     */
+    @CommandHandler
+    public void handle(WaivePremiumCommand command) {
+        if (this.status.statusCode() != PolicyStatus.StatusCode.EFFECTIVE) {
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "仅生效保单可办理保费豁免");
+        }
+        if (this.premiumWaived) {
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "保单已办理保费豁免，不可重复豁免");
+        }
+        if (command.reason() == null) {
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "保费豁免原因不能为空");
+        }
+        AggregateLifecycle.apply(new PremiumWaivedEvent(this.policyId, command.reason(), command.operatorId(),
+                LocalDateTime.now(), this.tenantId));
+    }
+
+    @EventSourcingHandler
+    public void on(PremiumWaivedEvent event) {
+        this.premiumWaived = true;
+        this.premiumWaiverReason = event.reason();
+    }
+
+    /**
+     * 红利派发（分红险年度红利处理，事件溯源）
+     * <p>
+     * 分红型保单按保单年度派发红利并按领取方式处置。仅生效的分红型（{@code ParticipationType.PARTICIPATING}，
+     * 由 product 侧配置决定，此处以红利金额为正校验）保单可派发；留存类领取方式（累积生息/购买交清增额）
+     * 累加到累计红利，现金/抵缴方式不累加。
+     * </p>
+     */
+    @CommandHandler
+    public void handle(DistributeDividendCommand command) {
+        if (this.status.statusCode() != PolicyStatus.StatusCode.EFFECTIVE) {
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "仅生效保单可派发红利");
+        }
+        // 投连/万能险为账户价值型产品，其收益走单位净值/结算利率（investment 域账户），非分红险红利机制，
+        // 不可走本红利派发。分红资格（普通型是否分红）由 product 侧 ParticipationType 决定，
+        // 保单聚合暂未承载该维度（需从 PolicyCreatedEvent 透传，属后续增强），当前先拦截账户价值型形态。
+        if (this.policyForm != null && this.policyForm.isInvestmentLinked()) {
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION",
+                    "投连/万能险不适用红利派发（其收益走账户价值/结算利率）");
+        }
+        if (command.dividendAmount() == null || command.dividendAmount().compareTo(java.math.BigDecimal.ZERO) <= 0) {
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "红利金额必须大于零");
+        }
+        if (command.option() == null) {
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "红利领取方式不能为空");
+        }
+        // 留存类方式累加累计红利，现金/抵缴不累加
+        java.math.BigDecimal currentAccumulated = this.accumulatedDividend != null
+                ? this.accumulatedDividend.value() : java.math.BigDecimal.ZERO;
+        java.math.BigDecimal newAccumulated = command.option().isRetained()
+                ? currentAccumulated.add(command.dividendAmount()) : currentAccumulated;
+        AggregateLifecycle.apply(new DividendDistributedEvent(this.policyId, command.dividendAmount(), command.option(),
+                command.policyYear(), newAccumulated, command.operatorId(), LocalDateTime.now(), this.tenantId));
+    }
+
+    @EventSourcingHandler
+    public void on(DividendDistributedEvent event) {
+        // 累计红利以事件携带的累计值为准（留存类累加，现金/抵缴保持不变）
+        String currency = this.sumInsured != null ? this.sumInsured.currency() : "CNY";
+        this.accumulatedDividend = Money.of(event.accumulatedDividend(), currency);
     }
 
     /**

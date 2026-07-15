@@ -11,6 +11,7 @@ import org.axonframework.modelling.command.AggregateLifecycle;
 import org.axonframework.spring.stereotype.Aggregate;
 
 import com.titanium.common.domain.BaseAggregate;
+import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.enums.underwriting.UnderwritingEnum.ConclusionType;
 import com.titanium.metadata.valueobject.Money;
@@ -64,6 +65,8 @@ public class Insurance extends BaseAggregate {
     private UnderwritingResult     underwritingResult;
     /** 投保单状态 */
     private InsuranceStatus        status;
+    /** 险种三级分类（自意向单/直接创建透传，可空以兼容存量事件） */
+    private InsuranceProductType   insuranceType;
 
     // ==================== CommandHandler ====================
 
@@ -76,7 +79,7 @@ public class Insurance extends BaseAggregate {
                 command.proposalId(), command.policyForm(), command.applicantId(), command.insuredCount(),
                 command.exactPremium() != null ? command.exactPremium().value() : null, command.insurancePeriodStart(),
                 command.insurancePeriodEnd(), command.productCodes(), command.underwritingPriority(),
-                LocalDateTime.now(), command.tenantId()));
+                command.insuranceType(), LocalDateTime.now(), command.tenantId()));
     }
 
     /**
@@ -87,7 +90,7 @@ public class Insurance extends BaseAggregate {
         AggregateLifecycle.apply(new InsuranceCreatedEvent(command.insuranceId(), command.insuranceNo(), null, // 无关联意向单
                 command.policyForm(), command.holderId(), command.insuredCount(), command.exactPremium(),
                 command.insurancePeriodStart(), command.insurancePeriodEnd(), command.productCodes(),
-                command.underwritingPriority(), LocalDateTime.now(), command.tenantId()));
+                command.underwritingPriority(), command.insuranceType(), LocalDateTime.now(), command.tenantId()));
     }
 
     /**
@@ -153,6 +156,7 @@ public class Insurance extends BaseAggregate {
         this.insuranceNo = event.insuranceNo();
         this.proposalId = event.proposalId();
         this.policyForm = event.policyForm();
+        this.insuranceType = event.insuranceType();
         this.tenantId = event.tenantId();
         this.createTime = event.createTime();
         this.updateTime = event.createTime();

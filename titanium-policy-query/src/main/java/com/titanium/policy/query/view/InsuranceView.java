@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 import com.titanium.common.jpa.BaseView;
+import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.enums.underwriting.UnderwritingEnum.ConclusionType;
 import com.titanium.policy.valueobject.insurance.InsuranceStatus;
@@ -52,6 +53,11 @@ public class InsuranceView extends BaseView {
     @Enumerated(EnumType.STRING)
     @Column(name = "policy_form", length = 32)
     private PolicyForm               policyForm;
+
+    /** 险种三级分类 */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "insurance_type", length = 64)
+    private InsuranceProductType     insuranceType;
 
     /** 投保人ID */
     @Column(name = "holder_id", length = 36)

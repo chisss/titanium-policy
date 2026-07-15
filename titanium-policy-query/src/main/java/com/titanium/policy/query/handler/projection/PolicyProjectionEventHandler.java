@@ -9,16 +9,21 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.titanium.metadata.enums.CurrencyEnum;
 import com.titanium.metadata.enums.policy.PolicyEnum;
+import com.titanium.policy.event.AccountValueUpdatedEvent;
+import com.titanium.policy.event.DividendDistributedEvent;
+import com.titanium.policy.event.InvestmentAccountLinkedEvent;
 import com.titanium.policy.event.PolicyActivatedEvent;
 import com.titanium.policy.event.PolicyCancelledEvent;
 import com.titanium.policy.event.PolicyCreatedEvent;
 import com.titanium.policy.event.PolicyExpiredEvent;
 import com.titanium.policy.event.PolicyIssuedEvent;
 import com.titanium.policy.event.PolicyLapsedEvent;
+import com.titanium.policy.event.PolicyMaturedEvent;
 import com.titanium.policy.event.PolicyReinstatedEvent;
 import com.titanium.policy.event.PolicyResumedEvent;
 import com.titanium.policy.event.PolicySuspendedEvent;
 import com.titanium.policy.event.PolicyTerminatedEvent;
+import com.titanium.policy.event.PremiumWaivedEvent;
 import com.titanium.policy.query.repository.PolicyViewRepository;
 import com.titanium.policy.query.view.PolicyView;
 import com.titanium.policy.valueobject.PolicyStatus;
@@ -71,6 +76,7 @@ public class PolicyProjectionEventHandler {
         }
         view.setStartDate(event.effectiveDate());
         view.setEndDate(event.expiryDate());
+        view.setInsuranceType(event.insuranceType());
         view.setTenantId(event.tenantId());
         if (view.getCreateTime() == null) {
             view.setCreateTime(now);
@@ -159,6 +165,65 @@ public class PolicyProjectionEventHandler {
     @Transactional
     public void on(PolicyCancelledEvent event) {
         applyStatus(event.policyId(), event.tenantId(), PolicyStatus.StatusCode.CANCELLED);
+    }
+
+    /**
+     * 投影保单满期给付事件：记录满期金并将状态置为满期（EXPIRED）
+     */
+    @EventHandler
+    @Transactional
+    public void on(PolicyMaturedEvent event) {
+        log.info("[读模型投影] 保单满期给付: policyId={}, 满期金={}", event.policyId(), event.maturityBenefit());
+        applyUpdate(event.policyId(), event.tenantId(), "满期给付", view -> {
+            view.setMaturityBenefit(event.maturityBenefit());
+            view.setPolicyStatus(mapStatus(PolicyStatus.StatusCode.EXPIRED));
+        });
+    }
+
+    /**
+     * 投影保费豁免事件：标记后续保费豁免，保单状态不变（持续有效）
+     */
+    @EventHandler
+    @Transactional
+    public void on(PremiumWaivedEvent event) {
+        log.info("[读模型投影] 保费豁免: policyId={}, 原因={}", event.policyId(), event.reason());
+        applyUpdate(event.policyId(), event.tenantId(), "保费豁免", view -> {
+            view.setPremiumWaived(true);
+            view.setWaiverReason(event.reason() != null ? event.reason().getCode() : null);
+        });
+    }
+
+    /**
+     * 投影红利派发事件：按累计红利刷新读模型（红利派发不改保单状态）
+     */
+    @EventHandler
+    @Transactional
+    public void on(DividendDistributedEvent event) {
+        log.info("[读模型投影] 红利派发: policyId={}, 累计红利={}", event.policyId(), event.accumulatedDividend());
+        applyUpdate(event.policyId(), event.tenantId(), "红利派发", view -> {
+            view.setAccumulatedDividend(event.accumulatedDividend());
+            view.setDividendOption(event.option() != null ? event.option().getCode() : null);
+        });
+    }
+
+    @EventHandler
+    @Transactional
+    public void on(InvestmentAccountLinkedEvent event) {
+        log.info("[读模型投影] 投资账户挂接: policyId={}, accountId={}", event.policyId(),
+                event.investmentAccountId());
+        applyUpdate(event.policyId(), event.tenantId(), "投资账户挂接",
+                view -> view.setInvestmentAccountId(event.investmentAccountId()));
+    }
+
+    @EventHandler
+    @Transactional
+    public void on(AccountValueUpdatedEvent event) {
+        log.info("[读模型投影] 投资账户价值回写: policyId={}, accountId={}, 账户价值={}", event.policyId(),
+                event.accountId(), event.accountValue());
+        applyUpdate(event.policyId(), event.tenantId(), "投资账户价值回写", view -> {
+            view.setInvestmentAccountId(event.accountId());
+            view.setInvestmentAccountValue(event.accountValue());
+        });
     }
 
     /**

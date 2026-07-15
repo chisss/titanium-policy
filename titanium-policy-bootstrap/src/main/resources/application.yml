@@ -15,7 +15,7 @@ spring:
   # JPA配置
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: none
     show-sql: true
     properties:
       hibernate:
@@ -47,7 +47,7 @@ spring:
   # Liquibase配置
   liquibase:
     enabled: true
-    change-log: classpath:liquibase/changelog-init.xml
+    change-log: classpath:liquibase/changelog-master.xml
     default-schema: public
 
 # Axon配置

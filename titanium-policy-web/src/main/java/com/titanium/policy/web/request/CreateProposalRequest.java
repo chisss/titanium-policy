@@ -3,6 +3,7 @@ package com.titanium.policy.web.request;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.enums.product.ProductEnum.SalesChannel;
 
@@ -52,4 +53,7 @@ public class CreateProposalRequest {
 
     @Schema(description = "期望险种编码", example = "PROD_A")
     private String        expectedProductCode;
+
+    @Schema(description = "险种三级分类(可空)", example = "TERM_LIFE")
+    private InsuranceProductType insuranceType;
 }

@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 
 import org.axonframework.modelling.command.TargetAggregateIdentifier;
 
+import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.enums.product.ProductEnum.SalesChannel;
 import com.titanium.metadata.valueobject.Money;
@@ -25,5 +26,6 @@ public record CreatePolicyDirectlyCommand(
         LocalDateTime insurancePeriodStart,
         LocalDateTime insurancePeriodEnd,
         SalesChannel channel,
+        InsuranceProductType insuranceType,
         String tenantId
 ) {}

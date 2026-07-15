@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.policy.PolicyForm;
 
 /**
@@ -21,6 +22,7 @@ public record InsuranceCreatedEvent(
         LocalDateTime insurancePeriodEnd,
         List<String> productCodes,
         int underwritingPriority,
+        InsuranceProductType insuranceType,
         LocalDateTime createTime,
         String tenantId
 ) {}

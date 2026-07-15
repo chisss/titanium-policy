@@ -12,6 +12,7 @@ import org.axonframework.modelling.saga.StartSaga;
 import org.axonframework.spring.stereotype.Saga;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.command.CreatePolicyCommand;
@@ -91,6 +92,8 @@ public class IssuanceSaga {
     private LocalDateTime insurancePeriodEnd;
     /** 租户ID */
     private String        tenantId;
+    /** 险种三级分类（自投保单事件记忆，出单时透传保单，可空以兼容存量事件） */
+    private InsuranceProductType insuranceType;
 
     /**
      * 【投保】投保单创建 → 启动 Saga，记忆后续创建保单所需数据
@@ -108,6 +111,7 @@ public class IssuanceSaga {
         this.insurancePeriodStart = event.insurancePeriodStart();
         this.insurancePeriodEnd = event.insurancePeriodEnd();
         this.tenantId = event.tenantId();
+        this.insuranceType = event.insuranceType();
     }
 
     /**
@@ -175,6 +179,7 @@ public class IssuanceSaga {
                 insurancePeriodStart,
                 insurancePeriodEnd,
                 null,
+                insuranceType,
                 tenantId);
 
         commandGateway.sendAndWait(command);

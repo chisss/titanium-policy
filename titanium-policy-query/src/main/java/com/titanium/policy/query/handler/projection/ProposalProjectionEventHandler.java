@@ -31,7 +31,7 @@ import lombok.extern.slf4j.Slf4j;
  * </p>
  * <p>
  * <b>投影覆盖范围</b>：DRAFT/SUBMITTED/CONVERTED_TO_APPLICATION/VOIDED 全部状态。申请人/标的明细不进领域事件，仅投影 basicInfo 级数据。
- * 注：{@code ProposalConvertedEvent} 当前无命令触发（既有领域缺陷），投影已就绪，待写侧补齐转换命令后自动生效。
+ * 注：{@code ProposalConvertedEvent} 由 {@code ConvertProposalCommand} 触发（写侧已补齐），投影随命令生效。
  * </p>
  */
 @Slf4j

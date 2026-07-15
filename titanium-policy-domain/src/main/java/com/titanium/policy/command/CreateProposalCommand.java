@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 
 import org.axonframework.modelling.command.TargetAggregateIdentifier;
 
+import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.enums.product.ProductEnum.SalesChannel;
 import com.titanium.metadata.valueobject.Money;
@@ -26,6 +27,7 @@ import lombok.Builder;
  * @param insurancePeriodStart 保障期限起期
  * @param insurancePeriodEnd 保障期限止期
  * @param expectedProductCode 意向险种编码
+ * @param insuranceType 险种三级分类（可空，向后兼容存量事件）
  * @param tenantId 租户ID
  */
 @Builder
@@ -33,5 +35,5 @@ public record CreateProposalCommand(@TargetAggregateIdentifier String proposalId
                                     PolicyForm policyForm, SalesChannel channel, String customerId,
                                     Money intendedSumInsured, Money intendedPremium,
                                     LocalDateTime insurancePeriodStart, LocalDateTime insurancePeriodEnd,
-                                    String expectedProductCode, String tenantId) {
+                                    String expectedProductCode, InsuranceProductType insuranceType, String tenantId) {
 }

@@ -80,7 +80,8 @@ public class PolicyIssuanceOrchestrator {
         // ③ 据领域决策组装并下发命令（编排职责，不含业务判断）
         CreatePolicyCommand command = new CreatePolicyCommand(policyId, policyNo, insurance.getInsuranceId(),
                 decision.policyForm(), null, null, decision.holderId(), null, decision.premium(), decision.premium(),
-                decision.insurancePeriodStart(), decision.insurancePeriodEnd(), null, insurance.getTenantId());
+                decision.insurancePeriodStart(), decision.insurancePeriodEnd(), null, insurance.getInsuranceType(),
+                insurance.getTenantId());
         commandGateway.sendAndWait(command);
 
         LOG.info("[承保编排] 承保出单完成, insuranceId={}, policyId={}, policyNo={}", insurance.getInsuranceId(), policyId,

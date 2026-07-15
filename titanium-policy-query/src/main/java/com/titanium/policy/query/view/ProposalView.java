@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 import com.titanium.common.jpa.BaseView;
+import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.enums.product.ProductEnum.SalesChannel;
 import com.titanium.policy.valueobject.proposal.ProposalStatus;
@@ -77,6 +78,11 @@ public class ProposalView extends BaseView {
     /** 期望险种编码 */
     @Column(name = "expected_product_code", length = 64)
     private String                    expectedProductCode;
+
+    /** 险种三级分类（源头捕获，可空以兼容存量数据） */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "insurance_type", length = 64)
+    private InsuranceProductType      insuranceType;
 
     /** 意向单状态（领域状态机编码） */
     @Enumerated(EnumType.STRING)
