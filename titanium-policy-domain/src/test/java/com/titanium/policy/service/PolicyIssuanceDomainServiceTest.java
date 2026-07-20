@@ -51,7 +51,7 @@ class PolicyIssuanceDomainServiceTest {
     @DisplayName("核保通过(ACCEPT)：可承保且保单要素由投保单推导")
     void shouldAcceptWhenUnderwritingAccepted() {
         UnderwritingResult result = new UnderwritingResult("UW-1", ConclusionType.ACCEPT, "通过", "uw-user",
-                LocalDateTime.now(), null);
+                LocalDateTime.now(), null, null);
 
         PolicyIssuanceDecision decision = domainService.decideIssuance(approvedInsurance, result);
 
@@ -66,7 +66,7 @@ class PolicyIssuanceDomainServiceTest {
     @DisplayName("修改条件承保(MODIFY)：可承保且携带核保加费条件")
     void shouldCarryConditionWhenModify() {
         UnderwritingResult result = new UnderwritingResult("UW-2", ConclusionType.MODIFY, "加费承保", "uw-user",
-                LocalDateTime.now(), "加费30%");
+                LocalDateTime.now(), "加费30%", new java.math.BigDecimal("0.30"));
 
         PolicyIssuanceDecision decision = domainService.decideIssuance(approvedInsurance, result);
 
@@ -78,7 +78,7 @@ class PolicyIssuanceDomainServiceTest {
     @DisplayName("核保拒绝(REJECT)：不可承保")
     void shouldRejectWhenUnderwritingRejected() {
         UnderwritingResult result = new UnderwritingResult("UW-3", ConclusionType.REJECT, "风险过高", "uw-user",
-                LocalDateTime.now(), null);
+                LocalDateTime.now(), null, null);
 
         PolicyIssuanceDecision decision = domainService.decideIssuance(approvedInsurance, result);
 
@@ -90,7 +90,7 @@ class PolicyIssuanceDomainServiceTest {
     @DisplayName("核保暂缓(POSTPONE)：不可承保，需人工介入")
     void shouldRejectWhenPostpone() {
         UnderwritingResult result = new UnderwritingResult("UW-4", ConclusionType.POSTPONE, "待补充材料", "uw-user",
-                LocalDateTime.now(), null);
+                LocalDateTime.now(), null, null);
 
         PolicyIssuanceDecision decision = domainService.decideIssuance(approvedInsurance, result);
 
@@ -116,10 +116,10 @@ class PolicyIssuanceDomainServiceTest {
         assertFalse(domainService.canIssueByConclusion(conclusion(ConclusionType.POSTPONE)));
         assertFalse(domainService.canIssueByConclusion(null), "核保结果缺失不可承保");
         assertFalse(domainService.canIssueByConclusion(new UnderwritingResult("UW-X", null, null, null,
-                LocalDateTime.now(), null)), "核保结论为空不可承保");
+                LocalDateTime.now(), null, null)), "核保结论为空不可承保");
     }
 
     private UnderwritingResult conclusion(ConclusionType conclusionType) {
-        return new UnderwritingResult("UW-C", conclusionType, "结论", "uw-user", LocalDateTime.now(), null);
+        return new UnderwritingResult("UW-C", conclusionType, "结论", "uw-user", LocalDateTime.now(), null, null);
     }
 }

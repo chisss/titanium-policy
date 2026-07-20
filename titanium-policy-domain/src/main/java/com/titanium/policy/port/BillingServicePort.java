@@ -2,6 +2,7 @@ package com.titanium.policy.port;
 
 import com.titanium.policy.valueobject.billing.BillingResult;
 import com.titanium.policy.valueobject.billing.PremiumBillRequest;
+import com.titanium.policy.valueobject.billing.PremiumScheduleRequest;
 
 /**
  * 计费服务网关端口（driven port，与聚合平级）
@@ -20,4 +21,14 @@ public interface BillingServicePort {
      * @return 计费结果
      */
     BillingResult createPremiumBill(PremiumBillRequest request);
+
+    /**
+     * 为保单生成期缴计划（BILL-3）
+     * <p>
+     * 出单后根据缴费模式、缴费年数、保费金额生成期缴计划，供后续定时收费任务扫描执行。
+     * </p>
+     *
+     * @param request 期缴计划生成请求
+     */
+    void generatePremiumSchedule(PremiumScheduleRequest request);
 }

@@ -20,6 +20,9 @@ import com.titanium.policy.event.insurance.InsuranceIssuedEvent;
 import com.titanium.policy.event.insurance.InsuranceSubmittedForUnderwritingEvent;
 import com.titanium.policy.event.insurance.UnderwritingResultReceivedEvent;
 import com.titanium.policy.generator.PolicyNoGenerator;
+import com.titanium.policy.port.PremiumCalculationGateway;
+import com.titanium.policy.port.PremiumCalculationGateway.StandardPremiumRequest;
+import com.titanium.policy.port.PremiumCalculationGateway.StandardPremiumResult;
 import com.titanium.policy.port.UnderwritingDecisionGateway;
 import com.titanium.policy.service.impl.PolicyIssuanceDomainServiceImpl;
 import com.titanium.policy.valueobject.insurance.UnderwritingDecisionRequest;
@@ -50,12 +53,12 @@ public class IssuanceSagaTest {
     public void setUp() {
         fixture = new SagaTestFixture<>(IssuanceSaga.class);
         underwritingGateway = new StubUnderwritingDecisionGateway();
-        // 注册 Saga 所需的注入资源（命令网关由夹具记录所发命令）
         fixture.registerCommandGateway(CommandGateway.class);
         fixture.registerResource(underwritingGateway);
         fixture.registerResource(new PolicyNoGenerator());
-        // 注册承保领域服务真实实现（纯领域计算、无依赖），承保准入裁决口径与生产一致
         fixture.registerResource(new PolicyIssuanceDomainServiceImpl());
+        // BILL-2：注册保费计算网关桩（返回固定保费，不依赖 billing 服务）
+        fixture.registerResource(new StubPremiumCalculationGateway());
     }
 
     /**
@@ -144,7 +147,8 @@ public class IssuanceSagaTest {
     private InsuranceCreatedEvent insuranceCreatedEvent() {
         return new InsuranceCreatedEvent(INSURANCE_ID, "INS_NO_001", null, PolicyForm.INDIVIDUAL, "HOLDER_001", 1,
                 new BigDecimal("1000.00"), LocalDateTime.now(), LocalDateTime.now().plusYears(1),
-                List.of("PRODUCT_001"), 0, null, LocalDateTime.now(), TENANT_ID);
+                List.of("PRODUCT_001"), 0, null, null, LocalDateTime.now(), TENANT_ID,
+                new BigDecimal("500000"), "ANNUAL", 20);
     }
 
     private InsuranceSubmittedForUnderwritingEvent insuranceSubmittedEvent() {
@@ -155,7 +159,7 @@ public class IssuanceSagaTest {
 
     private UnderwritingResultReceivedEvent underwritingResultEvent(ConclusionType resultCode) {
         return new UnderwritingResultReceivedEvent(INSURANCE_ID, "UW_001", resultCode, "核保意见", "UW_USER_001",
-                LocalDateTime.now(), null, TENANT_ID);
+                LocalDateTime.now(), null, TENANT_ID, null);
     }
 
     private InsuranceIssuedEvent insuranceIssuedEvent() {
@@ -164,10 +168,11 @@ public class IssuanceSagaTest {
 
     private UnderwritingResult approvedResult() {
         return new UnderwritingResult("UW_001", ConclusionType.ACCEPT, "核保通过", "UW_USER_001",
-                LocalDateTime.now(), null);
+                LocalDateTime.now(), null, null);
     }
 
     /**
+     * 핵보 결정 게이트웨이 스텁: 반환 가능한 고정 결론 보장
      * 核保决策网关桩：返回可配置的固定结论，保证测试确定性
      */
     private static class StubUnderwritingDecisionGateway implements UnderwritingDecisionGateway {
@@ -180,6 +185,18 @@ public class IssuanceSagaTest {
         @Override
         public UnderwritingResult requestDecision(UnderwritingDecisionRequest request) {
             return result;
+        }
+    }
+
+    /**
+     * 보험료 계산 게이트웨이 스텁: 고정 보험료 반환
+     * 保费计算网关桩：返回固定保费，保证测试确定性（不依赖 billing 域）
+     */
+    private static class StubPremiumCalculationGateway implements PremiumCalculationGateway {
+        @Override
+        public StandardPremiumResult calculatePremium(StandardPremiumRequest request) {
+            return new StandardPremiumResult(new BigDecimal("1000.00"),
+                    new BigDecimal("1000.00"), 1, "CNY");
         }
     }
 }

@@ -3,11 +3,11 @@ package com.titanium.policy.web.provider;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.titanium.policy.api.PolicyApi;
-import com.titanium.policy.api.dto.AccountValueWriteBackDTO;
-import com.titanium.policy.api.dto.CreatePolicyDTO;
-import com.titanium.policy.api.dto.PolicyDTO;
-import com.titanium.policy.api.dto.PolicyStatusDTO;
+import com.titanium.policy.api.request.AccountValueWriteBackRequest;
+import com.titanium.policy.api.request.CreatePolicyRequest;
 import com.titanium.policy.api.response.ApiResponse;
+import com.titanium.policy.api.response.PolicyResponse;
+import com.titanium.policy.api.response.PolicyStatusResponse;
 import com.titanium.policy.application.command.PolicyApplicationService;
 import com.titanium.policy.application.query.PolicyAppQueryService;
 import com.titanium.policy.command.CreatePolicyCommand;
@@ -37,7 +37,7 @@ public class PolicyApiProvider implements PolicyApi {
     private final PolicyWebMapper          policyWebMapper;
 
     @Override
-    public ApiResponse<String> createPolicy(CreatePolicyDTO dto, String tenantId) {
+    public ApiResponse<String> createPolicy(CreatePolicyRequest dto, String tenantId) {
         // 协议转换：远程 DTO → 领域命令，收敛到同一应用层门面
         CreatePolicyCommand command = policyWebMapper.toCommand(dto, tenantId);
         String policyId = policyApplicationService.createPolicy(command);
@@ -45,7 +45,7 @@ public class PolicyApiProvider implements PolicyApi {
     }
 
     @Override
-    public ApiResponse<String> createPolicyDirectly(CreatePolicyDTO dto, String tenantId) {
+    public ApiResponse<String> createPolicyDirectly(CreatePolicyRequest dto, String tenantId) {
         // 一步出单：DTO → 一步出单命令，收敛到 application 门面
         CreatePolicyDirectlyCommand command = policyWebMapper.toDirectCommand(dto, tenantId);
         String policyId = policyApplicationService.createPolicyDirectly(command);
@@ -53,18 +53,18 @@ public class PolicyApiProvider implements PolicyApi {
     }
 
     @Override
-    public ApiResponse<PolicyDTO> getPolicy(String policyId, String tenantId) {
+    public ApiResponse<PolicyResponse> getPolicy(String policyId, String tenantId) {
         // 读：构造 FindPolicyByIdQuery 交读门面派发（QueryGateway → PolicyView），未命中返回 404 码
         return policyAppQueryService.findById(new FindPolicyByIdQuery(policyId, tenantId))
-                .map(policyWebMapper::toDTO)
+                .map(policyWebMapper::toResponse)
                 .map(ApiResponse::success)
                 .orElseGet(() -> ApiResponse.error(404, "保单不存在: " + policyId));
     }
 
     @Override
-    public ApiResponse<PolicyStatusDTO> getPolicyStatus(String policyId, String tenantId) {
+    public ApiResponse<PolicyStatusResponse> getPolicyStatus(String policyId, String tenantId) {
         return policyAppQueryService.findById(new FindPolicyByIdQuery(policyId, tenantId))
-                .map(policyWebMapper::toStatusDTO)
+                .map(policyWebMapper::toStatusResponse)
                 .map(ApiResponse::success)
                 .orElseGet(() -> ApiResponse.error(404, "保单不存在: " + policyId));
     }
@@ -82,7 +82,7 @@ public class PolicyApiProvider implements PolicyApi {
     }
 
     @Override
-    public ApiResponse<Void> writeBackAccountValue(String policyId, AccountValueWriteBackDTO dto, String tenantId) {
+    public ApiResponse<Void> writeBackAccountValue(String policyId, AccountValueWriteBackRequest dto, String tenantId) {
         // 协议转换：投资域回写请求 → 更新账户价值命令，收敛到 application 门面
         policyApplicationService.updateAccountValue(policyId, dto.getAccountId(), dto.getAccountValue(),
                 dto.getCurrency(), tenantId);

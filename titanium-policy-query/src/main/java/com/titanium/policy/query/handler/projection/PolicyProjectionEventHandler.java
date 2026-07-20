@@ -1,14 +1,16 @@
 package com.titanium.policy.query.handler.projection;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import org.axonframework.config.ProcessingGroup;
 import org.axonframework.eventhandling.EventHandler;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.titanium.metadata.enums.CurrencyEnum;
+import com.titanium.common.jpa.BasePersistable;
 import com.titanium.metadata.enums.policy.PolicyEnum;
+import com.titanium.policy.entity.insurance.InsuredPartyList;
 import com.titanium.policy.event.AccountValueUpdatedEvent;
 import com.titanium.policy.event.DividendDistributedEvent;
 import com.titanium.policy.event.InvestmentAccountLinkedEvent;
@@ -24,6 +26,7 @@ import com.titanium.policy.event.PolicyResumedEvent;
 import com.titanium.policy.event.PolicySuspendedEvent;
 import com.titanium.policy.event.PolicyTerminatedEvent;
 import com.titanium.policy.event.PremiumWaivedEvent;
+import com.titanium.policy.query.mapper.PolicyViewMapper;
 import com.titanium.policy.query.repository.PolicyViewRepository;
 import com.titanium.policy.query.view.PolicyView;
 import com.titanium.policy.valueobject.PolicyStatus;
@@ -53,6 +56,7 @@ import lombok.extern.slf4j.Slf4j;
 public class PolicyProjectionEventHandler {
 
     private final PolicyViewRepository policyViewRepository;
+    private final PolicyViewMapper     policyViewMapper;
 
     /**
      * 投影保单创建事件：新建读模型记录
@@ -65,23 +69,24 @@ public class PolicyProjectionEventHandler {
         PolicyView view = policyViewRepository.findByPolicyIdAndTenantId(event.policyId(), event.tenantId())
                 .orElseGet(PolicyView::new);
 
-        LocalDateTime now = LocalDateTime.now();
-        view.setPolicyId(event.policyId());
-        view.setPolicyNo(event.policyNo() != null ? event.policyNo().value() : null);
+        // 事件字段 → 读模型的结构映射收敛到 MapStruct（保单号/保费值对象拆解、起止期改名），消除逐字段 set
+        policyViewMapper.applyCreated(view, event);
+        // 状态含 null 兜底 + 本地状态机→metadata 枚举映射，属处理器职责，不下沉映射器
         view.setPolicyStatus(event.status() != null ? mapStatus(event.status().statusCode())
                 : PolicyEnum.PolicyStatus.PENDING_EFFECTIVE);
-        if (event.premium() != null) {
-            view.setPremium(event.premium().value());
-            view.setCurrency(CurrencyEnum.fromCode(event.premium().currency()));
+        // 从参与方清单填充投保人/首位被保险人字段（事件携带快照则直写，否则留空待后续补全）
+        if (event.insuredPartyList() != null) {
+            InsuredPartyList.HolderInfo holder = event.insuredPartyList().holderInfo();
+            if (holder != null) {
+                view.setPolicyHolderId(holder.customerId());
+                view.setPolicyHolderName(holder.name());
+            }
+            List<InsuredPartyList.InsuredInfo> insuredList = event.insuredPartyList().insuredList();
+            if (insuredList != null && !insuredList.isEmpty()) {
+                view.setInsuredName(insuredList.get(0).name());
+            }
         }
-        view.setStartDate(event.effectiveDate());
-        view.setEndDate(event.expiryDate());
-        view.setInsuranceType(event.insuranceType());
-        view.setTenantId(event.tenantId());
-        if (view.getCreateTime() == null) {
-            view.setCreateTime(now);
-        }
-        view.setUpdateTime(now);
+        stampAuditTime(view);
 
         policyViewRepository.save(view);
     }
@@ -276,5 +281,21 @@ public class PolicyProjectionEventHandler {
             policyViewRepository.save(view);
         }, () -> log.warn("[读模型投影] {} 失败：未找到读模型记录 policyId={}, tenantId={}（可能事件乱序，将由DLQ重试）", action,
                 policyId, tenantId));
+    }
+
+    /**
+     * 统一填充读模型审计时间戳：createTime 仅首次创建时写入、updateTime 每次投影刷新。
+     * <p>
+     * 该逻辑含 {@code now()} 运行时副作用与"仅首次设置"语义，属投影处理器职责，不下沉 MapStruct 映射器。
+     * </p>
+     *
+     * @param view 读模型（继承 {@link BasePersistable}）
+     */
+    private void stampAuditTime(BasePersistable view) {
+        LocalDateTime now = LocalDateTime.now();
+        if (view.getCreateTime() == null) {
+            view.setCreateTime(now);
+        }
+        view.setUpdateTime(now);
     }
 }

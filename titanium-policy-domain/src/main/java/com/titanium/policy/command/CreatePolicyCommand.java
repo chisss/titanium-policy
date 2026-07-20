@@ -6,6 +6,7 @@ import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.enums.product.ProductEnum.SalesChannel;
 import com.titanium.metadata.valueobject.Money;
+import com.titanium.policy.entity.insurance.InsuredPartyList;
 
 /*
  * 创建保单命令
@@ -46,6 +47,10 @@ public record CreatePolicyCommand(
                                    * 被保险人ID
                                    */
                                   String insuredId,
+                                  /*
+                                   * 投保参与方清单（含投保人/被保险人/受益人快照）
+                                   */
+                                  InsuredPartyList insuredPartyList,
                                   /*
                                    * 保额
                                    */

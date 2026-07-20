@@ -7,9 +7,9 @@ import org.springframework.stereotype.Component;
 
 import com.titanium.policy.port.UnderwritingServicePort;
 import com.titanium.underwriting.api.UnderwritingApi;
-import com.titanium.underwriting.api.dto.UnderwritingDTO;
 import com.titanium.underwriting.api.request.CreateUnderwritingRequest;
 import com.titanium.underwriting.api.request.UnderwriteRequest;
+import com.titanium.underwriting.api.response.UnderwritingResponse;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,7 +31,7 @@ public class UnderwritingServiceAdapter implements UnderwritingServicePort {
     public Object createUnderwriting(Object request, String tenantId) {
         if (request instanceof CreateUnderwritingRequest createRequest) {
             log.info("创建核保, tenantId={}", tenantId);
-            ResponseEntity<UnderwritingDTO> response = underwritingApi.createUnderwriting(createRequest, tenantId);
+            ResponseEntity<UnderwritingResponse> response = underwritingApi.createUnderwriting(createRequest, tenantId);
             return response.getBody();
         }
         throw new IllegalArgumentException("Invalid request type for createUnderwriting");
@@ -40,14 +40,14 @@ public class UnderwritingServiceAdapter implements UnderwritingServicePort {
     @Override
     public Object getUnderwritingById(String underwritingId, String tenantId) {
         log.info("获取核保详情, underwritingId={}, tenantId={}", underwritingId, tenantId);
-        ResponseEntity<UnderwritingDTO> response = underwritingApi.getUnderwritingById(underwritingId, tenantId);
+        ResponseEntity<UnderwritingResponse> response = underwritingApi.getUnderwritingById(underwritingId, tenantId);
         return response.getBody();
     }
 
     @Override
     public List<?> getUnderwritingByPolicyId(String policyId, String tenantId) {
         log.info("根据保单ID获取核保, policyId={}, tenantId={}", policyId, tenantId);
-        ResponseEntity<List<UnderwritingDTO>> response = underwritingApi.getUnderwritingByPolicyId(policyId, tenantId);
+        ResponseEntity<List<UnderwritingResponse>> response = underwritingApi.getUnderwritingByPolicyId(policyId, tenantId);
         return response.getBody();
     }
 
@@ -55,7 +55,7 @@ public class UnderwritingServiceAdapter implements UnderwritingServicePort {
     public Object underwrite(String underwritingId, Object request, String tenantId) {
         if (request instanceof UnderwriteRequest underwriteRequest) {
             log.info("执行核保, underwritingId={}, tenantId={}", underwritingId, tenantId);
-            ResponseEntity<UnderwritingDTO> response = underwritingApi.underwrite(underwritingId, underwriteRequest,
+            ResponseEntity<UnderwritingResponse> response = underwritingApi.underwrite(underwritingId, underwriteRequest,
                     tenantId);
             return response.getBody();
         }

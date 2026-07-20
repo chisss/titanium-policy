@@ -9,7 +9,9 @@ import org.springframework.stereotype.Component;
 import com.titanium.policy.query.query.FindPoliciesByCustomerQuery;
 import com.titanium.policy.query.query.FindPoliciesByMultipleConditionsQuery;
 import com.titanium.policy.query.query.FindPolicyByIdQuery;
+import com.titanium.policy.query.query.FindPolicyStatisticsQuery;
 import com.titanium.policy.query.result.PolicyQueryResult;
+import com.titanium.policy.query.result.PolicyStatisticsResult;
 import com.titanium.policy.query.service.PolicyQueryService;
 
 import lombok.AllArgsConstructor;
@@ -62,5 +64,16 @@ public class PolicyQueryHandler {
                 query.insuredName(), query.productCode(), query.status(), query.effectiveDateStart(),
                 query.effectiveDateEnd(), query.expiryDateStart(), query.expiryDateEnd(), query.tenantId(),
                 query.page(), query.size());
+    }
+
+    /**
+     * 查询保单聚合统计（管理后台看板）
+     *
+     * @param query 统计查询条件（含租户ID）
+     * @return 保单统计结果
+     */
+    @QueryHandler
+    public PolicyStatisticsResult handle(FindPolicyStatisticsQuery query) {
+        return policyQueryService.getStatistics(query.tenantId());
     }
 }

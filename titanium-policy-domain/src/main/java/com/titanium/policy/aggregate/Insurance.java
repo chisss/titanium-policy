@@ -79,7 +79,8 @@ public class Insurance extends BaseAggregate {
                 command.proposalId(), command.policyForm(), command.applicantId(), command.insuredCount(),
                 command.exactPremium() != null ? command.exactPremium().value() : null, command.insurancePeriodStart(),
                 command.insurancePeriodEnd(), command.productCodes(), command.underwritingPriority(),
-                command.insuranceType(), LocalDateTime.now(), command.tenantId()));
+                command.insuredPartyList(), command.insuranceType(), LocalDateTime.now(), command.tenantId(),
+                command.sumInsured(), command.paymentMode(), command.premiumPaymentYears()));
     }
 
     /**
@@ -87,10 +88,12 @@ public class Insurance extends BaseAggregate {
      */
     @CommandHandler
     public Insurance(CreateInsuranceDirectlyCommand command) {
-        AggregateLifecycle.apply(new InsuranceCreatedEvent(command.insuranceId(), command.insuranceNo(), null, // 无关联意向单
+        AggregateLifecycle.apply(new InsuranceCreatedEvent(command.insuranceId(), command.insuranceNo(), null,
                 command.policyForm(), command.holderId(), command.insuredCount(), command.exactPremium(),
                 command.insurancePeriodStart(), command.insurancePeriodEnd(), command.productCodes(),
-                command.underwritingPriority(), command.insuranceType(), LocalDateTime.now(), command.tenantId()));
+                command.underwritingPriority(), command.insuredPartyList(), command.insuranceType(),
+                LocalDateTime.now(), command.tenantId(),
+                command.sumInsured(), command.paymentMode(), command.premiumPaymentYears()));
     }
 
     /**
@@ -132,7 +135,7 @@ public class Insurance extends BaseAggregate {
         UnderwritingResult result = command.underwritingResult();
         AggregateLifecycle.apply(new UnderwritingResultReceivedEvent(this.insuranceId, result.underwritingId(),
                 result.resultCode(), result.underwritingOpinion(), result.underwriterId(), result.underwritingTime(),
-                result.condition(), this.tenantId));
+                result.condition(), this.tenantId, result.extraPremiumRatio()));
     }
 
     /**
@@ -161,6 +164,8 @@ public class Insurance extends BaseAggregate {
         this.createTime = event.createTime();
         this.updateTime = event.createTime();
         this.insuranceProducts = new ArrayList<>();
+        // 参与方清单从事件初始化；事件无清单时置 null，兼容存量事件（SubmitUnderwriting 有 null 校验保护）
+        this.insuredPartyList = event.insuredPartyList();
         this.status = new InsuranceStatus(InsuranceStatus.StatusCode.DRAFT, event.createTime(),
                 event.proposalId() != null ? "从意向单创建投保单" : "直接创建投保单");
         this.basicInfo = new InsuranceBasicInfo(event.holderId(), event.insuredCount(),
@@ -179,7 +184,8 @@ public class Insurance extends BaseAggregate {
     public void on(UnderwritingResultReceivedEvent event) {
         ConclusionType resultCode = event.resultCode();
         this.underwritingResult = new UnderwritingResult(event.underwritingId(), resultCode, event.opinion(),
-                event.underwriterId(), event.underwritingTime(), event.underwritingCondition());
+                event.underwriterId(), event.underwritingTime(), event.underwritingCondition(),
+                event.extraPremiumRatio());
 
         InsuranceStatus.StatusCode newStatus = switch (resultCode) {
             case ACCEPT, MODIFY -> InsuranceStatus.StatusCode.UNDERWRITING_APPROVED;

@@ -1,11 +1,13 @@
 package com.titanium.policy.entity.insurance;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import com.titanium.metadata.enums.customer.CustomerEnum.CustomerGender;
 import com.titanium.metadata.enums.customer.CustomerEnum.IdCardType;
-import com.titanium.metadata.enums.customer.CustomerEnum.InsuranceRole;
+import com.titanium.metadata.enums.policy.BeneficiaryType;
 import com.titanium.policy.common.enums.FamilyRelation;
 
 /**
@@ -69,14 +71,20 @@ public record InsuredPartyList(
         if (beneficiaryList == null || beneficiaryList.isEmpty()) {
             return true;
         }
-        double sum = 0d;
+        // 按受益顺位分组，每个顺位内份额之和须为 100%（第一顺位领完才轮第二顺位，各顺位独立守恒）
+        Map<Integer, Double> ratioSumByOrder = new LinkedHashMap<>();
         for (BeneficiaryInfo beneficiary : beneficiaryList) {
             if (beneficiary.beneficiaryRatio() <= 0d) {
                 return false;
             }
-            sum += beneficiary.beneficiaryRatio();
+            ratioSumByOrder.merge(beneficiary.order(), beneficiary.beneficiaryRatio(), Double::sum);
         }
-        return Math.abs(sum - 1.0d) <= RATIO_EPSILON;
+        for (Double sum : ratioSumByOrder.values()) {
+            if (Math.abs(sum - 1.0d) > RATIO_EPSILON) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
@@ -115,14 +123,22 @@ public record InsuredPartyList(
 
     /**
      * 投保人信息
+     * <p>
+     * {@code customerId} 引用 customer 域客户主数据（单一事实来源）；姓名/证件为出单时点快照，
+     * 便于展示与留痕，权威值以 customerId 指向的主数据为准。
+     * </p>
      */
     public record HolderInfo(
                              /*
-                              * 投保人ID
+                              * 客户主数据ID（引用 customer 域）
+                              */
+                             String customerId,
+                             /*
+                              * 投保人ID（聚合内标识）
                               */
                              String holderId,
                              /*
-                              * 姓名
+                              * 姓名（出单快照）
                               */
                              String name,
                              /*
@@ -144,11 +160,15 @@ public record InsuredPartyList(
      */
     public record InsuredInfo(
                               /*
-                               * 被保险人ID
+                               * 客户主数据ID（引用 customer 域）
+                               */
+                              String customerId,
+                              /*
+                               * 被保险人ID（聚合内标识）
                                */
                               String insuredId,
                               /*
-                               * 姓名
+                               * 姓名（出单快照）
                                */
                               String name,
                               /*
@@ -178,11 +198,15 @@ public record InsuredPartyList(
      */
     public record BeneficiaryInfo(
                                   /*
-                                   * 受益人ID
+                                   * 客户主数据ID（引用 customer 域）
+                                   */
+                                  String customerId,
+                                  /*
+                                   * 受益人ID（聚合内标识）
                                    */
                                   String beneficiaryId,
                                   /*
-                                   * 姓名
+                                   * 姓名（出单快照）
                                    */
                                   String name,
                                   /*
@@ -194,11 +218,15 @@ public record InsuredPartyList(
                                    */
                                   String certNo,
                                   /*
-                                   * 受益类型
+                                   * 受益人类型（身故受益人/生存受益人）
                                    */
-                                  InsuranceRole beneficiaryType,
+                                  BeneficiaryType beneficiaryType,
                                   /*
-                                   * 受益比例
+                                   * 受益顺位（1=第一顺位，2=第二顺位…；同顺位内按份额分配）
+                                   */
+                                  int order,
+                                  /*
+                                   * 受益比例（同一顺位内份额，以 1.0 表示 100%）
                                    */
                                   double beneficiaryRatio) {
     }

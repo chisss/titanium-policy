@@ -30,6 +30,35 @@ class PolicyArchitectureTest extends AbstractArchitectureGuardTest {
     }
 
     /**
+     * 启用「api 层使用 Request/Response 而非 DTO」（2026-07-19 命名新规）。
+     * <p>
+     * 保单域 api 层已弃用 DTO：写入参 {@code CreatePolicyRequest}/{@code CreateProposalRequest}/
+     * {@code ConvertToInsuranceRequest}/{@code AccountValueWriteBackRequest} 落 {@code policy.api.request}，
+     * 读出参 {@code PolicyResponse}/{@code PolicyStatusResponse}/{@code InsuranceResponse}/{@code ProposalResponse}
+     * 落 {@code policy.api.response}，跨请求/响应共享结构体 {@code Amount}/{@code PolicyItem} 落 {@code policy.api.model}
+     * （中性名，无 DTO 后缀）。故停用旧 {@code dtoMustResideInApiLayer}、改启用本规则。
+     * </p>
+     */
+    @Test
+    @Override
+    protected void apiLayerUsesRequestResponseNotDto() {
+        super.apiLayerUsesRequestResponseNotDto();
+    }
+
+    /**
+     * 启用「web 层使用 DTO/VO 而非 Request/Response」（2026-07-19 命名新规）。
+     * <p>
+     * 保单域 web 层前端入参已改名 {@code CreatePolicyDTO}/{@code CreateProposalDTO} 等落 {@code policy.web.dto}，
+     * 出参 {@code PolicyDetailVO}/{@code InsuranceVO}/{@code ProposalVO} 用 VO，web 层无 Request/Response 后缀类型。
+     * </p>
+     */
+    @Test
+    @Override
+    protected void webLayerUsesDtoVoNotRequest() {
+        super.webLayerUsesDtoVoNotRequest();
+    }
+
+    /**
      * 启用「API 契约实现（Provider）须位于 web.provider 且以 Provider 结尾」。
      * <p>
      * 保单域三聚合根契约实现为 {@code PolicyApiProvider}/{@code InsuranceApiProvider}/{@code ProposalApiProvider}，

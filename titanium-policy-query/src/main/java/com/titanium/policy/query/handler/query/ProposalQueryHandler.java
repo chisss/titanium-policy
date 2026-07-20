@@ -1,11 +1,14 @@
 package com.titanium.policy.query.handler.query;
 
+import java.util.List;
+
 import org.axonframework.config.ProcessingGroup;
 import org.axonframework.queryhandling.QueryHandler;
 import org.springframework.stereotype.Component;
 
 import com.titanium.policy.query.query.FindProposalByIdQuery;
 import com.titanium.policy.query.query.FindProposalByNoQuery;
+import com.titanium.policy.query.query.FindProposalsByConditionQuery;
 import com.titanium.policy.query.result.ProposalQueryResult;
 import com.titanium.policy.query.service.ProposalQueryService;
 
@@ -44,5 +47,17 @@ public class ProposalQueryHandler {
     @QueryHandler
     public ProposalQueryResult handle(FindProposalByNoQuery query) {
         return proposalQueryService.findProposalByNo(query.proposalNo(), query.tenantId());
+    }
+
+    /**
+     * 多条件分页查询意向单列表
+     *
+     * @param query 查询条件
+     * @return 意向单查询结果列表
+     */
+    @QueryHandler
+    public List<ProposalQueryResult> handle(FindProposalsByConditionQuery query) {
+        return proposalQueryService.findProposalsByConditions(query.proposalNo(), query.expectedProductCode(),
+                query.status(), query.tenantId(), query.page(), query.size());
     }
 }

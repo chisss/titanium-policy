@@ -8,10 +8,12 @@ import org.axonframework.eventhandling.EventHandler;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.titanium.common.jpa.BasePersistable;
 import com.titanium.policy.event.proposal.ProposalConvertedEvent;
 import com.titanium.policy.event.proposal.ProposalCreatedEvent;
 import com.titanium.policy.event.proposal.ProposalSubmittedEvent;
 import com.titanium.policy.event.proposal.ProposalVoidedEvent;
+import com.titanium.policy.query.mapper.ProposalViewMapper;
 import com.titanium.policy.query.repository.ProposalViewRepository;
 import com.titanium.policy.query.view.ProposalView;
 import com.titanium.policy.valueobject.proposal.ProposalStatus;
@@ -41,6 +43,7 @@ import lombok.extern.slf4j.Slf4j;
 public class ProposalProjectionEventHandler {
 
     private final ProposalViewRepository proposalViewRepository;
+    private final ProposalViewMapper     proposalViewMapper;
 
     /**
      * 投影意向单创建事件：新建读模型记录，初始状态 DRAFT
@@ -53,23 +56,11 @@ public class ProposalProjectionEventHandler {
         ProposalView view = proposalViewRepository.findByProposalIdAndTenantId(event.proposalId(), event.tenantId())
                 .orElseGet(ProposalView::new);
 
-        LocalDateTime now = LocalDateTime.now();
-        view.setProposalId(event.proposalId());
-        view.setProposalNo(event.proposalNo());
-        view.setPolicyForm(event.policyForm());
-        view.setChannel(event.channel());
-        view.setCustomerId(event.customerId());
-        view.setIntendedSumInsured(event.intendedSumInsured());
-        view.setIntendedPremium(event.intendedPremium());
-        view.setInsurancePeriodStart(event.insurancePeriodStart());
-        view.setInsurancePeriodEnd(event.insurancePeriodEnd());
-        view.setExpectedProductCode(event.expectedProductCode());
+        // 事件字段 → 读模型的同名结构映射收敛到 MapStruct，消除逐字段 set（insuranceType 保持原行为不投影）
+        proposalViewMapper.applyCreated(view, event);
+        // 初始状态 DRAFT 属创建期语义，由处理器显式赋值，不下沉映射器
         view.setStatus(ProposalStatus.StatusCode.DRAFT);
-        view.setTenantId(event.tenantId());
-        if (view.getCreateTime() == null) {
-            view.setCreateTime(now);
-        }
-        view.setUpdateTime(now);
+        stampAuditTime(view);
 
         proposalViewRepository.save(view);
     }
@@ -114,5 +105,21 @@ public class ProposalProjectionEventHandler {
             proposalViewRepository.save(view);
         }, () -> log.warn("[读模型投影] {} 失败：未找到读模型记录 proposalId={}, tenantId={}（可能事件乱序，将由DLQ重试）", action,
                 proposalId, tenantId));
+    }
+
+    /**
+     * 统一填充读模型审计时间戳：createTime 仅首次创建时写入、updateTime 每次投影刷新。
+     * <p>
+     * 该逻辑含 {@code now()} 运行时副作用与"仅首次设置"语义，属投影处理器职责，不下沉 MapStruct 映射器。
+     * </p>
+     *
+     * @param view 读模型（继承 {@link BasePersistable}）
+     */
+    private void stampAuditTime(BasePersistable view) {
+        LocalDateTime now = LocalDateTime.now();
+        if (view.getCreateTime() == null) {
+            view.setCreateTime(now);
+        }
+        view.setUpdateTime(now);
     }
 }

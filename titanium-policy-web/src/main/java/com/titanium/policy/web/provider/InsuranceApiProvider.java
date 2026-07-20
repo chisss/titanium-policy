@@ -3,9 +3,9 @@ package com.titanium.policy.web.provider;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.titanium.policy.api.InsuranceApi;
-import com.titanium.policy.api.dto.ConvertToInsuranceDTO;
-import com.titanium.policy.api.dto.InsuranceDTO;
+import com.titanium.policy.api.request.ConvertToInsuranceRequest;
 import com.titanium.policy.api.response.ApiResponse;
+import com.titanium.policy.api.response.InsuranceResponse;
 import com.titanium.policy.application.command.InsuranceApplicationService;
 import com.titanium.policy.application.query.InsuranceAppQueryService;
 import com.titanium.policy.command.ConvertProposalToInsuranceCommand;
@@ -33,7 +33,7 @@ public class InsuranceApiProvider implements InsuranceApi {
     private final InsuranceWebMapper          insuranceWebMapper;
 
     @Override
-    public ApiResponse<String> convertFromProposal(ConvertToInsuranceDTO dto, String tenantId) {
+    public ApiResponse<String> convertFromProposal(ConvertToInsuranceRequest dto, String tenantId) {
         // 协议转换：远程 DTO → 领域命令，收敛到同一应用层门面
         ConvertProposalToInsuranceCommand command = insuranceWebMapper.toCommand(dto, tenantId);
         String insuranceId = insuranceApplicationService.convertFromProposal(command);
@@ -41,10 +41,10 @@ public class InsuranceApiProvider implements InsuranceApi {
     }
 
     @Override
-    public ApiResponse<InsuranceDTO> getInsurance(String insuranceId, String tenantId) {
+    public ApiResponse<InsuranceResponse> getInsurance(String insuranceId, String tenantId) {
         // 走读模型（QueryGateway → InsuranceView），命中组装为对外 DTO，未命中返回 404 码
         return insuranceAppQueryService.findById(insuranceId, tenantId)
-                .map(insuranceWebMapper::toDTO)
+                .map(insuranceWebMapper::toResponse)
                 .map(ApiResponse::success)
                 .orElseGet(() -> ApiResponse.error(404, "投保单不存在: " + insuranceId));
     }

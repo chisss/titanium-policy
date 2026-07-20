@@ -7,7 +7,9 @@ import org.axonframework.eventhandling.EventHandler;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.titanium.common.jpa.BasePersistable;
 import com.titanium.policy.event.PolicyEndorsedEvent;
+import com.titanium.policy.query.mapper.PolicyViewMapper;
 import com.titanium.policy.query.repository.PolicyEndorsementViewRepository;
 import com.titanium.policy.query.repository.PolicyViewRepository;
 import com.titanium.policy.query.view.PolicyEndorsementView;
@@ -31,6 +33,7 @@ public class EndorsementProjectionEventHandler {
 
     private final PolicyEndorsementViewRepository endorsementViewRepository;
     private final PolicyViewRepository            policyViewRepository;
+    private final PolicyViewMapper                policyViewMapper;
 
     /**
      * 投影批改事件：写批单流水 + 刷新保单读模型版本
@@ -43,30 +46,35 @@ public class EndorsementProjectionEventHandler {
 
         PolicyEndorsementView view = endorsementViewRepository.findById(event.endorsementNo())
                 .orElseGet(PolicyEndorsementView::new);
-        view.setEndorsementNo(event.endorsementNo());
-        view.setPolicyId(event.policyId());
-        view.setUpdateType(event.updateType().getCode());
-        view.setCategory(event.category().getCode());
-        view.setPolicyVersion(event.versionAfter());
-        view.setEffectiveDate(event.endorsementEffectiveDate());
-        view.setChangeSummary(event.changeSummary());
-        view.setRequiresPremiumRecalc(event.requiresPremiumRecalc());
-        view.setSourceMaintenanceId(event.sourceMaintenanceId());
-        view.setOperatorId(event.operatorId());
-        view.setTenantId(event.tenantId());
+
+        // 事件字段 → 批单读模型的结构映射收敛到 MapStruct（类型/大类枚举取 code、版本号与生效日改名），消除逐字段 set
+        policyViewMapper.applyEndorsed(view, event);
+        // 批改落地时间含 now() 兜底，属处理器职责，不下沉映射器
         view.setEndorsedAt(event.endorsedAt() != null ? event.endorsedAt() : LocalDateTime.now());
-        LocalDateTime now = LocalDateTime.now();
-        if (view.getCreateTime() == null) {
-            view.setCreateTime(now);
-        }
-        view.setUpdateTime(now);
+        stampAuditTime(view);
         endorsementViewRepository.save(view);
 
-        // 同步保单读模型当前版本号 + 更新时间
+        // 同步保单读模型当前版本号 + 更新时间（增量更新既有 View，非新建型，保留逐字段 set）
         policyViewRepository.findByPolicyIdAndTenantId(event.policyId(), event.tenantId()).ifPresent(policy -> {
             policy.setCurrentVersion(event.versionAfter());
             policy.setUpdateTime(LocalDateTime.now());
             policyViewRepository.save(policy);
         });
+    }
+
+    /**
+     * 统一填充读模型审计时间戳：createTime 仅首次创建时写入、updateTime 每次投影刷新。
+     * <p>
+     * 该逻辑含 {@code now()} 运行时副作用与"仅首次设置"语义，属投影处理器职责，不下沉 MapStruct 映射器。
+     * </p>
+     *
+     * @param view 读模型（继承 {@link BasePersistable}）
+     */
+    private void stampAuditTime(BasePersistable view) {
+        LocalDateTime now = LocalDateTime.now();
+        if (view.getCreateTime() == null) {
+            view.setCreateTime(now);
+        }
+        view.setUpdateTime(now);
     }
 }

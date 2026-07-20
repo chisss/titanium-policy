@@ -161,7 +161,7 @@ public class Policy extends BaseAggregate {
                         command.endDate(), command.premium(), command.sumInsured(),
                         new PolicyStatus(PolicyStatus.StatusCode.NOT_EFFECTIVE,
                                 LocalDateTime.now(), "创建保单", PolicyConstants.POLICY_SYSTEM),
-                        new ArrayList<>(), command.insuranceType(), command.tenantId()));
+                        new ArrayList<>(), command.insuredPartyList(), command.insuranceType(), command.tenantId()));
     }
 
     /**
@@ -174,7 +174,7 @@ public class Policy extends BaseAggregate {
                 command.insurancePeriodEnd(), command.totalPremium(), command.sumInsured(),
                 new PolicyStatus(PolicyStatus.StatusCode.NOT_EFFECTIVE, LocalDateTime.now(), "一步出单创建保单",
                         PolicyConstants.POLICY_SYSTEM),
-                new ArrayList<>(), command.insuranceType(), command.tenantId()));
+                new ArrayList<>(), null, command.insuranceType(), command.tenantId()));
     }
 
     /**
@@ -339,8 +339,10 @@ public class Policy extends BaseAggregate {
         this.policyRelation = new PolicyRelation(PolicyEnum.PolicyLevel.INDEPENDENT, null, 0, null);
         this.basicInfo = new PolicyBasicInfo(null, 0, event.premium(), event.effectiveDate(), event.expiryDate(), 0,
                 null);
-        // 初始化空被保险人清单，支撑团单/家庭险出单后的成员动态增减（4.5/4.6）
-        this.insuredPartyList = new InsuredPartyList(this.policyId, null, new ArrayList<>(), new ArrayList<>());
+        // 优先使用事件携带的参与方清单（含真实投保人/被保险人/受益人快照）；事件无清单时初始化空清单以兼容存量事件
+        this.insuredPartyList = event.insuredPartyList() != null
+                ? event.insuredPartyList()
+                : new InsuredPartyList(this.policyId, null, new ArrayList<>(), new ArrayList<>());
     }
 
     @EventSourcingHandler
@@ -547,8 +549,8 @@ public class Policy extends BaseAggregate {
         InsuredPartyList.InsuredInfo member = event.member();
         // 家庭险场景以事件携带的家庭关系覆盖成员关系，保证清单内关系一致
         if (event.familyRelation() != null) {
-            member = new InsuredPartyList.InsuredInfo(member.insuredId(), member.name(), member.certType(),
-                    member.certNo(), member.age(), member.gender(), event.familyRelation());
+            member = new InsuredPartyList.InsuredInfo(member.customerId(), member.insuredId(), member.name(),
+                    member.certType(), member.certNo(), member.age(), member.gender(), event.familyRelation());
         }
         if (this.insuredPartyList != null) {
             this.insuredPartyList = this.insuredPartyList.addInsured(member);

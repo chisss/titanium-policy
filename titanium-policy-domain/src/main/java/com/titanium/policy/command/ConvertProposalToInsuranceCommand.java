@@ -1,5 +1,6 @@
 package com.titanium.policy.command;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -8,6 +9,7 @@ import org.axonframework.modelling.command.TargetAggregateIdentifier;
 import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.valueobject.Money;
+import com.titanium.policy.entity.insurance.InsuredPartyList;
 
 import lombok.Builder;
 
@@ -29,8 +31,12 @@ import lombok.Builder;
  * @param productCodes 投保险种编码列表
  * @param underwritingPriority 核保优先级
  * @param changeReason 变更原因
+ * @param insuredPartyList 投保参与方清单（含投保人/被保险人/受益人快照，可空）
  * @param insuranceType 险种三级分类（可空，向后兼容存量事件）
  * @param tenantId 租户ID
+ * @param sumInsured 基本保额，供 billing 计算真实保费（null 时回退 exactPremium）
+ * @param paymentMode 缴费模式 code（LUMP_SUM/ANNUAL/MONTHLY），null 时由 billing 产品配置决定
+ * @param premiumPaymentYears 缴费年数（0 表示未知）
  */
 @Builder
 public record ConvertProposalToInsuranceCommand(@TargetAggregateIdentifier String insuranceId, String insuranceNo,
@@ -38,6 +44,10 @@ public record ConvertProposalToInsuranceCommand(@TargetAggregateIdentifier Strin
                                                 int insuredCount, Money exactPremium,
                                                 LocalDateTime insurancePeriodStart, LocalDateTime insurancePeriodEnd,
                                                 List<String> productCodes, int underwritingPriority,
-                                                String changeReason, InsuranceProductType insuranceType,
-                                                String tenantId) {
+                                                String changeReason, InsuredPartyList insuredPartyList,
+                                                InsuranceProductType insuranceType,
+                                                String tenantId,
+                                                BigDecimal sumInsured,
+                                                String paymentMode,
+                                                int premiumPaymentYears) {
 }

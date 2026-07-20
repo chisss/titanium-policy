@@ -9,9 +9,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 
-import com.titanium.policy.api.dto.ConvertToInsuranceDTO;
-import com.titanium.policy.api.dto.InsuranceDTO;
+import com.titanium.policy.api.request.ConvertToInsuranceRequest;
 import com.titanium.policy.api.response.ApiResponse;
+import com.titanium.policy.api.response.InsuranceResponse;
 
 /**
  * 投保单聚合对外契约（Feign）
@@ -37,7 +37,7 @@ public interface InsuranceApi {
      * @return 投保单ID
      */
     @PostMapping("/from-proposal")
-    ApiResponse<String> convertFromProposal(@RequestBody ConvertToInsuranceDTO dto,
+    ApiResponse<String> convertFromProposal(@RequestBody ConvertToInsuranceRequest dto,
                                             @RequestHeader("X-Tenant-Id") String tenantId);
 
     /**
@@ -48,7 +48,7 @@ public interface InsuranceApi {
      * @return 投保单详情，不存在时 code=404
      */
     @GetMapping("/{insuranceId}")
-    ApiResponse<InsuranceDTO> getInsurance(@PathVariable("insuranceId") String insuranceId,
+    ApiResponse<InsuranceResponse> getInsurance(@PathVariable("insuranceId") String insuranceId,
                                            @RequestHeader("X-Tenant-Id") String tenantId);
 
     /**

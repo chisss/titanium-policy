@@ -55,7 +55,7 @@ class PolicyLifeBenefitTest {
         return new PolicyCreatedEvent(POLICY_ID, new PolicyNo("POL-2024-0001"), PolicyForm.INDIVIDUAL, null, now,
                 now.plusYears(10), null, null,
                 new PolicyStatus(PolicyStatus.StatusCode.NOT_EFFECTIVE, now, "创建", "system"), new ArrayList<>(),
-                type, TENANT_ID);
+                null, type, TENANT_ID);
     }
 
     private PolicyActivatedEvent activatedEvent() {
@@ -119,7 +119,7 @@ class PolicyLifeBenefitTest {
         return new PolicyCreatedEvent(POLICY_ID, new PolicyNo("POL-2024-0003"), PolicyForm.INDIVIDUAL, null, now,
                 now.plusYears(10), null, com.titanium.metadata.valueobject.Money.of(sumInsured, "CNY"),
                 new PolicyStatus(PolicyStatus.StatusCode.NOT_EFFECTIVE, now, "创建", "system"), new ArrayList<>(),
-                type, TENANT_ID);
+                null, type, TENANT_ID);
     }
 
     @Test
@@ -247,6 +247,6 @@ class PolicyLifeBenefitTest {
         return new PolicyCreatedEvent(POLICY_ID, new PolicyNo("POL-2024-0002"), PolicyForm.UNIVERSAL, null, now,
                 now.plusYears(10), null, null,
                 new PolicyStatus(PolicyStatus.StatusCode.NOT_EFFECTIVE, now, "创建", "system"), new ArrayList<>(),
-                InsuranceProductType.WHOLE_LIFE, TENANT_ID);
+                null, InsuranceProductType.WHOLE_LIFE, TENANT_ID);
     }
 }

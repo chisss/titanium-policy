@@ -7,9 +7,11 @@ import org.axonframework.eventhandling.EventHandler;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.titanium.common.jpa.BasePersistable;
 import com.titanium.policy.common.enums.AnnuityPayoutStatus;
 import com.titanium.policy.event.AnnuityBenefitPaidEvent;
 import com.titanium.policy.event.AnnuityPayoutStartedEvent;
+import com.titanium.policy.query.mapper.PolicyViewMapper;
 import com.titanium.policy.query.repository.AnnuityPayoutPlanViewRepository;
 import com.titanium.policy.query.view.AnnuityPayoutPlanView;
 
@@ -31,6 +33,7 @@ import lombok.extern.slf4j.Slf4j;
 public class AnnuityPayoutPlanProjectionEventHandler {
 
     private final AnnuityPayoutPlanViewRepository annuityRepository;
+    private final PolicyViewMapper                policyViewMapper;
 
     /**
      * 投影年金给付期启动事件：建立初始给付计划（已给付 0 期、状态给付中）
@@ -41,24 +44,14 @@ public class AnnuityPayoutPlanProjectionEventHandler {
         log.info("[年金给付投影] 启动给付期: policyId={}, frequency={}", event.policyId(), event.frequency());
         AnnuityPayoutPlanView view = annuityRepository.findById(event.policyId())
                 .orElseGet(AnnuityPayoutPlanView::new);
-        view.setId(event.policyId());
-        view.setPolicyId(event.policyId());
-        view.setStartDate(event.startDate());
-        view.setFrequency(event.frequency() != null ? event.frequency().getCode() : null);
-        if (event.amountPerInstallment() != null) {
-            view.setAmount(event.amountPerInstallment().value());
-            view.setCurrency(event.amountPerInstallment().currency());
-        }
-        view.setTotalInstallments(event.totalInstallments());
+
+        // 事件字段 → 读模型的结构映射收敛到 MapStruct（主键取 policyId、频率取 code、金额值对象拆解），消除逐字段 set
+        policyViewMapper.applyPayoutStarted(view, event);
+        // 初始已给付 0 期 + 给付中状态属创建期语义，由处理器显式赋值，不下沉映射器
         view.setPaidInstallments(0);
-        view.setNextPayoutDate(event.nextPayoutDate());
         view.setPayoutStatus(AnnuityPayoutStatus.PAYING.getCode());
-        view.setTenantId(event.tenantId());
-        LocalDateTime now = LocalDateTime.now();
-        if (view.getCreateTime() == null) {
-            view.setCreateTime(now);
-        }
-        view.setUpdateTime(now);
+        stampAuditTime(view);
+
         annuityRepository.save(view);
     }
 
@@ -84,5 +77,21 @@ public class AnnuityPayoutPlanProjectionEventHandler {
         }
         view.setUpdateTime(LocalDateTime.now());
         annuityRepository.save(view);
+    }
+
+    /**
+     * 统一填充读模型审计时间戳：createTime 仅首次创建时写入、updateTime 每次投影刷新。
+     * <p>
+     * 该逻辑含 {@code now()} 运行时副作用与"仅首次设置"语义，属投影处理器职责，不下沉 MapStruct 映射器。
+     * </p>
+     *
+     * @param view 读模型（继承 {@link BasePersistable}）
+     */
+    private void stampAuditTime(BasePersistable view) {
+        LocalDateTime now = LocalDateTime.now();
+        if (view.getCreateTime() == null) {
+            view.setCreateTime(now);
+        }
+        view.setUpdateTime(now);
     }
 }

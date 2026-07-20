@@ -1,6 +1,6 @@
 --liquibase formatted sql
 --changeset weisun:axon-1
-CREATE TABLE IF NOT EXISTS domain_event_entry (
+CREATE TABLE IF NOT EXISTS axon_domain_event_entry (
     global_index         BIGINT       NOT NULL AUTO_INCREMENT,
     event_identifier     VARCHAR(255) NOT NULL,
     meta_data            BLOB,
@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS domain_event_entry (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 --changeset weisun:axon-2
-CREATE TABLE IF NOT EXISTS snapshot_event_entry (
+CREATE TABLE IF NOT EXISTS axon_snapshot_event_entry (
     aggregate_identifier VARCHAR(255) NOT NULL,
     sequence_number      BIGINT       NOT NULL,
     type                 VARCHAR(255) NOT NULL,
@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS snapshot_event_entry (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 --changeset weisun:axon-3
-CREATE TABLE IF NOT EXISTS token_entry (
+CREATE TABLE IF NOT EXISTS axon_token_entry (
     processor_name VARCHAR(255) NOT NULL,
     segment        INT          NOT NULL,
     token          BLOB,
@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS token_entry (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 --changeset weisun:axon-4
-CREATE TABLE IF NOT EXISTS saga_entry (
+CREATE TABLE IF NOT EXISTS axon_saga_entry (
     saga_id         VARCHAR(255) NOT NULL,
     revision        VARCHAR(255),
     saga_type       VARCHAR(255),
@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS saga_entry (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 --changeset weisun:axon-5
-CREATE TABLE IF NOT EXISTS association_value_entry (
+CREATE TABLE IF NOT EXISTS axon_association_value_entry (
     id                BIGINT       NOT NULL AUTO_INCREMENT,
     association_key   VARCHAR(255) NOT NULL,
     association_value VARCHAR(255),
@@ -64,7 +64,7 @@ CREATE TABLE IF NOT EXISTS association_value_entry (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 --changeset weisun:axon-6
-CREATE TABLE IF NOT EXISTS dead_letter_entry (
+CREATE TABLE IF NOT EXISTS axon_dead_letter_entry (
     dead_letter_id       VARCHAR(255) NOT NULL,
     cause_message        VARCHAR(1023),
     cause_type           VARCHAR(255),
@@ -90,4 +90,4 @@ CREATE TABLE IF NOT EXISTS dead_letter_entry (
     PRIMARY KEY (dead_letter_id),
     UNIQUE KEY uk_dle_seq (processing_group, sequence_identifier, sequence_index)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
---rollback DROP TABLE IF EXISTS domain_event_entry, snapshot_event_entry, token_entry, saga_entry, association_value_entry, dead_letter_entry;
+--rollback DROP TABLE IF EXISTS axon_domain_event_entry, axon_snapshot_event_entry, axon_token_entry, axon_saga_entry, axon_association_value_entry, axon_dead_letter_entry;

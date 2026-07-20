@@ -1,5 +1,11 @@
 package com.titanium.policy.query.service.impl;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -7,7 +13,9 @@ import com.titanium.policy.query.repository.InsuranceViewRepository;
 import com.titanium.policy.query.result.InsuranceQueryResult;
 import com.titanium.policy.query.service.InsuranceQueryService;
 import com.titanium.policy.query.view.InsuranceView;
+import com.titanium.policy.valueobject.insurance.InsuranceStatus;
 
+import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -41,6 +49,45 @@ public class InsuranceQueryServiceImpl implements InsuranceQueryService {
                 .orElse(null);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<InsuranceQueryResult> findInsurancesByConditions(String insuranceNo, String holderId,
+                                                                 String status, String tenantId, int page, int size) {
+        Specification<InsuranceView> spec = buildSpec(insuranceNo, holderId, status, tenantId);
+        Pageable pageable = PageRequest.of(Math.max(page, 0), size <= 0 ? 20 : size);
+        return insuranceViewRepository.findAll(spec, pageable)
+                .stream()
+                .map(this::toQueryResult)
+                .toList();
+    }
+
+    /**
+     * 构建多条件动态查询规约（仅对非空条件追加谓词）
+     */
+    private Specification<InsuranceView> buildSpec(String insuranceNo, String holderId, String status,
+                                                    String tenantId) {
+        return (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            // 多租户隔离：强制条件
+            predicates.add(cb.equal(root.get("tenantId"), tenantId));
+            if (isNotBlank(insuranceNo)) {
+                predicates.add(cb.like(root.get("insuranceNo"), "%" + insuranceNo + "%"));
+            }
+            if (isNotBlank(holderId)) {
+                predicates.add(cb.equal(root.get("holderId"), holderId));
+            }
+            if (isNotBlank(status)) {
+                try {
+                    InsuranceStatus.StatusCode statusEnum = InsuranceStatus.StatusCode.valueOf(status);
+                    predicates.add(cb.equal(root.get("status"), statusEnum));
+                } catch (IllegalArgumentException e) {
+                    log.warn("无效的投保单状态值: {}", status);
+                }
+            }
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+    }
+
     /**
      * 读模型实体 → 查询结果
      */
@@ -64,5 +111,9 @@ public class InsuranceQueryServiceImpl implements InsuranceQueryService {
         result.setUpdateTime(view.getUpdateTime());
         result.setTenantId(view.getTenantId());
         return result;
+    }
+
+    private boolean isNotBlank(String value) {
+        return value != null && !value.isBlank();
     }
 }

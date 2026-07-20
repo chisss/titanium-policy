@@ -15,6 +15,9 @@ spring:
   # JPA配置
   jpa:
     hibernate:
+      # Axon 系统表加 axon_ 前缀，业务表不受影响
+      naming:
+        physical-strategy: com.titanium.common.jpa.AxonTablePrefixPhysicalNamingStrategy
       ddl-auto: none
     show-sql: true
     properties:

@@ -1,5 +1,6 @@
 package com.titanium.policy.infrastructure.adapter;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 import org.springframework.http.ResponseEntity;
@@ -11,23 +12,29 @@ import com.titanium.policy.port.UnderwritingDecisionGateway;
 import com.titanium.policy.valueobject.insurance.UnderwritingDecisionRequest;
 import com.titanium.policy.valueobject.insurance.UnderwritingResult;
 import com.titanium.underwriting.api.UnderwritingApi;
-import com.titanium.underwriting.api.dto.UnderwritingDTO;
 import com.titanium.underwriting.api.request.CreateUnderwritingRequest;
-import com.titanium.underwriting.api.request.UnderwriteRequest;
+import com.titanium.underwriting.api.request.DecideUnderwritingApiRequest;
+import com.titanium.underwriting.api.request.SubmitUnderwritingInputApiRequest;
+import com.titanium.underwriting.api.response.UnderwritingResponse;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * 核保决策网关同步适配器
+ * 核保决策网关同步适配器（富核保路径）
  * <p>
  * {@link UnderwritingDecisionGateway} 的当前阶段实现：注册中心/消息总线就绪前，直接经
- * {@link UnderwritingApi}（Feign）同步调用核保域，完成"创建核保 → 执行核保 → 回传结论"。
- * 将核保域 {@link UnderwritingDTO} 翻译为保单域 {@link UnderwritingResult}，构成防腐层（ACL）。
+ * {@link UnderwritingApi}（Feign）同步调用核保域，完成富核保「创建核保 → 提交结构化输入 → 触发决策 → 回传结论」。
+ * 将核保域 {@link UnderwritingResponse} 翻译为保单域 {@link UnderwritingResult}，构成防腐层（ACL）。
  * </p>
  * <p>
- * <b>演进说明</b>：后续可新增异步实现（发 {@code SubmitUnderwriting} 命令 + 监听核保域 Kafka 回流事件），
- * 通过切换 Spring Bean 即可替换，投保出单 Saga 编排逻辑无需改动。
+ * <b>UW-2 富核保切换</b>：替代原「createUnderwriting + underwrite（金额>10万兜底）」路径，改走
+ * submitInput（组装被保人年龄/性别/职业/BMI 等风险要素）+ decide（触发核保域富评分决策）。
+ * 被保人要素不足时留空，由核保域按保守标准体兜底评分。
+ * </p>
+ * <p>
+ * <b>UW-3 加费回传</b>：从决策后 DTO 读取结构化加费率 {@code extraPremiumRatio} 填入
+ * {@link UnderwritingResult}，供出单 Saga 并入保费。
  * </p>
  */
 @Slf4j
@@ -35,35 +42,42 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class SyncUnderwritingDecisionAdapter implements UnderwritingDecisionGateway {
 
+    /** 自动核保方式（出单主链路默认走自动核保决策） */
+    private static final String AUDIT_TYPE_AUTOMATIC = "AUTOMATIC";
+
     private final UnderwritingApi underwritingApi;
 
     @Override
     public UnderwritingResult requestDecision(UnderwritingDecisionRequest request) {
-        log.info("[核保网关] 同步请求核保, insuranceId={}, holderId={}, tenantId={}", request.insuranceId(),
+        log.info("[核保网关] 同步请求富核保, insuranceId={}, holderId={}, tenantId={}", request.insuranceId(),
                 request.holderId(), request.tenantId());
 
-        // 1. 创建核保单
-        ResponseEntity<UnderwritingDTO> createdResponse = underwritingApi.createUnderwriting(buildCreateRequest(request),
+        // 1. 创建核保单（透传险种编码供核保域按产品配置决策——UW-4）
+        ResponseEntity<UnderwritingResponse> createdResponse = underwritingApi.createUnderwriting(buildCreateRequest(request),
                 request.tenantId());
-        UnderwritingDTO created = createdResponse.getBody();
+        UnderwritingResponse created = createdResponse.getBody();
         String underwritingId = created.getUnderwritingId();
 
-        // 2. 执行核保，获取核保结论
-        ResponseEntity<UnderwritingDTO> decidedResponse = underwritingApi.underwrite(underwritingId,
-                buildUnderwriteRequest(request), request.tenantId());
-        UnderwritingDTO decided = decidedResponse.getBody();
+        // 2. 提交结构化核保输入（被保人风险要素 → 富核保评分依据），替代旧金额兜底
+        underwritingApi.submitInput(underwritingId, buildInputRequest(request), request.tenantId());
 
-        // 3. 核保域结果翻译为保单域核保结果（防腐层）
+        // 3. 触发核保决策（核保域基于已提交输入产出富结论/风险等级/加费）
+        ResponseEntity<UnderwritingResponse> decidedResponse = underwritingApi.decide(underwritingId,
+                buildDecideRequest(request), request.tenantId());
+        UnderwritingResponse decided = decidedResponse.getBody();
+
+        // 4. 核保域结果翻译为保单域核保结果（防腐层），携带结构化加费率
         ConclusionType resultCode = mapToResultCode(decided.getStatus());
-        log.info("[核保网关] 核保完成, insuranceId={}, underwritingId={}, 结论={}", request.insuranceId(),
-                underwritingId, resultCode);
+        BigDecimal extraPremiumRatio = decided.getExtraPremiumRatio();
+        log.info("[核保网关] 富核保完成, insuranceId={}, underwritingId={}, 结论={}, 加费率={}", request.insuranceId(),
+                underwritingId, resultCode, extraPremiumRatio);
 
         return new UnderwritingResult(underwritingId, resultCode, decided.getReviewComments(),
-                decided.getUnderwriterId(), LocalDateTime.now(), decided.getSurchargeReason());
+                decided.getUnderwriterId(), LocalDateTime.now(), decided.getSurchargeReason(), extraPremiumRatio);
     }
 
     /**
-     * 构建创建核保请求
+     * 构建创建核保请求（透传险种编码，供核保域 UW-4 按产品查配置）
      */
     private CreateUnderwritingRequest buildCreateRequest(UnderwritingDecisionRequest request) {
         CreateUnderwritingRequest createRequest = new CreateUnderwritingRequest();
@@ -71,28 +85,71 @@ public class SyncUnderwritingDecisionAdapter implements UnderwritingDecisionGate
         createRequest.setCustomerId(request.holderId());
         createRequest.setAmount(request.premium());
         createRequest.setCurrency(request.currency());
-        createRequest.setUnderwritingType(resolveUnderwritingType(request));
+        createRequest.setUnderwritingType(UnderwritingEnum.UnderwritingType.NEW_BUSINESS);
         createRequest.setRequestDate(LocalDateTime.now());
         createRequest.setRequestBy(request.holderId());
+        // 险种编码取投保险种列表首个（承保主险载体）
+        createRequest.setProductCode(resolveProductCode(request));
         return createRequest;
     }
 
     /**
-     * 构建执行核保请求
+     * 构建结构化核保输入请求（UW-2 富核保核心）
+     * <p>
+     * 从核保决策请求携带的被保人要素组装职业/体检输入。健康告知等更细粒度信息在 saga 尚不完整时留空，
+     * 由核保域评分兜底；至少填充职业类别/BMI 以走富评分路径，不再走金额兜底。
+     * </p>
      */
-    private UnderwriteRequest buildUnderwriteRequest(UnderwritingDecisionRequest request) {
-        UnderwriteRequest underwriteRequest = new UnderwriteRequest();
-        underwriteRequest.setAmount(request.premium());
-        underwriteRequest.setUnderwriteDate(LocalDateTime.now());
-        underwriteRequest.setReason("投保出单 Saga 自动提交核保");
-        return underwriteRequest;
+    private SubmitUnderwritingInputApiRequest buildInputRequest(UnderwritingDecisionRequest request) {
+        SubmitUnderwritingInputApiRequest inputRequest = new SubmitUnderwritingInputApiRequest();
+        inputRequest.setSubmittedBy(request.holderId());
+
+        // 职业信息：有职业类别时填充（意外险/定期寿险风险要素）
+        if (request.primaryInsuredOccupationCategory() != null) {
+            SubmitUnderwritingInputApiRequest.OccupationInput occupation =
+                    new SubmitUnderwritingInputApiRequest.OccupationInput();
+            occupation.setOccupationCategory(request.primaryInsuredOccupationCategory());
+            inputRequest.setOccupationInfo(occupation);
+        }
+
+        // 体检结果：有 BMI 时填充（寿险/重疾健康风险要素）
+        if (request.primaryInsuredBmi() != null) {
+            SubmitUnderwritingInputApiRequest.PhysicalExamInput exam =
+                    new SubmitUnderwritingInputApiRequest.PhysicalExamInput();
+            exam.setBmi(request.primaryInsuredBmi());
+            inputRequest.setPhysicalExamResult(exam);
+        }
+
+        // 财务评估：以保费/保额触发高保额财务核保（保额取应缴保费的粗略放大，具体由核保域评估）
+        if (request.premium() != null) {
+            SubmitUnderwritingInputApiRequest.FinancialAssessInput financial =
+                    new SubmitUnderwritingInputApiRequest.FinancialAssessInput();
+            financial.setRequestedSumInsured(request.premium());
+            inputRequest.setFinancialAssessment(financial);
+        }
+
+        return inputRequest;
     }
 
     /**
-     * 解析核保类型（投保出单 Saga 触发的核保为新单核保）
+     * 构建核保决策请求（出单主链路走自动核保）
      */
-    private UnderwritingEnum.UnderwritingType resolveUnderwritingType(UnderwritingDecisionRequest request) {
-        return UnderwritingEnum.UnderwritingType.NEW_BUSINESS;
+    private DecideUnderwritingApiRequest buildDecideRequest(UnderwritingDecisionRequest request) {
+        DecideUnderwritingApiRequest decideRequest = new DecideUnderwritingApiRequest();
+        decideRequest.setAuditType(AUDIT_TYPE_AUTOMATIC);
+        decideRequest.setDecidedBy(request.holderId());
+        // UW-4：透传险种编码，供核保域 application 层查询产品核保配置（加费许可等）
+        decideRequest.setProductCode(resolveProductCode(request));
+        return decideRequest;
+    }
+
+    /**
+     * 解析险种编码（取投保险种编码列表首个作为承保主险载体）
+     */
+    private String resolveProductCode(UnderwritingDecisionRequest request) {
+        return request.productCodes() != null && !request.productCodes().isEmpty()
+                ? request.productCodes().get(0)
+                : null;
     }
 
     /**

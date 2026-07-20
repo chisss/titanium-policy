@@ -9,9 +9,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 
-import com.titanium.policy.api.dto.CreateProposalDTO;
-import com.titanium.policy.api.dto.ProposalDTO;
+import com.titanium.policy.api.request.CreateProposalRequest;
 import com.titanium.policy.api.response.ApiResponse;
+import com.titanium.policy.api.response.ProposalResponse;
 
 /**
  * 投保意向单聚合对外契约（Feign）
@@ -37,7 +37,7 @@ public interface ProposalApi {
      * @return 意向单ID
      */
     @PostMapping
-    ApiResponse<String> createProposal(@RequestBody CreateProposalDTO dto,
+    ApiResponse<String> createProposal(@RequestBody CreateProposalRequest dto,
                                        @RequestHeader("X-Tenant-Id") String tenantId);
 
     /**
@@ -48,7 +48,7 @@ public interface ProposalApi {
      * @return 意向单详情，不存在时 code=404
      */
     @GetMapping("/{proposalId}")
-    ApiResponse<ProposalDTO> getProposal(@PathVariable("proposalId") String proposalId,
+    ApiResponse<ProposalResponse> getProposal(@PathVariable("proposalId") String proposalId,
                                          @RequestHeader("X-Tenant-Id") String tenantId);
 
     /**

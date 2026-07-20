@@ -225,3 +225,9 @@ ALTER TABLE t_policy_view ADD COLUMN dividend_option      VARCHAR(32)   COMMENT 
 ALTER TABLE t_policy_view ADD COLUMN investment_account_id    VARCHAR(64)   COMMENT '关联投资账户ID(投连/万能保单挂接)' AFTER dividend_option;
 ALTER TABLE t_policy_view ADD COLUMN investment_account_value DECIMAL(18,2) COMMENT '投资账户最新价值(investment域回写,展示型最终一致)' AFTER investment_account_id;
 --rollback ALTER TABLE t_policy_view DROP COLUMN investment_account_id; ALTER TABLE t_policy_view DROP COLUMN investment_account_value;
+
+-- EN-3/4: 为被保险人/受益人投影子表补 version 列（对齐 BaseView 乐观锁契约）
+--changeset weisun:policy-14
+ALTER TABLE t_policy_insured    ADD COLUMN version BIGINT COMMENT '乐观锁版本号' AFTER is_deleted;
+ALTER TABLE t_policy_beneficiary ADD COLUMN version BIGINT COMMENT '乐观锁版本号' AFTER is_deleted;
+--rollback ALTER TABLE t_policy_insured DROP COLUMN version; ALTER TABLE t_policy_beneficiary DROP COLUMN version;

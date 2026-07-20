@@ -45,7 +45,7 @@ class PolicyEndorsementTest {
         return new PolicyCreatedEvent(POLICY_ID, new PolicyNo("POL-2024-0001"), PolicyForm.INDIVIDUAL, null,
                 now.minusDays(1), now.plusYears(1), null, null,
                 new PolicyStatus(PolicyStatus.StatusCode.NOT_EFFECTIVE, now, "创建", "system"),
-                Collections.emptyList(), null, TENANT_ID);
+                Collections.emptyList(), null, null, TENANT_ID);
     }
 
     /** 匹配指定批改类型的 PolicyEndorsedEvent（忽略时间戳） */

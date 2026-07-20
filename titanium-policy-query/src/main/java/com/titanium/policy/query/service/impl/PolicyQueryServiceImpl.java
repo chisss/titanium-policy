@@ -1,8 +1,11 @@
 package com.titanium.policy.query.service.impl;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -10,9 +13,12 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.titanium.metadata.enums.insurance.InsuranceCategory;
+import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.policy.PolicyEnum;
 import com.titanium.policy.query.repository.PolicyViewRepository;
 import com.titanium.policy.query.result.PolicyQueryResult;
+import com.titanium.policy.query.result.PolicyStatisticsResult;
 import com.titanium.policy.query.service.PolicyQueryService;
 import com.titanium.policy.query.view.PolicyView;
 
@@ -178,6 +184,45 @@ public class PolicyQueryServiceImpl implements PolicyQueryService {
         result.setUpdateTime(view.getUpdateTime());
         result.setTenantId(view.getTenantId());
         return result;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PolicyStatisticsResult getStatistics(String tenantId) {
+        // 有效保单数：状态为 EFFECTIVE（保单状态枚举无 ACTIVE，生效态即有效）
+        long activeCount = policyViewRepository.countByPolicyStatusAndTenantId(PolicyEnum.PolicyStatus.EFFECTIVE,
+                tenantId);
+        // 今日新增：create_time 落在 [今日 00:00, 次日 00:00) 半开区间
+        LocalDateTime todayStart = LocalDate.now().atStartOfDay();
+        LocalDateTime tomorrowStart = todayStart.plusDays(1);
+        long todayCount = policyViewRepository
+                .countByTenantIdAndCreateTimeGreaterThanEqualAndCreateTimeLessThan(tenantId, todayStart, tomorrowStart);
+        // 保单总数
+        long totalCount = policyViewRepository.countByTenantId(tenantId);
+        // 险种一级分类分布：三级险种分组计数后按一级分类归并
+        List<PolicyStatisticsResult.CategoryDistribution> distribution = buildCategoryDistribution(tenantId);
+        return new PolicyStatisticsResult(activeCount, todayCount, totalCount, distribution);
+    }
+
+    /**
+     * 按险种一级分类归并保单数分布。
+     * <p>
+     * 仓储按三级险种（{@link InsuranceProductType}）分组计数，此处上溯到一级分类（{@link InsuranceCategory}）
+     * 累加，输出看板 {@code {name, value}} 结构，保持分类枚举声明顺序稳定。
+     * </p>
+     */
+    private List<PolicyStatisticsResult.CategoryDistribution> buildCategoryDistribution(String tenantId) {
+        // 用 EnumMap 保持一级分类声明顺序，避免看板展示顺序抖动
+        Map<InsuranceCategory, Long> categoryCount = new EnumMap<>(InsuranceCategory.class);
+        for (Object[] row : policyViewRepository.countGroupByInsuranceType(tenantId)) {
+            InsuranceProductType type = (InsuranceProductType) row[0];
+            long count = ((Number) row[1]).longValue();
+            categoryCount.merge(type.getCategory(), count, Long::sum);
+        }
+        return categoryCount.entrySet().stream()
+                .map(entry -> new PolicyStatisticsResult.CategoryDistribution(entry.getKey().getName(),
+                        entry.getValue()))
+                .toList();
     }
 
     private boolean isNotBlank(String value) {

@@ -6,9 +6,9 @@ import org.springframework.stereotype.Component;
 
 import com.titanium.policy.port.RuleEngineServicePort;
 import com.titanium.ruleengine.api.RuleEngineApi;
-import com.titanium.ruleengine.api.dto.RuleExecutionResultDTO;
-import com.titanium.ruleengine.api.dto.ValidationResultDTO;
 import com.titanium.ruleengine.api.response.ApiResponse;
+import com.titanium.ruleengine.api.response.RuleExecutionResultResponse;
+import com.titanium.ruleengine.api.response.ValidationResultResponse;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,7 +30,7 @@ public class RuleEngineServiceAdapter implements RuleEngineServicePort {
     @Override
     public Object executeRule(String ruleSetCode, Map<String, Object> variables, String tenantId) {
         log.info("执行规则, ruleSetCode={}, tenantId={}", ruleSetCode, tenantId);
-        ApiResponse<RuleExecutionResultDTO> response = ruleEngineApi.execute(ruleSetCode, variables, tenantId);
+        ApiResponse<RuleExecutionResultResponse> response = ruleEngineApi.execute(ruleSetCode, variables, tenantId);
         if (response.isSuccess()) {
             return response.getData();
         }
@@ -41,7 +41,7 @@ public class RuleEngineServiceAdapter implements RuleEngineServicePort {
     @Override
     public Object validateRule(String ruleSetCode, Map<String, Object> variables, String tenantId) {
         log.info("验证规则, ruleSetCode={}, tenantId={}", ruleSetCode, tenantId);
-        ApiResponse<ValidationResultDTO> response = ruleEngineApi.validate(ruleSetCode, variables, tenantId);
+        ApiResponse<ValidationResultResponse> response = ruleEngineApi.validate(ruleSetCode, variables, tenantId);
         if (response.isSuccess()) {
             return response.getData();
         }

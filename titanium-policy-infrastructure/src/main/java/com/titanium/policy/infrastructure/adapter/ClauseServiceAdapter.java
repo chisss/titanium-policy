@@ -5,7 +5,7 @@ import java.util.List;
 import org.springframework.stereotype.Component;
 
 import com.titanium.clause.api.ClauseApi;
-import com.titanium.clause.api.dto.ClauseDTO;
+import com.titanium.clause.api.response.ClauseResponse;
 import com.titanium.policy.port.ClauseServicePort;
 
 import lombok.RequiredArgsConstructor;
@@ -37,7 +37,7 @@ public class ClauseServiceAdapter implements ClauseServicePort {
     @Override
     public List<?> getClauses(String status, String clauseType) {
         log.info("获取条款列表, status={}, clauseType={}", status, clauseType);
-        List<ClauseDTO> clauses = clauseApi.getClauses(status, clauseType, DEFAULT_TENANT);
+        List<ClauseResponse> clauses = clauseApi.getClauses(status, clauseType, DEFAULT_TENANT);
         return clauses;
     }
 }

@@ -9,11 +9,11 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 
-import com.titanium.policy.api.dto.AccountValueWriteBackDTO;
-import com.titanium.policy.api.dto.CreatePolicyDTO;
-import com.titanium.policy.api.dto.PolicyDTO;
-import com.titanium.policy.api.dto.PolicyStatusDTO;
+import com.titanium.policy.api.request.AccountValueWriteBackRequest;
+import com.titanium.policy.api.request.CreatePolicyRequest;
 import com.titanium.policy.api.response.ApiResponse;
+import com.titanium.policy.api.response.PolicyResponse;
+import com.titanium.policy.api.response.PolicyStatusResponse;
 
 /**
  * 保单聚合对外契约（Feign）
@@ -39,7 +39,7 @@ public interface PolicyApi {
      * @return 保单ID
      */
     @PostMapping
-    ApiResponse<String> createPolicy(@RequestBody CreatePolicyDTO dto,
+    ApiResponse<String> createPolicy(@RequestBody CreatePolicyRequest dto,
                                      @RequestHeader("X-Tenant-Id") String tenantId);
 
     /**
@@ -50,7 +50,7 @@ public interface PolicyApi {
      * @return 保单ID
      */
     @PostMapping("/direct")
-    ApiResponse<String> createPolicyDirectly(@RequestBody CreatePolicyDTO dto,
+    ApiResponse<String> createPolicyDirectly(@RequestBody CreatePolicyRequest dto,
                                              @RequestHeader("X-Tenant-Id") String tenantId);
 
     /**
@@ -61,7 +61,7 @@ public interface PolicyApi {
      * @return 保单详情，不存在时 code=404
      */
     @GetMapping("/{policyId}")
-    ApiResponse<PolicyDTO> getPolicy(@PathVariable("policyId") String policyId,
+    ApiResponse<PolicyResponse> getPolicy(@PathVariable("policyId") String policyId,
                                      @RequestHeader("X-Tenant-Id") String tenantId);
 
     /**
@@ -72,7 +72,7 @@ public interface PolicyApi {
      * @return 保单状态，不存在时 code=404
      */
     @GetMapping("/{policyId}/status")
-    ApiResponse<PolicyStatusDTO> getPolicyStatus(@PathVariable("policyId") String policyId,
+    ApiResponse<PolicyStatusResponse> getPolicyStatus(@PathVariable("policyId") String policyId,
                                                  @RequestHeader("X-Tenant-Id") String tenantId);
 
     /**
@@ -109,6 +109,6 @@ public interface PolicyApi {
      */
     @PutMapping("/{policyId}/account-value")
     ApiResponse<Void> writeBackAccountValue(@PathVariable("policyId") String policyId,
-                                            @RequestBody AccountValueWriteBackDTO dto,
+                                            @RequestBody AccountValueWriteBackRequest dto,
                                             @RequestHeader("X-Tenant-Id") String tenantId);
 }

@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import com.titanium.policy.query.result.PolicyQueryResult;
+import com.titanium.policy.query.result.PolicyStatisticsResult;
 
 /**
  * 保单查询服务
@@ -81,4 +82,16 @@ public interface PolicyQueryService {
      */
     List<PolicyQueryResult> findPoliciesByDateRange(LocalDateTime startDate, LocalDateTime endDate, String dateType,
                                                     String tenantId, int page, int size);
+
+    /**
+     * 查询保单聚合统计（管理后台看板用）
+     * <p>
+     * 聚合读模型表 {@code t_policy_view}：有效保单数、今日新增数、保单总数，及按险种一级分类的保单数分布。
+     * 强制携带 {@code tenantId} 保证多租户隔离。
+     * </p>
+     *
+     * @param tenantId 租户ID
+     * @return 保单统计结果
+     */
+    PolicyStatisticsResult getStatistics(String tenantId);
 }

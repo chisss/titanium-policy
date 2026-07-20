@@ -7,7 +7,7 @@ import org.junit.jupiter.api.Test;
 
 import com.titanium.metadata.enums.customer.CustomerEnum.CustomerGender;
 import com.titanium.metadata.enums.customer.CustomerEnum.IdCardType;
-import com.titanium.metadata.enums.customer.CustomerEnum.InsuranceRole;
+import com.titanium.metadata.enums.policy.BeneficiaryType;
 import com.titanium.policy.entity.insurance.InsuredPartyList.BeneficiaryInfo;
 import com.titanium.policy.entity.insurance.InsuredPartyList.HolderInfo;
 import com.titanium.policy.entity.insurance.InsuredPartyList.InsuredInfo;
@@ -22,17 +22,17 @@ import com.titanium.policy.entity.insurance.InsuredPartyList.InsuredInfo;
 class InsuredPartyListTest {
 
     private HolderInfo holder() {
-        return new HolderInfo("H-1", "张三", IdCardType.CHINA_ID_CARD, "3301**********1234", "13800000000");
+        return new HolderInfo("C-H-1", "H-1", "张三", IdCardType.CHINA_ID_CARD, "3301**********1234", "13800000000");
     }
 
     private InsuredInfo insured() {
-        return new InsuredInfo("I-1", "张三", IdCardType.CHINA_ID_CARD, "3301**********1234", 30, CustomerGender.MALE,
-                null);
+        return new InsuredInfo("C-I-1", "I-1", "张三", IdCardType.CHINA_ID_CARD, "3301**********1234", 30,
+                CustomerGender.MALE, null);
     }
 
     private BeneficiaryInfo beneficiary(String id, double ratio) {
-        return new BeneficiaryInfo(id, "受益人" + id, IdCardType.CHINA_ID_CARD, "3301**********5678",
-                InsuranceRole.BENEFICIARY, ratio);
+        return new BeneficiaryInfo("C-" + id, id, "受益人" + id, IdCardType.CHINA_ID_CARD, "3301**********5678",
+                BeneficiaryType.DEATH, 1, ratio);
     }
 
     private InsuredPartyList partyList(List<BeneficiaryInfo> beneficiaries) {

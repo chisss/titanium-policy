@@ -1,0 +1,39 @@
+package com.titanium.policy.query.repository;
+
+import java.util.List;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.stereotype.Repository;
+
+import com.titanium.policy.query.view.PolicyBeneficiaryView;
+
+/**
+ * 保单受益人读模型仓储（CQRS 读侧）
+ * <p>
+ * 支持投影幂等（先按 policyId+tenantId 删除再批量插入）和查询。所有查询强制携带 tenantId 保证多租户隔离。
+ * </p>
+ */
+@Repository
+public interface PolicyBeneficiaryViewRepository extends JpaRepository<PolicyBeneficiaryView, String> {
+
+    /**
+     * 按保单ID + 租户ID 查询受益人列表
+     *
+     * @param policyId 保单ID
+     * @param tenantId 租户ID
+     * @return 受益人读模型列表
+     */
+    List<PolicyBeneficiaryView> findByPolicyIdAndTenantId(String policyId, String tenantId);
+
+    /**
+     * 按保单ID + 租户ID 删除（投影幂等用：先清后插）
+     *
+     * @param policyId 保单ID
+     * @param tenantId 租户ID
+     */
+    @Modifying
+    @Query("DELETE FROM PolicyBeneficiaryView v WHERE v.policyId = :policyId AND v.tenantId = :tenantId")
+    void deleteByPolicyIdAndTenantId(String policyId, String tenantId);
+}

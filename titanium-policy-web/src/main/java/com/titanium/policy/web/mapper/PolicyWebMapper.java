@@ -6,14 +6,24 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
 import com.titanium.metadata.valueobject.Money;
-import com.titanium.policy.api.dto.AmountDTO;
-import com.titanium.policy.api.dto.CreatePolicyDTO;
-import com.titanium.policy.api.dto.PolicyDTO;
-import com.titanium.policy.api.dto.PolicyStatusDTO;
+import com.titanium.policy.api.model.Amount;
+import com.titanium.policy.api.request.CreatePolicyRequest;
+import com.titanium.policy.api.response.PolicyResponse;
+import com.titanium.policy.api.response.PolicyStatusResponse;
+import com.titanium.policy.command.ApplyPolicyEndorsementCommand;
 import com.titanium.policy.command.CreatePolicyCommand;
 import com.titanium.policy.command.CreatePolicyDirectlyCommand;
+import com.titanium.policy.command.DistributeDividendCommand;
+import com.titanium.policy.command.MaturePolicyCommand;
+import com.titanium.policy.command.StartAnnuityPayoutCommand;
+import com.titanium.policy.command.WaivePremiumCommand;
 import com.titanium.policy.query.result.PolicyQueryResult;
-import com.titanium.policy.web.request.CreatePolicyRequest;
+import com.titanium.policy.web.dto.ApplyEndorsementDTO;
+import com.titanium.policy.web.dto.CreatePolicyDTO;
+import com.titanium.policy.web.dto.DistributeDividendDTO;
+import com.titanium.policy.web.dto.MaturePolicyDTO;
+import com.titanium.policy.web.dto.StartAnnuityPayoutDTO;
+import com.titanium.policy.web.dto.WaivePremiumDTO;
 import com.titanium.policy.web.response.PolicyDetailVO;
 
 /**
@@ -42,7 +52,7 @@ public interface PolicyWebMapper {
     @Mapping(target = "sumInsured", expression = "java(toMoney(request.getSumInsured(), request.getCurrency()))")
     @Mapping(target = "premium", expression = "java(toMoney(request.getPremium(), request.getCurrency()))")
     @Mapping(target = "tenantId", source = "tenantId")
-    CreatePolicyCommand toCommand(CreatePolicyRequest request, String tenantId);
+    CreatePolicyCommand toCommand(CreatePolicyDTO request, String tenantId);
 
     /**
      * HTTP Request → 一步出单命令（Controller 的 direct 端点用）
@@ -58,7 +68,7 @@ public interface PolicyWebMapper {
     @Mapping(target = "insurancePeriodEnd", source = "request.endDate")
     @Mapping(target = "tenantId", source = "tenantId")
     @Mapping(target = "insuredCount", ignore = true)
-    CreatePolicyDirectlyCommand toDirectCommand(CreatePolicyRequest request, String tenantId);
+    CreatePolicyDirectlyCommand toDirectCommand(CreatePolicyDTO request, String tenantId);
 
     /**
      * 远程 DTO → 领域命令（Provider 用）
@@ -83,7 +93,7 @@ public interface PolicyWebMapper {
     @Mapping(target = "insuredId", ignore = true)
     @Mapping(target = "sumInsured", ignore = true)
     @Mapping(target = "channel", ignore = true)
-    CreatePolicyCommand toCommand(CreatePolicyDTO dto, String tenantId);
+    CreatePolicyCommand toCommand(CreatePolicyRequest dto, String tenantId);
 
     /**
      * 远程 DTO → 一步出单命令（Provider 的 direct 端点用）
@@ -106,7 +116,7 @@ public interface PolicyWebMapper {
     @Mapping(target = "insuredCount", ignore = true)
     @Mapping(target = "sumInsured", ignore = true)
     @Mapping(target = "channel", ignore = true)
-    CreatePolicyDirectlyCommand toDirectCommand(CreatePolicyDTO dto, String tenantId);
+    CreatePolicyDirectlyCommand toDirectCommand(CreatePolicyRequest dto, String tenantId);
 
     /**
      * 读模型结果 → 展示 VO（Controller 用）
@@ -128,7 +138,7 @@ public interface PolicyWebMapper {
     @Mapping(target = "createdAt", source = "createTime")
     @Mapping(target = "updatedAt", source = "updateTime")
     @Mapping(target = "policyItems", ignore = true)
-    PolicyDTO toDTO(PolicyQueryResult result);
+    PolicyResponse toResponse(PolicyQueryResult result);
 
     /**
      * 读模型结果 → 保单状态 DTO（Provider 用）
@@ -137,7 +147,103 @@ public interface PolicyWebMapper {
      * @return 保单状态 DTO
      */
     @Mapping(target = "status", expression = "java(result.getStatus() != null ? result.getStatus().name() : null)")
-    PolicyStatusDTO toStatusDTO(PolicyQueryResult result);
+    PolicyStatusResponse toStatusResponse(PolicyQueryResult result);
+
+    /**
+     * HTTP Request → 保费豁免命令（Controller 用）
+     * <p>
+     * 保单ID 取路径变量，操作人/租户ID 取请求头，豁免原因取请求体。
+     * </p>
+     *
+     * @param request 保费豁免请求
+     * @param policyId 保单ID
+     * @param operatorId 操作人ID
+     * @param tenantId 租户ID
+     * @return 保费豁免命令
+     */
+    @Mapping(target = "policyId", source = "policyId")
+    @Mapping(target = "reason", source = "request.reason")
+    @Mapping(target = "operatorId", source = "operatorId")
+    @Mapping(target = "tenantId", source = "tenantId")
+    WaivePremiumCommand toWaivePremiumCommand(WaivePremiumDTO request, String policyId, String operatorId,
+                                              String tenantId);
+
+    /**
+     * HTTP Request → 红利派发命令（Controller 用）
+     *
+     * @param request 红利派发请求
+     * @param policyId 保单ID
+     * @param operatorId 操作人ID
+     * @param tenantId 租户ID
+     * @return 红利派发命令
+     */
+    @Mapping(target = "policyId", source = "policyId")
+    @Mapping(target = "dividendAmount", source = "request.dividendAmount")
+    @Mapping(target = "option", source = "request.option")
+    @Mapping(target = "policyYear", source = "request.policyYear")
+    @Mapping(target = "operatorId", source = "operatorId")
+    @Mapping(target = "tenantId", source = "tenantId")
+    DistributeDividendCommand toDistributeDividendCommand(DistributeDividendDTO request, String policyId,
+                                                          String operatorId, String tenantId);
+
+    /**
+     * HTTP Request → 启动年金给付命令（Controller 用）
+     * <p>
+     * 每期给付金额+币种组装为 {@code Money}；保单ID 取路径变量，操作人/租户ID 取请求头。
+     * </p>
+     *
+     * @param request 启动年金给付请求
+     * @param policyId 保单ID
+     * @param operatorId 操作人ID
+     * @param tenantId 租户ID
+     * @return 启动年金给付命令
+     */
+    @Mapping(target = "policyId", source = "policyId")
+    @Mapping(target = "startDate", source = "request.startDate")
+    @Mapping(target = "frequency", source = "request.frequency")
+    @Mapping(target = "amountPerInstallment", expression = "java(toMoney(request.getAmountPerInstallment(), request.getCurrency()))")
+    @Mapping(target = "totalInstallments", source = "request.totalInstallments")
+    @Mapping(target = "operatorId", source = "operatorId")
+    @Mapping(target = "tenantId", source = "tenantId")
+    StartAnnuityPayoutCommand toStartAnnuityPayoutCommand(StartAnnuityPayoutDTO request, String policyId,
+                                                          String operatorId, String tenantId);
+
+    /**
+     * HTTP Request → 满期给付命令（Controller 用）
+     *
+     * @param request 满期给付请求
+     * @param policyId 保单ID
+     * @param operatorId 操作人ID
+     * @param tenantId 租户ID
+     * @return 满期给付命令
+     */
+    @Mapping(target = "policyId", source = "policyId")
+    @Mapping(target = "maturityBenefit", source = "request.maturityBenefit")
+    @Mapping(target = "operatorId", source = "operatorId")
+    @Mapping(target = "tenantId", source = "tenantId")
+    MaturePolicyCommand toMaturePolicyCommand(MaturePolicyDTO request, String policyId, String operatorId,
+                                              String tenantId);
+
+    /**
+     * HTTP Request → 应用保单批改命令（Controller 用）
+     *
+     * @param request 申请批改请求
+     * @param policyId 保单ID
+     * @param operatorId 操作人ID
+     * @param tenantId 租户ID
+     * @return 应用保单批改命令
+     */
+    @Mapping(target = "policyId", source = "policyId")
+    @Mapping(target = "endorsementNo", source = "request.endorsementNo")
+    @Mapping(target = "updateType", source = "request.updateType")
+    @Mapping(target = "endorsementEffectiveDate", source = "request.endorsementEffectiveDate")
+    @Mapping(target = "changeSummary", source = "request.changeSummary")
+    @Mapping(target = "originalSnapshot", source = "request.originalSnapshot")
+    @Mapping(target = "sourceMaintenanceId", source = "request.sourceMaintenanceId")
+    @Mapping(target = "operatorId", source = "operatorId")
+    @Mapping(target = "tenantId", source = "tenantId")
+    ApplyPolicyEndorsementCommand toApplyEndorsementCommand(ApplyEndorsementDTO request, String policyId,
+                                                            String operatorId, String tenantId);
 
     /**
      * BigDecimal + 币种 → Money 值对象（空安全，缺省币种 CNY）
@@ -149,25 +255,25 @@ public interface PolicyWebMapper {
     /**
      * 取金额 DTO 的数值（空安全）
      */
-    default BigDecimal amountValue(AmountDTO amount) {
+    default BigDecimal amountValue(Amount amount) {
         return amount != null ? amount.getValue() : null;
     }
 
     /**
      * 取金额 DTO 的币种（空安全）
      */
-    default String amountCurrency(AmountDTO amount) {
+    default String amountCurrency(Amount amount) {
         return amount != null ? amount.getCurrency() : null;
     }
 
     /**
      * 数值 + 币种 → 金额 DTO（空安全）
      */
-    default AmountDTO toAmount(Double value, String currency) {
+    default Amount toAmount(Double value, String currency) {
         if (value == null) {
             return null;
         }
-        AmountDTO amount = new AmountDTO();
+        Amount amount = new Amount();
         amount.setValue(BigDecimal.valueOf(value));
         amount.setCurrency(currency);
         return amount;

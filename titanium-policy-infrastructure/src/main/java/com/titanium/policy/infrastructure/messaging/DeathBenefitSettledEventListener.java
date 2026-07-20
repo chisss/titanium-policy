@@ -5,7 +5,8 @@ import org.springframework.stereotype.Component;
 
 import com.alibaba.fastjson2.JSONObject;
 
-import com.titanium.policy.application.orchestration.DeathBenefitTerminationOrchestrator;
+import com.titanium.policy.application.orchestration.lifecycle.DeathBenefitTerminationOrchestrator;
+import com.titanium.policy.infrastructure.messaging.inbound.DeathBenefitSettledMessage;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -44,19 +45,19 @@ public class DeathBenefitSettledEventListener {
      */
     @KafkaListener(topics = DEATH_BENEFIT_SETTLED_TOPIC, groupId = "${spring.kafka.consumer.group-id}")
     public void onDeathBenefitSettled(String payload) {
-        JSONObject json = JSONObject.parseObject(payload);
-        String policyId = json.getString("policyId");
+        // 一次性反序列化为防腐入站消息（不依赖 claim 域类型），取代手工逐字段解析
+        DeathBenefitSettledMessage message = JSONObject.parseObject(payload, DeathBenefitSettledMessage.class);
+        String policyId = message.policyId();
         if (policyId == null || policyId.isBlank()) {
             log.warn("[身故给付-入站] 事件缺少 policyId，跳过保单终止, payload={}", payload);
             return;
         }
-        // claim 域事件未贯穿 tenantId/operatorId，以系统账号兜底，保单按 policyId 强一致路由
+        // claim 域事件未贯穿 operatorId，以系统账号兜底，保单按 policyId 强一致路由
         String operatorId = "claim-death-settlement";
-        String tenantId = json.getString("tenantId");
 
         log.info("[身故给付-入站] 收到身故给付结算, policyId={}, 触发保单终止", policyId);
         try {
-            terminationOrchestrator.terminateOnDeathBenefit(policyId, operatorId, tenantId);
+            terminationOrchestrator.terminateOnDeathBenefit(policyId, operatorId, message.tenantId());
         } catch (Exception e) {
             // 幂等保护：保单已达终态（重复投递）会抛业务异常，记录但不阻塞消费
             log.error("[身故给付-入站] 保单终止失败, policyId={}, 原因={}", policyId, e.getMessage());

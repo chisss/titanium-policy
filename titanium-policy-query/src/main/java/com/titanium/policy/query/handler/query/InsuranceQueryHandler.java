@@ -1,11 +1,14 @@
 package com.titanium.policy.query.handler.query;
 
+import java.util.List;
+
 import org.axonframework.config.ProcessingGroup;
 import org.axonframework.queryhandling.QueryHandler;
 import org.springframework.stereotype.Component;
 
 import com.titanium.policy.query.query.FindInsuranceByIdQuery;
 import com.titanium.policy.query.query.FindInsuranceByNoQuery;
+import com.titanium.policy.query.query.FindInsurancesByConditionQuery;
 import com.titanium.policy.query.result.InsuranceQueryResult;
 import com.titanium.policy.query.service.InsuranceQueryService;
 
@@ -44,5 +47,17 @@ public class InsuranceQueryHandler {
     @QueryHandler
     public InsuranceQueryResult handle(FindInsuranceByNoQuery query) {
         return insuranceQueryService.findInsuranceByNo(query.insuranceNo(), query.tenantId());
+    }
+
+    /**
+     * 多条件分页查询投保单列表
+     *
+     * @param query 查询条件
+     * @return 投保单查询结果列表
+     */
+    @QueryHandler
+    public List<InsuranceQueryResult> handle(FindInsurancesByConditionQuery query) {
+        return insuranceQueryService.findInsurancesByConditions(query.insuranceNo(), query.holderId(),
+                query.status(), query.tenantId(), query.page(), query.size());
     }
 }

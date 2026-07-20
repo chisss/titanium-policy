@@ -51,7 +51,7 @@ class PolicyFormBehaviorTest {
         LocalDateTime now = LocalDateTime.now();
         return new PolicyCreatedEvent(POLICY_ID, new PolicyNo("POL-2024-0001"), form, null, now, now.plusYears(1), null,
                 null, new PolicyStatus(PolicyStatus.StatusCode.NOT_EFFECTIVE, now, "创建", "system"), new ArrayList<>(),
-                null, TENANT_ID);
+                null, null, TENANT_ID);
     }
 
     private PolicyActivatedEvent activatedEvent() {
@@ -59,8 +59,8 @@ class PolicyFormBehaviorTest {
     }
 
     private InsuredInfo member(String id) {
-        return new InsuredInfo(id, "张三", IdCardType.CHINA_ID_CARD, "3301**********1234", 30, CustomerGender.MALE,
-                null);
+        return new InsuredInfo("C-" + id, id, "张三", IdCardType.CHINA_ID_CARD, "3301**********1234", 30,
+                CustomerGender.MALE, null);
     }
 
     @Test

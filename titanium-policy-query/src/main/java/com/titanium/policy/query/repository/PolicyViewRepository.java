@@ -7,6 +7,8 @@ import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import com.titanium.metadata.enums.insurance.InsuranceProductType;
@@ -78,4 +80,46 @@ public interface PolicyViewRepository
      */
     List<PolicyView> findByPolicyStatusAndInsuranceTypeAndEndDateLessThanEqual(PolicyEnum.PolicyStatus policyStatus,
             InsuranceProductType insuranceType, LocalDateTime endDate, Pageable pageable);
+
+    /**
+     * 按租户ID统计保单总数（多租户隔离）
+     *
+     * @param tenantId 租户ID
+     * @return 保单总数
+     */
+    long countByTenantId(String tenantId);
+
+    /**
+     * 按状态 + 租户ID统计保单数（有效保单数用 EFFECTIVE）
+     *
+     * @param policyStatus 保单状态
+     * @param tenantId 租户ID
+     * @return 命中状态的保单数
+     */
+    long countByPolicyStatusAndTenantId(PolicyEnum.PolicyStatus policyStatus, String tenantId);
+
+    /**
+     * 按创建时间区间 + 租户ID统计保单数（今日新增用当天 00:00~次日 00:00 半开区间）
+     *
+     * @param tenantId 租户ID
+     * @param start 起始时间（含）
+     * @param end 结束时间（不含）
+     * @return 区间内新增保单数
+     */
+    long countByTenantIdAndCreateTimeGreaterThanEqualAndCreateTimeLessThan(String tenantId, LocalDateTime start,
+            LocalDateTime end);
+
+    /**
+     * 按险种三级分类分组统计保单数（管理后台看板分布用）
+     * <p>
+     * 只统计险种非空的保单，返回 {@code [InsuranceProductType, count]} 行；一级分类归并在应用层完成，
+     * 保持仓储职责单一。强制携带 {@code tenantId} 保证多租户隔离。
+     * </p>
+     *
+     * @param tenantId 租户ID
+     * @return 每行为 {@code Object[]{InsuranceProductType, Long}} 的分组统计列表
+     */
+    @Query("SELECT p.insuranceType, COUNT(p) FROM PolicyView p "
+            + "WHERE p.tenantId = :tenantId AND p.insuranceType IS NOT NULL GROUP BY p.insuranceType")
+    List<Object[]> countGroupByInsuranceType(@Param("tenantId") String tenantId);
 }

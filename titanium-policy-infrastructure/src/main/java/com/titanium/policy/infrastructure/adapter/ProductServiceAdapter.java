@@ -8,8 +8,8 @@ import com.alibaba.fastjson2.JSONObject;
 import com.titanium.metadata.enums.product.ProductEnum;
 import com.titanium.policy.port.ProductServicePort;
 import com.titanium.product.api.ProductApi;
-import com.titanium.product.api.dto.ProductDTO;
 import com.titanium.product.api.response.ApiResponse;
+import com.titanium.product.api.response.ProductResponse;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,7 +31,7 @@ public class ProductServiceAdapter implements ProductServicePort {
     @Override
     public Object getProductById(String productId, String tenantId) {
         log.info("获取产品详情, productId={}, tenantId={}", productId, tenantId);
-        ApiResponse<ProductDTO> response = productApi.getProductById(productId, tenantId);
+        ApiResponse<ProductResponse> response = productApi.getProductById(productId, tenantId);
         if (response.isSuccess()) {
             return response.getData();
         }

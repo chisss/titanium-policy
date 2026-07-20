@@ -51,7 +51,7 @@ class PolicyAnnuityPayoutTest {
         return new PolicyCreatedEvent(POLICY_ID, new PolicyNo("POL-2024-0001"), PolicyForm.INDIVIDUAL, null, now,
                 now.plusYears(1), null, null,
                 new PolicyStatus(PolicyStatus.StatusCode.NOT_EFFECTIVE, now, "创建", "system"), new ArrayList<>(),
-                insuranceType, TENANT_ID);
+                null, insuranceType, TENANT_ID);
     }
 
     private PolicyActivatedEvent activatedEvent() {

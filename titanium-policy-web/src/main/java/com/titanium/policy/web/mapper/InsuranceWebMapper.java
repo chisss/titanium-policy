@@ -6,11 +6,11 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
 import com.titanium.metadata.valueobject.Money;
-import com.titanium.policy.api.dto.ConvertToInsuranceDTO;
-import com.titanium.policy.api.dto.InsuranceDTO;
+import com.titanium.policy.api.request.ConvertToInsuranceRequest;
+import com.titanium.policy.api.response.InsuranceResponse;
 import com.titanium.policy.command.ConvertProposalToInsuranceCommand;
 import com.titanium.policy.query.result.InsuranceQueryResult;
-import com.titanium.policy.web.request.ConvertToInsuranceRequest;
+import com.titanium.policy.web.dto.ConvertToInsuranceDTO;
 import com.titanium.policy.web.response.InsuranceVO;
 
 /**
@@ -38,7 +38,8 @@ public interface InsuranceWebMapper {
      */
     @Mapping(target = "exactPremium", expression = "java(toMoney(request.getExactPremium(), request.getCurrency()))")
     @Mapping(target = "tenantId", source = "tenantId")
-    ConvertProposalToInsuranceCommand toCommand(ConvertToInsuranceRequest request, String tenantId);
+    @Mapping(target = "insuredPartyList", ignore = true)
+    ConvertProposalToInsuranceCommand toCommand(ConvertToInsuranceDTO request, String tenantId);
 
     /**
      * 远程 DTO → 领域命令（Provider 用）
@@ -49,7 +50,8 @@ public interface InsuranceWebMapper {
      */
     @Mapping(target = "exactPremium", expression = "java(toMoney(dto.getExactPremium(), dto.getCurrency()))")
     @Mapping(target = "tenantId", source = "tenantId")
-    ConvertProposalToInsuranceCommand toCommand(ConvertToInsuranceDTO dto, String tenantId);
+    @Mapping(target = "insuredPartyList", ignore = true)
+    ConvertProposalToInsuranceCommand toCommand(ConvertToInsuranceRequest dto, String tenantId);
 
     /**
      * 读模型结果 → 展示 VO（Controller 用）
@@ -70,7 +72,7 @@ public interface InsuranceWebMapper {
      * @return 投保单 DTO
      */
     @Mapping(target = "status", expression = "java(result.getStatus() != null ? result.getStatus().name() : null)")
-    InsuranceDTO toDTO(InsuranceQueryResult result);
+    InsuranceResponse toResponse(InsuranceQueryResult result);
 
     /**
      * BigDecimal + 币种 → Money 值对象（空安全，缺省币种 CNY）

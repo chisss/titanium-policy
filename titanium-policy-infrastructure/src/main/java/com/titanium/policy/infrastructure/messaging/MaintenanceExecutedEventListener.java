@@ -1,6 +1,5 @@
 package com.titanium.policy.infrastructure.messaging;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -11,9 +10,10 @@ import org.springframework.stereotype.Component;
 
 import com.alibaba.fastjson2.JSONObject;
 
-import com.titanium.policy.application.orchestration.MaintenanceWriteBackContext;
-import com.titanium.policy.application.orchestration.MaintenanceWriteBackStrategy;
+import com.titanium.policy.application.orchestration.maintenance.MaintenanceWriteBackContext;
+import com.titanium.policy.application.orchestration.maintenance.MaintenanceWriteBackStrategy;
 import com.titanium.policy.common.enums.PolicyDataUpdateType;
+import com.titanium.policy.infrastructure.messaging.inbound.MaintenanceExecutedMessage;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -59,50 +59,36 @@ public class MaintenanceExecutedEventListener {
      */
     @KafkaListener(topics = MAINTENANCE_EXECUTED_TOPIC, groupId = "${spring.kafka.consumer.group-id}")
     public void onMaintenanceExecuted(String payload) {
-        JSONObject json = JSONObject.parseObject(payload);
-        String policyId = json.getString("policyId");
-        String maintenanceType = json.getString("maintenanceType");
-        String operatorId = json.getString("updatedBy");
-        String reason = json.getString("executionDetails");
-        String tenantId = json.getString("tenantId");
-        // maintenanceId 序列化为嵌套对象 {"id":"..."}，需从内层取
-        String sourceMaintenanceId = extractMaintenanceId(json);
-        LocalDateTime effectiveTime = json.getObject("effectiveTime", LocalDateTime.class);
+        // 一次性反序列化为防腐入站消息（不依赖 maintenance 域类型），取代手工逐字段解析
+        MaintenanceExecutedMessage message = JSONObject.parseObject(payload, MaintenanceExecutedMessage.class);
 
-        if (policyId == null || maintenanceType == null) {
+        if (message.policyId() == null || message.maintenanceType() == null) {
             log.warn("保全执行事件缺少 policyId/maintenanceType，跳过回写, payload={}", payload);
             return;
         }
 
-        MaintenanceWriteBackContext context = new MaintenanceWriteBackContext(policyId, operatorId, reason, tenantId,
-                maintenanceType, effectiveTime, sourceMaintenanceId);
+        MaintenanceWriteBackContext context = new MaintenanceWriteBackContext(message.policyId(), message.updatedBy(),
+                message.executionDetails(), message.tenantId(), message.maintenanceType(), message.effectiveTime(),
+                message.maintenanceIdValue());
 
         // 状态类保全：精确类型策略（Suspend/Resume/Terminate/Reinstate）
-        MaintenanceWriteBackStrategy strategy = strategyRegistry.get(maintenanceType);
+        MaintenanceWriteBackStrategy strategy = strategyRegistry.get(message.maintenanceType());
         // 数据/要素类批改：回退到统一批改策略
-        if (strategy == null && PolicyDataUpdateType.byMaintenanceType(maintenanceType) != null) {
+        if (strategy == null && PolicyDataUpdateType.byMaintenanceType(message.maintenanceType()) != null) {
             strategy = strategyRegistry.get(ENDORSEMENT_STRATEGY_KEY);
         }
         if (strategy == null) {
-            log.info("保全类型 {} 无匹配回写策略，跳过, policyId={}", maintenanceType, policyId);
+            log.info("保全类型 {} 无匹配回写策略，跳过, policyId={}", message.maintenanceType(), message.policyId());
             return;
         }
 
         try {
             strategy.writeBack(context);
-            log.info("保全回写完成, type={}, policyId={}", maintenanceType, policyId);
+            log.info("保全回写完成, type={}, policyId={}", message.maintenanceType(), message.policyId());
         } catch (Exception e) {
             // 幂等保护：保单状态已达目标态（重复投递）等场景会抛业务异常，记录但不阻塞消费
-            log.error("保全回写失败, type={}, policyId={}, 原因={}", maintenanceType, policyId, e.getMessage());
+            log.error("保全回写失败, type={}, policyId={}, 原因={}", message.maintenanceType(), message.policyId(),
+                    e.getMessage());
         }
-    }
-
-    private String extractMaintenanceId(JSONObject json) {
-        JSONObject idObj = json.getJSONObject("maintenanceId");
-        if (idObj != null) {
-            return idObj.getString("id");
-        }
-        // 兼容 maintenanceId 直接为字符串的情形
-        return json.getString("maintenanceId");
     }
 }

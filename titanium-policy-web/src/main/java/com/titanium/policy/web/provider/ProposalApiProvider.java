@@ -3,9 +3,9 @@ package com.titanium.policy.web.provider;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.titanium.policy.api.ProposalApi;
-import com.titanium.policy.api.dto.CreateProposalDTO;
-import com.titanium.policy.api.dto.ProposalDTO;
+import com.titanium.policy.api.request.CreateProposalRequest;
 import com.titanium.policy.api.response.ApiResponse;
+import com.titanium.policy.api.response.ProposalResponse;
 import com.titanium.policy.application.command.ProposalApplicationService;
 import com.titanium.policy.application.query.ProposalAppQueryService;
 import com.titanium.policy.command.CreateProposalCommand;
@@ -33,7 +33,7 @@ public class ProposalApiProvider implements ProposalApi {
     private final ProposalWebMapper          proposalWebMapper;
 
     @Override
-    public ApiResponse<String> createProposal(CreateProposalDTO dto, String tenantId) {
+    public ApiResponse<String> createProposal(CreateProposalRequest dto, String tenantId) {
         // 协议转换：远程 DTO → 领域命令，收敛到同一应用层门面
         CreateProposalCommand command = proposalWebMapper.toCommand(dto, tenantId);
         String proposalId = proposalApplicationService.createProposal(command);
@@ -41,10 +41,10 @@ public class ProposalApiProvider implements ProposalApi {
     }
 
     @Override
-    public ApiResponse<ProposalDTO> getProposal(String proposalId, String tenantId) {
+    public ApiResponse<ProposalResponse> getProposal(String proposalId, String tenantId) {
         // 走读模型（QueryGateway → ProposalView），命中组装为对外 DTO，未命中返回 404 码
         return proposalAppQueryService.findById(proposalId, tenantId)
-                .map(proposalWebMapper::toDTO)
+                .map(proposalWebMapper::toResponse)
                 .map(ApiResponse::success)
                 .orElseGet(() -> ApiResponse.error(404, "投保意向单不存在: " + proposalId));
     }

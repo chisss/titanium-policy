@@ -6,11 +6,11 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
 import com.titanium.metadata.valueobject.Money;
-import com.titanium.policy.api.dto.CreateProposalDTO;
-import com.titanium.policy.api.dto.ProposalDTO;
+import com.titanium.policy.api.request.CreateProposalRequest;
+import com.titanium.policy.api.response.ProposalResponse;
 import com.titanium.policy.command.CreateProposalCommand;
 import com.titanium.policy.query.result.ProposalQueryResult;
-import com.titanium.policy.web.request.CreateProposalRequest;
+import com.titanium.policy.web.dto.CreateProposalDTO;
 import com.titanium.policy.web.response.ProposalVO;
 
 /**
@@ -46,7 +46,7 @@ public interface ProposalWebMapper {
     @Mapping(target = "intendedSumInsured", expression = "java(toMoney(request.getIntendedSumInsured(), request.getCurrency()))")
     @Mapping(target = "intendedPremium", expression = "java(toMoney(request.getIntendedPremium(), request.getCurrency()))")
     @Mapping(target = "tenantId", source = "tenantId")
-    CreateProposalCommand toCommand(CreateProposalRequest request, String tenantId);
+    CreateProposalCommand toCommand(CreateProposalDTO request, String tenantId);
 
     /**
      * 远程 DTO → 领域命令（Provider 用）
@@ -61,7 +61,7 @@ public interface ProposalWebMapper {
     @Mapping(target = "intendedSumInsured", expression = "java(toMoney(dto.getIntendedSumInsured(), dto.getCurrency()))")
     @Mapping(target = "intendedPremium", expression = "java(toMoney(dto.getIntendedPremium(), dto.getCurrency()))")
     @Mapping(target = "tenantId", source = "tenantId")
-    CreateProposalCommand toCommand(CreateProposalDTO dto, String tenantId);
+    CreateProposalCommand toCommand(CreateProposalRequest dto, String tenantId);
 
     /**
      * 读模型结果 → 对外 DTO（Provider 用）
@@ -74,7 +74,7 @@ public interface ProposalWebMapper {
      * @return 投保意向单 DTO
      */
     @Mapping(target = "status", expression = "java(result.getStatus() != null ? result.getStatus().name() : null)")
-    ProposalDTO toDTO(ProposalQueryResult result);
+    ProposalResponse toResponse(ProposalQueryResult result);
 
     /**
      * BigDecimal + 币种 → Money 值对象（空安全，缺省币种 CNY）

@@ -15,11 +15,11 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
-import com.titanium.policy.application.orchestration.GenericEndorsementWriteBackStrategy;
-import com.titanium.policy.application.orchestration.ReinstatePolicyWriteBackStrategy;
-import com.titanium.policy.application.orchestration.ResumePolicyWriteBackStrategy;
-import com.titanium.policy.application.orchestration.SuspendPolicyWriteBackStrategy;
-import com.titanium.policy.application.orchestration.TerminatePolicyWriteBackStrategy;
+import com.titanium.policy.application.orchestration.maintenance.GenericEndorsementWriteBackStrategy;
+import com.titanium.policy.application.orchestration.maintenance.ReinstatePolicyWriteBackStrategy;
+import com.titanium.policy.application.orchestration.maintenance.ResumePolicyWriteBackStrategy;
+import com.titanium.policy.application.orchestration.maintenance.SuspendPolicyWriteBackStrategy;
+import com.titanium.policy.application.orchestration.maintenance.TerminatePolicyWriteBackStrategy;
 import com.titanium.policy.command.ApplyPolicyEndorsementCommand;
 import com.titanium.policy.command.ReinstatePolicyCommand;
 import com.titanium.policy.command.ResumePolicyCommand;

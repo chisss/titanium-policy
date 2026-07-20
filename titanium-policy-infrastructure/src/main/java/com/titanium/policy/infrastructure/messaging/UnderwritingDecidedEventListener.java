@@ -9,6 +9,7 @@ import com.alibaba.fastjson2.JSONObject;
 
 import com.titanium.metadata.enums.underwriting.UnderwritingEnum.ConclusionType;
 import com.titanium.policy.application.command.InsuranceApplicationService;
+import com.titanium.policy.infrastructure.messaging.inbound.UnderwritingDecidedMessage;
 import com.titanium.policy.valueobject.insurance.UnderwritingResult;
 
 import lombok.RequiredArgsConstructor;
@@ -44,39 +45,22 @@ public class UnderwritingDecidedEventListener {
      */
     @KafkaListener(topics = UNDERWRITING_DECIDED_TOPIC, groupId = "${spring.kafka.consumer.group-id}")
     public void onUnderwritingDecided(String payload) {
-        JSONObject json = JSONObject.parseObject(payload);
-        String insuranceId = extractPolicyId(json);
-        String underwritingId = extractNestedValue(json, "underwritingId", "value");
-        String tenantId = json.getString("tenantId");
+        // 一次性反序列化为防腐入站消息（不依赖核保域类型），取代手工逐字段解析与嵌套值对象提取
+        UnderwritingDecidedMessage message = JSONObject.parseObject(payload, UnderwritingDecidedMessage.class);
+        String insuranceId = message.policyIdValue();
+        String underwritingId = message.underwritingIdValue();
         if (insuranceId == null) {
             log.warn("[核保回流] 事件缺少 policyId，忽略: underwritingId={}", underwritingId);
             return;
         }
 
-        ConclusionType resultCode = parseConclusion(json.getString("conclusionType"));
-        UnderwritingResult result = new UnderwritingResult(underwritingId, resultCode, json.getString("decidedBy"),
-                json.getString("decidedBy"), LocalDateTime.now(), null);
+        ConclusionType resultCode = parseConclusion(message.conclusionType());
+        UnderwritingResult result = new UnderwritingResult(underwritingId, resultCode, message.decidedBy(),
+                message.decidedBy(), LocalDateTime.now(), null, message.extraPremiumRatioValue());
 
         log.info("[核保回流] 异步回写核保结论: insuranceId={}, underwritingId={}, 结论={}", insuranceId,
                 underwritingId, resultCode);
-        insuranceApplicationService.receiveUnderwritingResult(insuranceId, result, tenantId);
-    }
-
-    /** 提取 policyId（核保域 PolicyId 值对象序列化为 {"value":"..."} 或裸字符串） */
-    private String extractPolicyId(JSONObject json) {
-        return extractNestedValue(json, "policyId", "value");
-    }
-
-    /** 提取可能被序列化为 {"value":"..."} 的值对象字段，兼容裸字符串 */
-    private String extractNestedValue(JSONObject json, String field, String nestedKey) {
-        Object value = json.get(field);
-        if (value == null) {
-            return null;
-        }
-        if (value instanceof JSONObject nested) {
-            return nested.getString(nestedKey);
-        }
-        return value.toString();
+        insuranceApplicationService.receiveUnderwritingResult(insuranceId, result, message.tenantId());
     }
 
     /** 核保结论 code → 枚举，非法/缺失时按延期处理，避免异常逃逸阻断消费 */

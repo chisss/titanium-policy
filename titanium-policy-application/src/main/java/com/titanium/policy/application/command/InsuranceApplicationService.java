@@ -61,9 +61,11 @@ public class InsuranceApplicationService {
                                       List<String> productCodes, int underwritingPriority, String changeReason,
                                       InsuranceProductType insuranceType, String tenantId) {
         Money premium = exactPremium != null ? Money.of(exactPremium, currency != null ? currency : "CNY") : null;
+        // 标量重载无参与方清单上下文，传 null（Web 层调用方可改用命令重载传递完整清单）
         ConvertProposalToInsuranceCommand command = new ConvertProposalToInsuranceCommand(insuranceId, insuranceNo,
                 proposalId, policyForm, applicantId, insuredCount, premium, insurancePeriodStart, insurancePeriodEnd,
-                productCodes, underwritingPriority, changeReason, insuranceType, tenantId);
+                productCodes, underwritingPriority, changeReason, null, insuranceType, tenantId,
+                null, null, 0);
         commandGateway.sendAndWait(command);
         return insuranceId;
     }
