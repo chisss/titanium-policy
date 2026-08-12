@@ -2,10 +2,12 @@ package com.titanium.policy.event.proposal;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.enums.product.ProductEnum.SalesChannel;
+import com.titanium.policy.entity.proposal.ProposalLine;
 
 /**
  * 意向单创建事件
@@ -35,7 +37,13 @@ public record ProposalCreatedEvent(
         LocalDateTime insurancePeriodStart,
         LocalDateTime insurancePeriodEnd,
         String expectedProductCode,
+        /** 意向险种段列表（客户在 App 勾选的险种组合；单险种意向为长度 1，可空以兼容存量事件） */
+        List<ProposalLine> proposalLines,
         InsuranceProductType insuranceType,
+        /** 出单业务流水号（幂等与进度追溯，可空） */
+        String bizNo,
+        /** 营销包ID（弱引用，可空） */
+        String marketPackageId,
         LocalDateTime createTime,
         String tenantId
 ) {}

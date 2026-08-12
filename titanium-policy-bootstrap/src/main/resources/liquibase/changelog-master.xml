@@ -5,4 +5,8 @@
       http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.10.xsd">
     <include file="classpath:liquibase/ddl/axon_event_store_202607091700_weisun_ddl.sql"/>
     <include file="classpath:liquibase/ddl/policy_view_202607091700_weisun_ddl.sql"/>
+    <include file="classpath:liquibase/ddl/policy_multiline_202608071500_weisun_ddl.sql"/>
+    <include file="classpath:liquibase/ddl/policy_issuance_202608101800_weisun_ddl.sql"/>
+    <include file="classpath:liquibase/ddl/policy_beneficiary_nullable_202608111200_weisun_ddl.sql"/>
+    <include file="classpath:liquibase/ddl/policy_projection_fix_202608111500_weisun_ddl.sql"/>
 </databaseChangeLog>

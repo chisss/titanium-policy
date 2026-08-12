@@ -5,7 +5,7 @@ import org.axonframework.commandhandling.gateway.CommandGateway;
 import org.springframework.stereotype.Service;
 
 import com.titanium.metadata.enums.policy.PolicyEnum;
-import com.titanium.policy.application.orchestration.issuance.IssuanceOrchestrator;
+import com.titanium.policy.application.orchestration.issuance.orchestrator.IssuanceOrchestrator;
 import com.titanium.policy.command.ActivatePolicyCommand;
 import com.titanium.policy.command.ApplyPolicyEndorsementCommand;
 import com.titanium.policy.command.CancelPolicyCommand;

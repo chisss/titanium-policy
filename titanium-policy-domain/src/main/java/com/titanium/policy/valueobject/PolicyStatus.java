@@ -2,6 +2,8 @@ package com.titanium.policy.valueobject;
 
 import java.time.LocalDateTime;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import com.titanium.metadata.enums.BaseEnum;
 import com.titanium.policy.exception.PolicyStatusTransitionException;
 
@@ -54,6 +56,7 @@ public record PolicyStatus(StatusCode statusCode, LocalDateTime statusTime, Stri
      *
      * @return 是否有效
      */
+    @JsonIgnore
     public boolean isActive() {
         return this.statusCode == StatusCode.EFFECTIVE;
     }
@@ -63,6 +66,7 @@ public record PolicyStatus(StatusCode statusCode, LocalDateTime statusTime, Stri
      *
      * @return 是否终态
      */
+    @JsonIgnore
     public boolean isTerminal() {
         return this.statusCode == StatusCode.TERMINATED
                 || this.statusCode == StatusCode.EXPIRED

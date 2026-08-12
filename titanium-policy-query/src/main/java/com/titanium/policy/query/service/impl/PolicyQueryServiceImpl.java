@@ -173,8 +173,12 @@ public class PolicyQueryServiceImpl implements PolicyQueryService {
         result.setPolicyHolderName(view.getPolicyHolderName());
         result.setInsuredName(view.getInsuredName());
         result.setProductCode(view.getProductCode());
+        // TODO: productName需要跨域查询product服务或事件增强，暂时为null
         if (view.getPremium() != null) {
             result.setPremium(view.getPremium().doubleValue());
+        }
+        if (view.getSumInsured() != null) {
+            result.setSumInsured(view.getSumInsured().doubleValue());
         }
         result.setCurrency(view.getCurrency());
         result.setEffectiveDate(view.getStartDate());

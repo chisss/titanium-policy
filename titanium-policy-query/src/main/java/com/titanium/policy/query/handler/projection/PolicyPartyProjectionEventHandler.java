@@ -60,6 +60,11 @@ public class PolicyPartyProjectionEventHandler {
         // 幂等：先清理该保单的存量参与方投影，再重建
         insuredViewRepository.deleteByPolicyIdAndTenantId(policyId, tenantId);
         beneficiaryViewRepository.deleteByPolicyIdAndTenantId(policyId, tenantId);
+        // 🔴 必须显式 flush：投影主键是 policyId 派生的确定性 ID，事件重放时新旧主键相同。
+        // Hibernate 在事务提交时按「先 INSERT 后 DELETE」排序动作队列，若不强制先落 DELETE，
+        // 重放即撞主键（Duplicate entry for key PRIMARY），导致参与方投影永久失败。
+        insuredViewRepository.flush();
+        beneficiaryViewRepository.flush();
 
         // 投影被保险人列表
         List<InsuredPartyList.InsuredInfo> insuredList = partyList.insuredList();

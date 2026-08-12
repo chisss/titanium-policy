@@ -1,7 +1,6 @@
 package com.titanium.policy.aggregate;
 
 import java.time.LocalDateTime;
-import java.util.Collections;
 
 import org.axonframework.test.aggregate.AggregateTestFixture;
 import org.axonframework.test.aggregate.FixtureConfiguration;
@@ -19,6 +18,7 @@ import com.titanium.policy.event.PolicyEndorsedEvent;
 import com.titanium.policy.exception.PolicyBusinessRuleException;
 import com.titanium.policy.valueobject.PolicyNo;
 import com.titanium.policy.valueobject.PolicyStatus;
+import com.titanium.policy.valueobject.policy.PolicyPeriod;
 
 /**
  * 保单聚合根·批改回写测试
@@ -42,10 +42,9 @@ class PolicyEndorsementTest {
 
     private PolicyCreatedEvent createdEvent() {
         LocalDateTime now = LocalDateTime.now();
-        return new PolicyCreatedEvent(POLICY_ID, new PolicyNo("POL-2024-0001"), PolicyForm.INDIVIDUAL, null,
-                now.minusDays(1), now.plusYears(1), null, null,
-                new PolicyStatus(PolicyStatus.StatusCode.NOT_EFFECTIVE, now, "创建", "system"),
-                Collections.emptyList(), null, null, TENANT_ID);
+        return new PolicyCreatedEvent(POLICY_ID, new PolicyNo("POL-2024-0001"), PolicyForm.INDIVIDUAL, null, null, null, null, null,
+                PolicyPeriod.of(now.minusDays(1), now.plusYears(1), 0, 0), null, null, java.util.List.of(), null, null, null, new PolicyStatus(PolicyStatus.StatusCode.NOT_EFFECTIVE, now, "创建", "system"),
+                null, null, TENANT_ID);
     }
 
     /** 匹配指定批改类型的 PolicyEndorsedEvent（忽略时间戳） */

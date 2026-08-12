@@ -10,6 +10,8 @@ import org.axonframework.modelling.command.AggregateIdentifier;
 import org.axonframework.modelling.command.AggregateLifecycle;
 import org.axonframework.spring.stereotype.Aggregate;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import com.titanium.common.domain.BaseAggregate;
 import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.policy.PolicyEnum;
@@ -29,6 +31,7 @@ import com.titanium.policy.command.LinkSubPolicyCommand;
 import com.titanium.policy.command.MatureDuePolicyCommand;
 import com.titanium.policy.command.MaturePolicyCommand;
 import com.titanium.policy.command.PayAnnuityBenefitCommand;
+import com.titanium.policy.command.RecordPremiumCollectionCommand;
 import com.titanium.policy.command.ReinstatePolicyCommand;
 import com.titanium.policy.command.RemoveInsuredMemberCommand;
 import com.titanium.policy.command.ResumePolicyCommand;
@@ -36,14 +39,14 @@ import com.titanium.policy.command.StartAnnuityPayoutCommand;
 import com.titanium.policy.command.SuspendPolicyCommand;
 import com.titanium.policy.command.TerminatePolicyCommand;
 import com.titanium.policy.command.UpdateAccountValueCommand;
+import com.titanium.policy.command.UpdateLineUnderwritingResultCommand;
 import com.titanium.policy.command.WaivePremiumCommand;
 import com.titanium.policy.common.constant.PolicyConstants;
 import com.titanium.policy.common.enums.PremiumWaiverReason;
 import com.titanium.policy.entity.Endorsement;
-import com.titanium.policy.entity.InsuranceProduct;
 import com.titanium.policy.entity.PaymentRecord;
-import com.titanium.policy.entity.Subject;
 import com.titanium.policy.entity.insurance.InsuredPartyList;
+import com.titanium.policy.entity.policy.PolicyProduct;
 import com.titanium.policy.event.AccountValueUpdatedEvent;
 import com.titanium.policy.event.AnnuityBenefitPaidEvent;
 import com.titanium.policy.event.AnnuityPayoutStartedEvent;
@@ -51,6 +54,7 @@ import com.titanium.policy.event.DividendDistributedEvent;
 import com.titanium.policy.event.InsuredMemberAddedEvent;
 import com.titanium.policy.event.InsuredMemberRemovedEvent;
 import com.titanium.policy.event.InvestmentAccountLinkedEvent;
+import com.titanium.policy.event.LineUnderwritingResultUpdatedEvent;
 import com.titanium.policy.event.PolicyActivatedEvent;
 import com.titanium.policy.event.PolicyCancelledEvent;
 import com.titanium.policy.event.PolicyCreatedEvent;
@@ -64,17 +68,21 @@ import com.titanium.policy.event.PolicyReinstatedEvent;
 import com.titanium.policy.event.PolicyResumedEvent;
 import com.titanium.policy.event.PolicySuspendedEvent;
 import com.titanium.policy.event.PolicyTerminatedEvent;
+import com.titanium.policy.event.PremiumCollectedEvent;
 import com.titanium.policy.event.PremiumWaivedEvent;
 import com.titanium.policy.event.SubPolicyLinkedEvent;
 import com.titanium.policy.exception.PolicyBusinessRuleException;
+import com.titanium.policy.service.PolicyCompositionDomainService;
 import com.titanium.policy.valueobject.AnnuityPayoutPlan;
-import com.titanium.policy.valueobject.DeductibleRule;
-import com.titanium.policy.valueobject.PolicyBasicInfo;
 import com.titanium.policy.valueobject.PolicyDocument;
 import com.titanium.policy.valueobject.PolicyNo;
 import com.titanium.policy.valueobject.PolicyRelation;
 import com.titanium.policy.valueobject.PolicyStatus;
 import com.titanium.policy.valueobject.PremiumPlan;
+import com.titanium.policy.valueobject.RuleDecision;
+import com.titanium.policy.valueobject.policy.ChannelInfo;
+import com.titanium.policy.valueobject.policy.CollectionInfo;
+import com.titanium.policy.valueobject.policy.PolicyPeriod;
 
 import lombok.Getter;
 import lombok.experimental.SuperBuilder;
@@ -101,24 +109,45 @@ public class Policy extends BaseAggregate {
     private String                 insuranceId;
     /** 保单形态 */
     private PolicyForm             policyForm;
-    /** 父保单ID */
-    private String                 parentPolicyId;
-    /** 签发机构 */
-    private String                 issueOrg;
     /** 签发时间 */
     private LocalDateTime          issueTime;
-    /** 保单基本信息 */
-    private PolicyBasicInfo        basicInfo;
+    /** 关联意向单ID（三步出单来源；三级贯通 Proposal→Insurance→Policy 的回指） */
+    private String                 proposalId;
+    /** 关联核保单ID（承保依据溯源） */
+    private String                 underwritingId;
+    /** 营销包ID（弱引用 marketing 域，仅溯源与转化统计；无营销来源时为 null） */
+    private String                 marketPackageId;
+    /**
+     * 保单总保费（= Σ 计入段的保费；拒保段不计入）
+     * <p>
+     * 取代原 {@code PolicyBasicInfo.totalPremium}。原 {@code basicInfo} 的 7 个字段中，
+     * 投保人ID/被保险人数已由 {@code insuredPartyList} 承载、保障起止期已由 {@code policyPeriod}
+     * 承载、销售渠道已由 {@code channelInfo} 承载，仅总保费与版本号是唯一真相，故拆为直属字段
+     * 并删除该值对象，消除「同一事实两处存放」的漂移风险。
+     * </p>
+     */
+    private Money                  totalPremium;
+    /** 保单业务版本号（批改后递增；区别于 Axon 聚合序列号） */
+    private int                    policyVersion;
     /** 保单关系 */
     private PolicyRelation         policyRelation;
-    /** 投保险种列表 */
-    private List<InsuranceProduct> insuranceProducts;
-    /** 保险标的列表 */
-    private List<Subject>          subjects;
+    /**
+     * 险种段列表（L2，一单多险的载体）
+     * <p>
+     * 一张保单含 1..N 个险种段，每段对应一个产品并持有各自的保额/保费/保障期间/缴费条件/
+     * 核保结论/承保状态，段内含条款快照（L2.5）、标的（L3）、责任快照（L4）。
+     * 单险种保单即长度为 1。取代原 {@code insuranceProducts} + {@code subjects} 两个恒空列表。
+     * </p>
+     */
+    private List<PolicyProduct>    policyProducts;
+    /** 保单期间（保障期 + 等待期 + 犹豫期） */
+    private PolicyPeriod           policyPeriod;
+    /** 收费信息（收费方式/账单/支付单/应收实收/收讫状态） */
+    private CollectionInfo         collectionInfo;
+    /** 渠道信息（来源渠道/销售渠道大类/代理人） */
+    private ChannelInfo            channelInfo;
     /** 保费计划 */
     private PremiumPlan            premiumPlan;
-    /** 免赔规则列表 */
-    private List<DeductibleRule>   deductibleRules;
     /** 投保参与方清单 */
     private InsuredPartyList       insuredPartyList;
     /** 关联投资账户ID（投连/万能保单出单后挂接，investment 域生成） */
@@ -151,30 +180,67 @@ public class Policy extends BaseAggregate {
     // ==================== CommandHandler ====================
 
     /**
-     * 创建保单（从投保单+核保结果创建）
+     * 创建保单（承保出单：从投保单 + 核保结果创建）
+     * <p>
+     * 险种段构成的四条不变量（唯一主险 / 附加险依附合法 / 保费守恒 / 段标识唯一）由
+     * {@link PolicyCompositionDomainService} 裁决——该服务为纯领域服务（无 Port、无 CommandGateway），
+     * 经 Axon 的 {@code @CommandHandler} 参数注入取得，属合法用法（入参仍为实体与值对象）。
+     * </p>
+     *
+     * @param command                 创建保单命令
+     * @param compositionDomainService 保单构成领域服务（Axon 参数注入）
      */
     @CommandHandler
-    public Policy(CreatePolicyCommand command) {
-        AggregateLifecycle
-                .apply(new PolicyCreatedEvent(command.policyId(), new PolicyNo(command.policyNo()),
-                        command.policyForm(), command.productId(), command.startDate(),
-                        command.endDate(), command.premium(), command.sumInsured(),
-                        new PolicyStatus(PolicyStatus.StatusCode.NOT_EFFECTIVE,
-                                LocalDateTime.now(), "创建保单", PolicyConstants.POLICY_SYSTEM),
-                        new ArrayList<>(), command.insuredPartyList(), command.insuranceType(), command.tenantId()));
+    public Policy(CreatePolicyCommand command, PolicyCompositionDomainService compositionDomainService) {
+        validateComposition(compositionDomainService, command.policyProducts(), command.premium());
+        AggregateLifecycle.apply(new PolicyCreatedEvent(command.policyId(), new PolicyNo(command.policyNo()),
+                command.policyForm(), command.productId(), command.insuranceId(), command.proposalId(),
+                command.underwritingId(), command.marketPackageId(), command.policyPeriod(), command.premium(),
+                command.sumInsured(), command.policyProducts(), command.premiumPlan(), command.collectionInfo(),
+                command.channelInfo(),
+                new PolicyStatus(PolicyStatus.StatusCode.NOT_EFFECTIVE, LocalDateTime.now(), "创建保单",
+                        PolicyConstants.POLICY_SYSTEM),
+                command.insuredPartyList(), command.insuranceType(), command.tenantId()));
     }
 
     /**
-     * 一步出单直接创建保单
+     * 一步出单直接创建保单（免核保短险，录入即出单）
+     * <p>
+     * 与承保出单产出结构一致：同样落地险种段、参与方清单、期间、缴费与收费信息，下游读侧与
+     * 理赔无需区分出单模式。改造前本路径丢弃参与方（传 null），已修复。
+     * </p>
+     *
+     * @param command                 一步出单命令
+     * @param compositionDomainService 保单构成领域服务（Axon 参数注入）
      */
     @CommandHandler
-    public Policy(CreatePolicyDirectlyCommand command) {
+    public Policy(CreatePolicyDirectlyCommand command, PolicyCompositionDomainService compositionDomainService) {
+        validateComposition(compositionDomainService, command.policyProducts(), command.totalPremium());
         AggregateLifecycle.apply(new PolicyCreatedEvent(command.policyId(), new PolicyNo(command.policyNo()),
-                command.policyForm(), command.productId(), command.insurancePeriodStart(),
-                command.insurancePeriodEnd(), command.totalPremium(), command.sumInsured(),
+                command.policyForm(), command.productId(), null, null, null, command.marketPackageId(),
+                command.policyPeriod(), command.totalPremium(), command.sumInsured(), command.policyProducts(),
+                command.premiumPlan(), command.collectionInfo(), command.channelInfo(),
                 new PolicyStatus(PolicyStatus.StatusCode.NOT_EFFECTIVE, LocalDateTime.now(), "一步出单创建保单",
                         PolicyConstants.POLICY_SYSTEM),
-                new ArrayList<>(), null, command.insuranceType(), command.tenantId()));
+                command.insuredPartyList(), command.insuranceType(), command.tenantId()));
+    }
+
+    /**
+     * 校验险种段构成，不通过则转译为业务异常（不变量守护）。
+     * <p>
+     * 段列表为空时放行：兼容存量单险种链路尚未改造完成的调用方（其险种信息在读侧冗余字段），
+     * 出单入口贯通后由应用层保证段列表非空。
+     * </p>
+     */
+    private void validateComposition(PolicyCompositionDomainService compositionDomainService,
+                                     List<PolicyProduct> lines, Money totalPremium) {
+        if (lines == null || lines.isEmpty()) {
+            return;
+        }
+        RuleDecision decision = compositionDomainService.validate(lines, totalPremium);
+        if (!decision.passed()) {
+            throw new PolicyBusinessRuleException("POLICY_COMPOSITION_INVALID", decision.defaultMessage());
+        }
     }
 
     /**
@@ -186,13 +252,19 @@ public class Policy extends BaseAggregate {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "Only NOT_EFFECTIVE policies can be issued");
         }
         generateDocument();
-        Money issuedPremium = this.basicInfo != null ? this.basicInfo.totalPremium() : null;
+        Money issuedPremium = totalPremium();
         AggregateLifecycle.apply(new PolicyIssuedEvent(this.policyId, this.policyNo.value(), this.productId,
                 issuedPremium, this.sumInsured, LocalDateTime.now(), command.operatorId(), this.tenantId));
     }
 
     /**
      * 激活保单（生效）
+     * <p>
+     * 🔴 <b>收费校验修正</b>：改造前依赖 {@code premiumPlan.paymentStatus()}，而 {@code premiumPlan}
+     * 在事件溯源后恒为 null，使该校验被整体短路——「未收费也能激活保单」。现改为依
+     * {@link CollectionInfo#allowsActivation()} 判定：已收讫、或收费方式本身不以收讫为生效前提
+     * （先享后付）方可生效。
+     * </p>
      */
     @CommandHandler
     public void handle(ActivatePolicyCommand command) {
@@ -200,14 +272,16 @@ public class Policy extends BaseAggregate {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION",
                     "Only NOT_EFFECTIVE policies can be activated");
         }
-        // 校验首期保费是否已缴纳
-        if (this.premiumPlan != null && this.premiumPlan.paymentStatus() == PremiumPlan.PaymentStatus.UNPAID) {
-            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION",
-                    "First premium must be paid before activation");
+        if (!isPremiumConditionSatisfied()) {
+            throw new PolicyBusinessRuleException("POLICY_PREMIUM_NOT_COLLECTED",
+                    "首期保费未收讫，保单不可生效（收费方式："
+                            + (this.collectionInfo != null && this.collectionInfo.collectionMode() != null
+                                    ? this.collectionInfo.collectionMode().getName()
+                                    : "未知")
+                            + "）");
         }
         // 校验保障起期是否到达
-        if (this.basicInfo != null && this.basicInfo.insurancePeriodStart() != null
-                && this.basicInfo.insurancePeriodStart().isAfter(LocalDateTime.now())) {
+        if (this.policyPeriod != null && !this.policyPeriod.hasStarted(LocalDateTime.now())) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "Insurance period has not started yet");
         }
         AggregateLifecycle.apply(new PolicyActivatedEvent(this.policyId, LocalDateTime.now(), this.tenantId));
@@ -298,11 +372,117 @@ public class Policy extends BaseAggregate {
                     "保全案件 " + command.sourceMaintenanceId() + " 已批改，忽略重复请求");
         }
         // versionAfter 仅作审计快照（事件溯源权威版本由 ESH 重放 incrementVersion 产生）
-        int versionAfter = (this.basicInfo != null ? this.basicInfo.policyVersion() : 0) + 1;
+        int versionAfter = this.policyVersion + 1;
         AggregateLifecycle.apply(new PolicyEndorsedEvent(this.policyId, command.endorsementNo(), command.updateType(),
                 command.updateType().getCategory(), versionAfter, command.endorsementEffectiveDate(),
                 command.changeSummary(), command.originalSnapshot(), command.updateType().needsPremiumRecalc(),
                 command.sourceMaintenanceId(), LocalDateTime.now(), command.operatorId(), this.tenantId));
+    }
+
+    /**
+     * 记录保费收讫（billing / payment 收费回调驱动，事件溯源）
+     * <p>
+     * 补齐此前的断链：原 {@code recordPayment(PaymentRecord)} 为普通方法且零调用方，收费事实
+     * 无从进入保单，致 {@code collectionInfo} 恒无实收、保单生效校验被短路。
+     * </p>
+     * <p>
+     * 幂等保护：同一支付流水不重复记账（收费回调 at-least-once 重投兜底）。
+     * </p>
+     */
+    @CommandHandler
+    public void handle(RecordPremiumCollectionCommand command) {
+        if (command.collectedAmount() == null || command.collectedAmount().value().signum() <= 0) {
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "实收金额必须大于零");
+        }
+        if (command.paymentId() != null && this.paymentRecords != null && this.paymentRecords.stream()
+                .anyMatch(record -> command.paymentId().equals(record.paymentId()))) {
+            throw new PolicyBusinessRuleException("POLICY_PAYMENT_DUPLICATE",
+                    "支付流水 " + command.paymentId() + " 已记账，忽略重复回调");
+        }
+        CollectionInfo current = this.collectionInfo;
+        LocalDateTime collectedAt = command.collectedTime() != null ? command.collectedTime() : LocalDateTime.now();
+        CollectionInfo collected = current != null
+                ? current.collect(command.collectedAmount(), collectedAt)
+                : CollectionInfo.initial(null, command.collectedAmount(), collectedAt)
+                        .collect(command.collectedAmount(), collectedAt);
+        AggregateLifecycle.apply(new PremiumCollectedEvent(this.policyId, command.paymentId(), command.paymentNo(),
+                command.collectedAmount(), collected.collectedAmount(), collected.collectionStatus(),
+                command.paymentMethod(), collectedAt, command.operatorId(), this.tenantId));
+    }
+
+    @EventSourcingHandler
+    public void on(PremiumCollectedEvent event) {
+        if (this.collectionInfo != null) {
+            this.collectionInfo = this.collectionInfo.collect(event.collectedAmount(), event.collectedTime());
+        }
+        if (this.paymentRecords == null) {
+            this.paymentRecords = new ArrayList<>();
+        }
+        this.paymentRecords.add(new PaymentRecord(event.paymentId(), event.paymentNo(), event.collectedAmount(),
+                event.collectedTime(), event.paymentMethod(), null));
+        // 缴费计划的缴费状态随收讫同步（收讫则视为已缴）
+        if (this.premiumPlan != null && event.collectionStatus() != null && event.collectionStatus().allowsActivation()) {
+            this.premiumPlan = new PremiumPlan(this.premiumPlan.premiumAmount(), this.premiumPlan.paymentMethod(),
+                    this.premiumPlan.paymentCycle(), this.premiumPlan.premiumDueDate(), PremiumPlan.PaymentStatus.PAID);
+        }
+    }
+
+    /**
+     * 回写险种段核保结论（支撑主险通过 / 附加险拒保，事件溯源）
+     * <p>
+     * 拒保段的保费不计入保单总保费，故本命令会重算总保费并随事件携带，供读侧同步。
+     * </p>
+     */
+    @CommandHandler
+    public void handle(UpdateLineUnderwritingResultCommand command) {
+        PolicyProduct line = lineOf(command.policyProductId());
+        if (line == null) {
+            throw new PolicyBusinessRuleException("POLICY_LINE_NOT_FOUND",
+                    "险种段不存在: " + command.policyProductId());
+        }
+        if (command.conclusion() == null) {
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "核保结论不能为空");
+        }
+        PolicyProduct updated = line.withUnderwritingConclusion(command.conclusion());
+        Money totalAfter = totalPremiumExcluding(command.policyProductId(), updated.effectivePremium());
+        AggregateLifecycle.apply(new LineUnderwritingResultUpdatedEvent(this.policyId, command.policyProductId(),
+                command.conclusion(), updated.lineStatus(), command.underwritingId(), command.opinion(), totalAfter,
+                LocalDateTime.now(), command.operatorId(), this.tenantId));
+    }
+
+    @EventSourcingHandler
+    public void on(LineUnderwritingResultUpdatedEvent event) {
+        if (this.policyProducts == null) {
+            return;
+        }
+        for (int i = 0; i < this.policyProducts.size(); i++) {
+            PolicyProduct line = this.policyProducts.get(i);
+            if (event.policyProductId().equals(line.policyProductId())) {
+                this.policyProducts.set(i, line.withUnderwritingConclusion(event.conclusion()));
+                break;
+            }
+        }
+    }
+
+    /**
+     * 以指定段的新保费重算保单总保费（该段用新值，其余段用现值）。
+     */
+    private Money totalPremiumExcluding(String policyProductId, Money replacementPremium) {
+        Money total = replacementPremium;
+        if (this.policyProducts == null) {
+            return total;
+        }
+        for (PolicyProduct line : this.policyProducts) {
+            if (policyProductId.equals(line.policyProductId())) {
+                continue;
+            }
+            Money linePremium = line.effectivePremium();
+            if (linePremium == null) {
+                continue;
+            }
+            total = total == null ? linePremium : total.add(linePremium);
+        }
+        return total;
     }
 
     /**
@@ -327,18 +507,28 @@ public class Policy extends BaseAggregate {
         this.productId = event.productId();
         this.sumInsured = event.sumInsured();
         this.insuranceType = event.insuranceType();
+        this.insuranceId = event.insuranceId();
+        this.proposalId = event.proposalId();
+        this.underwritingId = event.underwritingId();
+        this.marketPackageId = event.marketPackageId();
         this.tenantId = event.tenantId();
         this.createTime = LocalDateTime.now();
-        this.insuranceProducts = new ArrayList<>();
-        this.subjects = new ArrayList<>();
-        this.deductibleRules = new ArrayList<>();
         this.paymentRecords = new ArrayList<>();
         this.policyDocuments = new ArrayList<>();
         this.endorsements = new ArrayList<>();
         this.status = event.status();
         this.policyRelation = new PolicyRelation(PolicyEnum.PolicyLevel.INDEPENDENT, null, 0, null);
-        this.basicInfo = new PolicyBasicInfo(null, 0, event.premium(), event.effectiveDate(), event.expiryDate(), 0,
-                null);
+        // 险种段列表（L2）：事件携带则落地，缺失时置空列表（兼容存量事件；改造后出单链路必带）
+        this.policyProducts = event.policyProducts() != null
+                ? new ArrayList<>(event.policyProducts())
+                : new ArrayList<>();
+        // 期间/缴费/收费/渠道：事件直落，不再恒 null（此前 premiumPlan 恒 null 致收费校验被短路）
+        this.policyPeriod = event.policyPeriod();
+        this.premiumPlan = event.premiumPlan();
+        this.collectionInfo = event.collectionInfo();
+        this.channelInfo = event.channelInfo();
+        this.totalPremium = event.premium();
+        this.policyVersion = 0;
         // 优先使用事件携带的参与方清单（含真实投保人/被保险人/受益人快照）；事件无清单时初始化空清单以兼容存量事件
         this.insuredPartyList = event.insuredPartyList() != null
                 ? event.insuredPartyList()
@@ -349,7 +539,7 @@ public class Policy extends BaseAggregate {
     public void on(PolicyEndorsedEvent event) {
         // 版本真相唯一由此处递增产生（事件 versionAfter 仅审计）；批单记录取递增后的版本号
         incrementVersion();
-        int currentVersion = this.basicInfo != null ? this.basicInfo.policyVersion() : event.versionAfter();
+        int currentVersion = this.policyVersion;
         if (this.endorsements == null) {
             this.endorsements = new ArrayList<>();
         }
@@ -414,6 +604,132 @@ public class Policy extends BaseAggregate {
     public void on(PolicyCancelledEvent event) {
         this.status = this.status.transitionStatus(PolicyStatus.StatusCode.CANCELLED, "保单取消",
                 PolicyConstants.POLICY_SYSTEM);
+    }
+
+    // ==================== 业务方法 ====================
+
+    // ==================== 险种段导航与保单构成 ====================
+
+    /**
+     * 主险段（一张保单有且仅有一个）。
+     *
+     * @return 主险段；段列表为空时返回 null
+     */
+    public PolicyProduct mainLine() {
+        if (this.policyProducts == null) {
+            return null;
+        }
+        return this.policyProducts.stream().filter(PolicyProduct::isMain).findFirst().orElse(null);
+    }
+
+    /**
+     * 附加险段列表（依附于主险，可为空）。
+     *
+     * @return 附加险段列表
+     */
+    public List<PolicyProduct> riderLines() {
+        if (this.policyProducts == null) {
+            return List.of();
+        }
+        return this.policyProducts.stream().filter(PolicyProduct::isRider).toList();
+    }
+
+    /**
+     * 按段ID查找险种段。
+     *
+     * @param policyProductId 险种段ID
+     * @return 匹配的险种段；未找到返回 null
+     */
+    public PolicyProduct lineOf(String policyProductId) {
+        if (this.policyProducts == null || policyProductId == null) {
+            return null;
+        }
+        return this.policyProducts.stream()
+                .filter(line -> policyProductId.equals(line.policyProductId()))
+                .findFirst()
+                .orElse(null);
+    }
+
+    /**
+     * 保单总保费（Σ 计入段的保费，拒保段不计入）。
+     * <p>
+     * 段列表为空时回退取基本信息中的总保费（兼容存量单险种保单）。
+     * </p>
+     *
+     * @return 总保费；无从计算时返回 null
+     */
+    public Money totalPremium() {
+        if (this.policyProducts == null || this.policyProducts.isEmpty()) {
+            return this.totalPremium;
+        }
+        Money total = null;
+        for (PolicyProduct line : this.policyProducts) {
+            Money linePremium = line.effectivePremium();
+            if (linePremium == null) {
+                continue;
+            }
+            total = total == null ? linePremium : total.add(linePremium);
+        }
+        return total;
+    }
+
+    /**
+     * 本保单包含的险种段数量（单险种保单为 1）。
+     *
+     * @return 险种段数量
+     */
+    public int lineCount() {
+        return this.policyProducts != null ? this.policyProducts.size() : 0;
+    }
+
+    // ==================== 期间与收费判定 ====================
+
+    /**
+     * 当前是否处于等待期内（疾病类责任此期间不赔）。
+     *
+     * @return 在等待期内返回 {@code true}
+     */
+    @JsonIgnore
+    public boolean isInWaitingPeriod() {
+        return this.policyPeriod != null && this.policyPeriod.isInWaitingPeriod(LocalDateTime.now());
+    }
+
+    /**
+     * 当前是否处于犹豫期内（投保人可无条件退保，仅扣工本费）。
+     *
+     * @return 在犹豫期内返回 {@code true}
+     */
+    @JsonIgnore
+    public boolean isInHesitationPeriod() {
+        return this.policyPeriod != null && this.policyPeriod.isInHesitationPeriod(LocalDateTime.now());
+    }
+
+    /**
+     * 保单是否满足全部生效条件（收费条件 + 保障起期已到 + 当前为未生效态）。
+     *
+     * @return 可生效返回 {@code true}
+     */
+    public boolean canActivate() {
+        return this.status != null && this.status.statusCode() == PolicyStatus.StatusCode.NOT_EFFECTIVE
+                && isPremiumConditionSatisfied()
+                && (this.policyPeriod == null || this.policyPeriod.hasStarted(LocalDateTime.now()));
+    }
+
+    /**
+     * 保费条件是否满足生效要求。
+     * <p>
+     * 有收费信息时以其判定（已收讫或先享后付放行）；无收费信息时退回缴费计划判定，
+     * 二者皆无则放行（兼容尚未接入收费链路的存量保单）。
+     * </p>
+     */
+    private boolean isPremiumConditionSatisfied() {
+        if (this.collectionInfo != null) {
+            return this.collectionInfo.allowsActivation();
+        }
+        if (this.premiumPlan != null) {
+            return this.premiumPlan.paymentStatus() != PremiumPlan.PaymentStatus.UNPAID;
+        }
+        return true;
     }
 
     // ==================== 业务方法 ====================
@@ -787,12 +1103,13 @@ public class Policy extends BaseAggregate {
     }
 
     /**
-     * 版本递增（保全域数据变更后调用）
+     * 业务版本号递增（保全域数据变更/批改后调用）
+     * <p>
+     * 版本真相唯一由此产生（{@code PolicyEndorsedEvent.versionAfter} 仅作审计快照）。
+     * </p>
      */
     public void incrementVersion() {
-        if (this.basicInfo != null) {
-            this.basicInfo = this.basicInfo.createNewVersion();
-        }
+        this.policyVersion++;
     }
 
     // ==================== 内部方法 ====================

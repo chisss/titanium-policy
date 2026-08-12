@@ -7,11 +7,10 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.RequestMapping;
 
+import com.titanium.metadata.response.ApiResponse;
 import com.titanium.policy.api.request.AccountValueWriteBackRequest;
 import com.titanium.policy.api.request.CreatePolicyRequest;
-import com.titanium.policy.api.response.ApiResponse;
 import com.titanium.policy.api.response.PolicyResponse;
 import com.titanium.policy.api.response.PolicyStatusResponse;
 
@@ -27,8 +26,7 @@ import com.titanium.policy.api.response.PolicyStatusResponse;
  * 否则 Spring 启动报「Multiple @FeignClient with the same name」Bean 冲突。
  * </p>
  */
-@FeignClient(name = "titanium-policy", contextId = "policyApi")
-@RequestMapping("/api/v1/policies")
+@FeignClient(name = "titanium-policy", contextId = "policyApi", path = "/api/v1/policies")
 public interface PolicyApi {
 
     /**

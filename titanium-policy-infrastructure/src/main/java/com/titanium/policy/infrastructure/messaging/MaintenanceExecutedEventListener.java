@@ -10,8 +10,8 @@ import org.springframework.stereotype.Component;
 
 import com.alibaba.fastjson2.JSONObject;
 
-import com.titanium.policy.application.orchestration.maintenance.MaintenanceWriteBackContext;
-import com.titanium.policy.application.orchestration.maintenance.MaintenanceWriteBackStrategy;
+import com.titanium.policy.application.orchestration.maintenance.context.MaintenanceWriteBackContext;
+import com.titanium.policy.application.orchestration.maintenance.strategy.MaintenanceWriteBackStrategy;
 import com.titanium.policy.common.enums.PolicyDataUpdateType;
 import com.titanium.policy.infrastructure.messaging.inbound.MaintenanceExecutedMessage;
 

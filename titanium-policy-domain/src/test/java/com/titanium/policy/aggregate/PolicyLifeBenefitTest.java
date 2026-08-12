@@ -2,7 +2,6 @@ package com.titanium.policy.aggregate;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 
 import org.axonframework.test.aggregate.AggregateTestFixture;
 import org.axonframework.test.aggregate.FixtureConfiguration;
@@ -29,6 +28,7 @@ import com.titanium.policy.event.PremiumWaivedEvent;
 import com.titanium.policy.exception.PolicyBusinessRuleException;
 import com.titanium.policy.valueobject.PolicyNo;
 import com.titanium.policy.valueobject.PolicyStatus;
+import com.titanium.policy.valueobject.policy.PolicyPeriod;
 
 /**
  * 保单聚合根·寿险给付生命周期测试（满期给付 / 保费豁免 / 红利派发）
@@ -52,9 +52,8 @@ class PolicyLifeBenefitTest {
 
     private PolicyCreatedEvent createdEvent(InsuranceProductType type) {
         LocalDateTime now = LocalDateTime.now();
-        return new PolicyCreatedEvent(POLICY_ID, new PolicyNo("POL-2024-0001"), PolicyForm.INDIVIDUAL, null, now,
-                now.plusYears(10), null, null,
-                new PolicyStatus(PolicyStatus.StatusCode.NOT_EFFECTIVE, now, "创建", "system"), new ArrayList<>(),
+        return new PolicyCreatedEvent(POLICY_ID, new PolicyNo("POL-2024-0001"), PolicyForm.INDIVIDUAL, null, null, null, null, null,
+                PolicyPeriod.of(now, now.plusYears(10), 0, 0), null, null, java.util.List.of(), null, null, null, new PolicyStatus(PolicyStatus.StatusCode.NOT_EFFECTIVE, now, "创建", "system"),
                 null, type, TENANT_ID);
     }
 
@@ -116,10 +115,10 @@ class PolicyLifeBenefitTest {
 
     private PolicyCreatedEvent createdEventWithSumInsured(InsuranceProductType type, BigDecimal sumInsured) {
         LocalDateTime now = LocalDateTime.now();
-        return new PolicyCreatedEvent(POLICY_ID, new PolicyNo("POL-2024-0003"), PolicyForm.INDIVIDUAL, null, now,
-                now.plusYears(10), null, com.titanium.metadata.valueobject.Money.of(sumInsured, "CNY"),
-                new PolicyStatus(PolicyStatus.StatusCode.NOT_EFFECTIVE, now, "创建", "system"), new ArrayList<>(),
-                null, type, TENANT_ID);
+        return new PolicyCreatedEvent(POLICY_ID, new PolicyNo("POL-2024-0003"), PolicyForm.INDIVIDUAL, null, null, null,
+                null, null, PolicyPeriod.of(now, now.plusYears(10), 0, 0), null,
+                com.titanium.metadata.valueobject.Money.of(sumInsured, "CNY"), java.util.List.of(), null, null, null,
+                new PolicyStatus(PolicyStatus.StatusCode.NOT_EFFECTIVE, now, "创建", "system"), null, type, TENANT_ID);
     }
 
     @Test
@@ -244,9 +243,8 @@ class PolicyLifeBenefitTest {
 
     private PolicyCreatedEvent universalCreatedEvent() {
         LocalDateTime now = LocalDateTime.now();
-        return new PolicyCreatedEvent(POLICY_ID, new PolicyNo("POL-2024-0002"), PolicyForm.UNIVERSAL, null, now,
-                now.plusYears(10), null, null,
-                new PolicyStatus(PolicyStatus.StatusCode.NOT_EFFECTIVE, now, "创建", "system"), new ArrayList<>(),
+        return new PolicyCreatedEvent(POLICY_ID, new PolicyNo("POL-2024-0002"), PolicyForm.UNIVERSAL, null, null, null, null, null,
+                PolicyPeriod.of(now, now.plusYears(10), 0, 0), null, null, java.util.List.of(), null, null, null, new PolicyStatus(PolicyStatus.StatusCode.NOT_EFFECTIVE, now, "创建", "system"),
                 null, InsuranceProductType.WHOLE_LIFE, TENANT_ID);
     }
 }

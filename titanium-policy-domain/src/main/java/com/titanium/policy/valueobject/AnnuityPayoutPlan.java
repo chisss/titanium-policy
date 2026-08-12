@@ -2,6 +2,8 @@ package com.titanium.policy.valueobject;
 
 import java.time.LocalDateTime;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.common.enums.AnnuityPayoutFrequency;
 import com.titanium.policy.common.enums.AnnuityPayoutStatus;
@@ -69,6 +71,7 @@ public record AnnuityPayoutPlan(LocalDateTime startDate, AnnuityPayoutFrequency 
      *
      * @return 终身年金返回 {@code true}
      */
+    @JsonIgnore
     public boolean isWholeLife() {
         return this.totalInstallments == null;
     }
@@ -78,6 +81,7 @@ public record AnnuityPayoutPlan(LocalDateTime startDate, AnnuityPayoutFrequency 
      *
      * @return 已完成返回 {@code true}
      */
+    @JsonIgnore
     public boolean isCompleted() {
         return this.status == AnnuityPayoutStatus.COMPLETED
                 || (!isWholeLife() && this.paidInstallments >= this.totalInstallments);

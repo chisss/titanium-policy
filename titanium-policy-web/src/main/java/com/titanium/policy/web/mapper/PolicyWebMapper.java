@@ -1,6 +1,7 @@
 package com.titanium.policy.web.mapper;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -18,6 +19,7 @@ import com.titanium.policy.command.MaturePolicyCommand;
 import com.titanium.policy.command.StartAnnuityPayoutCommand;
 import com.titanium.policy.command.WaivePremiumCommand;
 import com.titanium.policy.query.result.PolicyQueryResult;
+import com.titanium.policy.valueobject.policy.PolicyPeriod;
 import com.titanium.policy.web.dto.ApplyEndorsementDTO;
 import com.titanium.policy.web.dto.CreatePolicyDTO;
 import com.titanium.policy.web.dto.DistributeDividendDTO;
@@ -51,23 +53,36 @@ public interface PolicyWebMapper {
      */
     @Mapping(target = "sumInsured", expression = "java(toMoney(request.getSumInsured(), request.getCurrency()))")
     @Mapping(target = "premium", expression = "java(toMoney(request.getPremium(), request.getCurrency()))")
+    @Mapping(target = "policyPeriod", expression = "java(toPolicyPeriod(request.getStartDate(), request.getEndDate()))")
     @Mapping(target = "tenantId", source = "tenantId")
+    @Mapping(target = "policyProducts", ignore = true)
+    @Mapping(target = "collectionInfo", ignore = true)
+    @Mapping(target = "channelInfo", ignore = true)
+    @Mapping(target = "premiumPlan", ignore = true)
     CreatePolicyCommand toCommand(CreatePolicyDTO request, String tenantId);
 
     /**
      * HTTP Request → 一步出单命令（Controller 的 direct 端点用）
+     * <p>
+     * 🔴 本映射产出的命令<b>不含险种段</b>（{@code policyProducts} 留空），仅用于兼容既有的裸建单端点。
+     * 完整的一单多险出单请自 {@code PolicyIssuanceApi} 提交——出单编排器会依产品配置装配段、
+     * 条款与责任快照。裸建单产出的保单在读侧查不到险种/责任明细。
+     * </p>
      *
      * @param request 创建保单请求
      * @param tenantId 租户ID（请求头）
      * @return 一步出单命令
      */
-    @Mapping(target = "productCode", source = "request.productId")
     @Mapping(target = "totalPremium", expression = "java(toMoney(request.getPremium(), request.getCurrency()))")
     @Mapping(target = "sumInsured", expression = "java(toMoney(request.getSumInsured(), request.getCurrency()))")
-    @Mapping(target = "insurancePeriodStart", source = "request.startDate")
-    @Mapping(target = "insurancePeriodEnd", source = "request.endDate")
+    @Mapping(target = "policyPeriod", expression = "java(toPolicyPeriod(request.getStartDate(), request.getEndDate()))")
     @Mapping(target = "tenantId", source = "tenantId")
-    @Mapping(target = "insuredCount", ignore = true)
+    @Mapping(target = "policyProducts", ignore = true)
+    @Mapping(target = "insuredPartyList", ignore = true)
+    @Mapping(target = "collectionInfo", ignore = true)
+    @Mapping(target = "channelInfo", ignore = true)
+    @Mapping(target = "premiumPlan", ignore = true)
+    @Mapping(target = "marketPackageId", ignore = true)
     CreatePolicyDirectlyCommand toDirectCommand(CreatePolicyDTO request, String tenantId);
 
     /**
@@ -81,18 +96,22 @@ public interface PolicyWebMapper {
      * @return 创建保单命令
      */
     @Mapping(target = "policyNo", source = "dto.policyNumber")
-    @Mapping(target = "policyHolderId", source = "dto.customerId")
     @Mapping(target = "premium", expression = "java(toMoney(amountValue(dto.getPremium()), amountCurrency(dto.getPremium())))")
-    @Mapping(target = "startDate", source = "dto.effectiveDate")
-    @Mapping(target = "endDate", source = "dto.expiryDate")
+    @Mapping(target = "policyPeriod", expression = "java(toPolicyPeriod(dto.getEffectiveDate(), dto.getExpiryDate()))")
     @Mapping(target = "tenantId", source = "tenantId")
     @Mapping(target = "insuranceId", ignore = true)
+    @Mapping(target = "proposalId", ignore = true)
+    @Mapping(target = "underwritingId", ignore = true)
+    @Mapping(target = "marketPackageId", ignore = true)
     @Mapping(target = "policyForm", ignore = true)
     @Mapping(target = "productId", ignore = true)
     @Mapping(target = "issueOrg", ignore = true)
-    @Mapping(target = "insuredId", ignore = true)
+    @Mapping(target = "insuredPartyList", ignore = true)
+    @Mapping(target = "policyProducts", ignore = true)
     @Mapping(target = "sumInsured", ignore = true)
-    @Mapping(target = "channel", ignore = true)
+    @Mapping(target = "premiumPlan", ignore = true)
+    @Mapping(target = "collectionInfo", ignore = true)
+    @Mapping(target = "channelInfo", ignore = true)
     CreatePolicyCommand toCommand(CreatePolicyRequest dto, String tenantId);
 
     /**
@@ -106,16 +125,18 @@ public interface PolicyWebMapper {
      * @return 一步出单命令
      */
     @Mapping(target = "policyNo", source = "dto.policyNumber")
-    @Mapping(target = "policyHolderId", source = "dto.customerId")
     @Mapping(target = "totalPremium", expression = "java(toMoney(amountValue(dto.getPremium()), amountCurrency(dto.getPremium())))")
-    @Mapping(target = "insurancePeriodStart", source = "dto.effectiveDate")
-    @Mapping(target = "insurancePeriodEnd", source = "dto.expiryDate")
+    @Mapping(target = "policyPeriod", expression = "java(toPolicyPeriod(dto.getEffectiveDate(), dto.getExpiryDate()))")
     @Mapping(target = "tenantId", source = "tenantId")
-    @Mapping(target = "productCode", ignore = true)
     @Mapping(target = "policyForm", ignore = true)
-    @Mapping(target = "insuredCount", ignore = true)
+    @Mapping(target = "productId", ignore = true)
     @Mapping(target = "sumInsured", ignore = true)
-    @Mapping(target = "channel", ignore = true)
+    @Mapping(target = "policyProducts", ignore = true)
+    @Mapping(target = "insuredPartyList", ignore = true)
+    @Mapping(target = "premiumPlan", ignore = true)
+    @Mapping(target = "collectionInfo", ignore = true)
+    @Mapping(target = "channelInfo", ignore = true)
+    @Mapping(target = "marketPackageId", ignore = true)
     CreatePolicyDirectlyCommand toDirectCommand(CreatePolicyRequest dto, String tenantId);
 
     /**
@@ -250,6 +271,18 @@ public interface PolicyWebMapper {
      */
     default Money toMoney(BigDecimal value, String currency) {
         return value != null ? Money.of(value, currency != null ? currency : "CNY") : null;
+    }
+
+    /**
+     * 起止期 → 保单期间值对象（空安全）
+     * <p>
+     * 裸建单端点不承载等待期/犹豫期（二者由产品 {@code InsureCondition} 配置决定，
+     * 经出单编排器装配），此处传 0 表示无。走 {@code PolicyIssuanceApi} 的正规出单链路
+     * 会填入产品配置的真实天数。
+     * </p>
+     */
+    default PolicyPeriod toPolicyPeriod(LocalDateTime start, LocalDateTime end) {
+        return start == null && end == null ? null : PolicyPeriod.of(start, end, 0, 0);
     }
 
     /**

@@ -1,7 +1,6 @@
 package com.titanium.policy.aggregate;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 
 import org.axonframework.test.aggregate.AggregateTestFixture;
 import org.axonframework.test.aggregate.FixtureConfiguration;
@@ -25,6 +24,7 @@ import com.titanium.policy.event.PolicyCreatedEvent;
 import com.titanium.policy.exception.PolicyBusinessRuleException;
 import com.titanium.policy.valueobject.PolicyNo;
 import com.titanium.policy.valueobject.PolicyStatus;
+import com.titanium.policy.valueobject.policy.PolicyPeriod;
 
 /**
  * 保单聚合根·形态行为测试（阶段四 4.4/4.5/4.6）
@@ -49,8 +49,8 @@ class PolicyFormBehaviorTest {
     /** 指定形态的保单创建事件 */
     private PolicyCreatedEvent createdEvent(PolicyForm form) {
         LocalDateTime now = LocalDateTime.now();
-        return new PolicyCreatedEvent(POLICY_ID, new PolicyNo("POL-2024-0001"), form, null, now, now.plusYears(1), null,
-                null, new PolicyStatus(PolicyStatus.StatusCode.NOT_EFFECTIVE, now, "创建", "system"), new ArrayList<>(),
+        return new PolicyCreatedEvent(POLICY_ID, new PolicyNo("POL-2024-0001"), form, null, null, null, null, null,
+                PolicyPeriod.of(now, now.plusYears(1), 0, 0), null, null, java.util.List.of(), null, null, null, new PolicyStatus(PolicyStatus.StatusCode.NOT_EFFECTIVE, now, "创建", "system"),
                 null, null, TENANT_ID);
     }
 

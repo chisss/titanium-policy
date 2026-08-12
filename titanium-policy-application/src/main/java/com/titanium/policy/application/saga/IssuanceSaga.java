@@ -2,6 +2,7 @@ package com.titanium.policy.application.saga;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 import org.axonframework.commandhandling.gateway.CommandGateway;
@@ -12,16 +13,22 @@ import org.axonframework.modelling.saga.StartSaga;
 import org.axonframework.spring.stereotype.Saga;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import com.titanium.metadata.enums.billing.PremiumCollectionMode;
 import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.valueobject.Money;
+import com.titanium.policy.application.orchestration.issuance.assembler.PolicyProductAssembler;
+import com.titanium.policy.application.orchestration.issuance.orchestrator.PremiumCollectionOrchestrator;
+import com.titanium.policy.command.ActivatePolicyCommand;
 import com.titanium.policy.command.CreatePolicyCommand;
 import com.titanium.policy.command.LinkInvestmentAccountCommand;
 import com.titanium.policy.command.ReceiveUnderwritingResultCommand;
 import com.titanium.policy.command.TriggerIssuanceCommand;
 import com.titanium.policy.common.constant.PolicyConstants;
+import com.titanium.policy.entity.insurance.InsuranceLine;
 import com.titanium.policy.entity.insurance.InsuredPartyList;
 import com.titanium.policy.entity.insurance.InsuredPartyList.InsuredInfo;
+import com.titanium.policy.entity.policy.PolicyProduct;
 import com.titanium.policy.event.insurance.InsuranceCreatedEvent;
 import com.titanium.policy.event.insurance.InsuranceIssuedEvent;
 import com.titanium.policy.event.insurance.InsuranceSubmittedForUnderwritingEvent;
@@ -30,12 +37,16 @@ import com.titanium.policy.generator.PolicyNoGenerator;
 import com.titanium.policy.port.BillingServicePort;
 import com.titanium.policy.port.InvestmentAccountPort;
 import com.titanium.policy.port.PremiumCalculationGateway;
+import com.titanium.policy.port.ProductServicePort;
 import com.titanium.policy.port.UnderwritingDecisionGateway;
 import com.titanium.policy.service.PolicyIssuanceDomainService;
-import com.titanium.policy.valueobject.billing.BillingResult;
-import com.titanium.policy.valueobject.billing.PremiumBillRequest;
 import com.titanium.policy.valueobject.insurance.UnderwritingDecisionRequest;
 import com.titanium.policy.valueobject.insurance.UnderwritingResult;
+import com.titanium.policy.valueobject.policy.ChannelInfo;
+import com.titanium.policy.valueobject.policy.CollectionInfo;
+import com.titanium.policy.valueobject.policy.CollectionResult;
+import com.titanium.policy.valueobject.policy.PolicyPeriod;
+import com.titanium.policy.valueobject.product.ProductIssueRules;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -84,6 +95,15 @@ public class IssuanceSaga {
     @Autowired
     private transient PremiumCalculationGateway premiumCalculationGateway;
 
+    @Autowired
+    private transient PolicyProductAssembler policyProductAssembler;
+
+    @Autowired
+    private transient PremiumCollectionOrchestrator premiumCollectionOrchestrator;
+
+    @Autowired
+    private transient ProductServicePort productServicePort;
+
     /** 保单形态 */
     private PolicyForm    policyForm;
     /** 投保人ID */
@@ -110,6 +130,22 @@ public class IssuanceSaga {
     private String paymentMode;
     /** 缴费年数（BILL-2：供 billing 精算计算，0 表示未知） */
     private int premiumPaymentYears;
+    /** 投保险种段列表（一单多险载体，承保时精化为保单段并冻结条款责任快照） */
+    private List<InsuranceLine> insuranceLines;
+    /** 关联意向单ID（三步出单来源，透传保单实现三级贯通） */
+    private String proposalId;
+    /** 核保单ID（承保依据溯源） */
+    private String underwritingId;
+    /** 营销包ID（弱引用，透传保单供转化统计） */
+    private String marketPackageId;
+    /** 收费方式（出单期确定，决定保单生效是否以收讫为前提） */
+    private PremiumCollectionMode collectionMode;
+    /** 渠道信息（透传保单，此前保单查不到来源渠道） */
+    private ChannelInfo channelInfo;
+    /** 等待期天数（取产品投保条件配置） */
+    private int waitingPeriodDays;
+    /** 犹豫期天数（取产品投保条件配置） */
+    private int hesitationPeriodDays;
 
     /**
      * 【投保】投保单创建 → 启动 Saga，记忆后续创建保单所需数据
@@ -134,6 +170,41 @@ public class IssuanceSaga {
         this.sumInsured = event.sumInsured();
         this.paymentMode = event.paymentMode();
         this.premiumPaymentYears = event.premiumPaymentYears();
+        // 记忆险种段（一单多险载体）与出单期确定的收费/渠道/溯源信息，出单时透传保单
+        this.insuranceLines = event.insuranceLines();
+        this.proposalId = event.proposalId();
+        this.marketPackageId = event.marketPackageId();
+        this.collectionMode = event.collectionMode();
+        this.channelInfo = event.channelInfo();
+        // 取产品投保条件的等待期/犹豫期配置（此前 policy 域完全未消费该配置）
+        rememberPolicyPeriodDays(event.insuranceLines());
+    }
+
+    /**
+     * 记忆主险产品配置的等待期与犹豫期天数（出单时构造保单期间用）。
+     * <p>
+     * 远程取数失败不阻断出单，按无等待期/无犹豫期兜底并告警——二者影响理赔与退保判定，
+     * 缺失需人工补正。
+     * </p>
+     */
+    private void rememberPolicyPeriodDays(List<InsuranceLine> lines) {
+        if (lines == null || lines.isEmpty()) {
+            return;
+        }
+        InsuranceLine main = lines.stream().filter(InsuranceLine::isMain).findFirst().orElse(lines.get(0));
+        if (main.productId() == null) {
+            return;
+        }
+        try {
+            ProductIssueRules rules = productServicePort.getIssueRules(main.productId(), tenantId);
+            if (rules != null) {
+                this.waitingPeriodDays = rules.waitingPeriodDays() != null ? rules.waitingPeriodDays() : 0;
+                this.hesitationPeriodDays = rules.hesitationPeriodDays() != null ? rules.hesitationPeriodDays() : 0;
+            }
+        } catch (Exception ex) {
+            log.warn("[IssuanceSaga] 取产品等待期/犹豫期配置失败，按无等待期兜底（需人工补正）: productId={}",
+                    main.productId(), ex);
+        }
     }
 
     /**
@@ -172,6 +243,16 @@ public class IssuanceSaga {
     public void on(UnderwritingResultReceivedEvent event) {
         // UW-3：记忆核保加费率，出单时并入保费
         this.extraPremiumRatio = event.extraPremiumRatio();
+        // 记忆核保单ID，出单时透传保单（承保依据溯源，此前保单查不到核保单）
+        this.underwritingId = event.underwritingId();
+        // 段级结论回写：整单结论下发各段，拒保段保费不计入总保费
+        if (this.insuranceLines != null) {
+            List<InsuranceLine> updated = new java.util.ArrayList<>();
+            for (InsuranceLine line : this.insuranceLines) {
+                updated.add(line.withUnderwritingResult(event.resultCode(), event.extraPremiumRatio()));
+            }
+            this.insuranceLines = updated;
+        }
 
         // 以核保事件构造核保结果值对象，交领域服务裁决承保准入（业务规则不落在 Saga）
         UnderwritingResult result = new UnderwritingResult(event.underwritingId(), event.resultCode(), event.opinion(),
@@ -202,21 +283,30 @@ public class IssuanceSaga {
         // UW-3：核保加费并入保费——最终应付保费 = 标准保费 ×(1 + 加费率)；无加费时等于标准保费
         Money finalPremium = applyExtraPremium(basePremium);
 
+        // 装配承保段：把投保段精化为保单段，冻结条款与责任快照（一单多险的落地点）
+        List<PolicyProduct> policyProducts = policyProductAssembler.assembleFromInsuranceLines(insuranceLines,
+                tenantId);
+        Money segmentPremium = policyProductAssembler.sumPremium(policyProducts);
+        Money payablePremium = segmentPremium != null ? segmentPremium : finalPremium;
+
         CreatePolicyCommand command = new CreatePolicyCommand(
                 policyId,
                 policyNo,
                 event.insuranceId(),
+                proposalId,
+                underwritingId,
+                marketPackageId,
                 policyForm,
                 productId,
                 null,
-                holderId,
-                null,
                 insuredPartyList,
-                basePremium,
-                finalPremium,
-                insurancePeriodStart,
-                insurancePeriodEnd,
+                policyProducts,
+                sumInsured != null ? Money.of(sumInsured, payablePremium.currency()) : null,
+                payablePremium,
+                PolicyPeriod.of(insurancePeriodStart, insurancePeriodEnd, waitingPeriodDays, hesitationPeriodDays),
                 null,
+                CollectionInfo.initial(collectionMode, payablePremium, LocalDateTime.now()),
+                channelInfo,
                 insuranceType,
                 tenantId);
 
@@ -226,14 +316,21 @@ public class IssuanceSaga {
                 event.insuranceId(), policyId, policyNo, basePremium.value(), extraPremiumRatio,
                 finalPremium.value());
 
-        // 出单后触发计费：经 BillingServicePort 为保单开立首期保费账单（跨服务同步，账单失败不回滚保单）
+        // 出单后收费：按收费方式路由（开账单 → 建支付单 → 收讫回写），取代此前的「只开账单不收钱」。
+        // 收费失败不销毁保单——保单停未生效、账单待催缴，可重新发起收款。
         try {
-            BillingResult billingResult = billingServicePort.createPremiumBill(
-                    new PremiumBillRequest(policyId, holderId, finalPremium, null, tenantId));
-            log.info("[IssuanceSaga] 首期保费账单开立结果: policyId={}, success={}, billId={}", policyId,
-                    billingResult.success(), billingResult.billId());
+            CollectionResult collection = premiumCollectionOrchestrator.collect(policyId, holderId, payablePremium,
+                    collectionMode, tenantId);
+            log.info("[IssuanceSaga] 收费编排完成: policyId={}, 收费方式={}, 收讫状态={}, billId={}, 支付单={}",
+                    policyId, collectionMode, collection.status(), collection.billId(),
+                    collection.paymentOrderId());
+            // 已收讫（免支付）或后付挂账（先享后付）时保单即刻满足保费条件，驱动生效；
+            // 其余方式待收费回调经 PremiumCollectionSaga 驱动。
+            if (collection.allowsActivation()) {
+                activateIfPeriodStarted(policyId);
+            }
         } catch (Exception ex) {
-            log.error("[IssuanceSaga] 开立首期保费账单失败（不阻断出单，待补偿）: policyId={}", policyId, ex);
+            log.error("[IssuanceSaga] 收费编排异常（不阻断出单，保单停未生效待催缴）: policyId={}", policyId, ex);
         }
 
         // BILL-3：出单后生成期缴计划（寿险期缴保费，跨服务同步，失败不阻断出单）
@@ -283,6 +380,24 @@ public class IssuanceSaga {
      * 保证出单不因保费计算失败而中断。
      * </p>
      */
+    /**
+     * 保费条件已满足时驱动保单生效（保障起期未到则由定时任务后续激活）。
+     * <p>
+     * 生效的两个前提——保费条件与保障起期——均由聚合内守护（{@code CollectionInfo} 与
+     * {@code PolicyPeriod}）。此处仅在收费条件满足时尝试激活；起期未到时聚合会拒绝，
+     * 属预期路径故仅记日志不视为异常。
+     * </p>
+     */
+    private void activateIfPeriodStarted(String policyId) {
+        try {
+            commandGateway.sendAndWait(new ActivatePolicyCommand(policyId, tenantId));
+            log.info("[IssuanceSaga] 保费条件已满足，保单已生效: policyId={}", policyId);
+        } catch (Exception ex) {
+            log.info("[IssuanceSaga] 保单暂不可生效（保障起期未到，待定时任务激活）: policyId={}, 原因={}", policyId,
+                    ex.getMessage());
+        }
+    }
+
     private Money calculateBasePremium() {
         if (sumInsured != null && productId != null) {
             try {

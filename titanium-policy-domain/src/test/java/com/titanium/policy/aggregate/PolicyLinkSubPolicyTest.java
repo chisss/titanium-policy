@@ -1,7 +1,6 @@
 package com.titanium.policy.aggregate;
 
 import java.time.LocalDateTime;
-import java.util.Collections;
 
 import org.axonframework.test.aggregate.AggregateTestFixture;
 import org.axonframework.test.aggregate.FixtureConfiguration;
@@ -16,6 +15,7 @@ import com.titanium.policy.event.PolicyCreatedEvent;
 import com.titanium.policy.event.SubPolicyLinkedEvent;
 import com.titanium.policy.valueobject.PolicyNo;
 import com.titanium.policy.valueobject.PolicyStatus;
+import com.titanium.policy.valueobject.policy.PolicyPeriod;
 
 /**
  * 保单聚合根·团单主子联动测试
@@ -40,10 +40,9 @@ class PolicyLinkSubPolicyTest {
 
     private PolicyCreatedEvent createdEvent() {
         LocalDateTime now = LocalDateTime.now();
-        return new PolicyCreatedEvent(PARENT_ID, new PolicyNo("POL-2024-0001"), PolicyForm.GROUP, null, now,
-                now.plusYears(1), null, null,
-                new PolicyStatus(PolicyStatus.StatusCode.NOT_EFFECTIVE, now, "创建", "system"),
-                Collections.emptyList(), null, null, TENANT_ID);
+        return new PolicyCreatedEvent(PARENT_ID, new PolicyNo("POL-2024-0001"), PolicyForm.GROUP, null, null, null, null, null,
+                PolicyPeriod.of(now, now.plusYears(1), 0, 0), null, null, java.util.List.of(), null, null, null, new PolicyStatus(PolicyStatus.StatusCode.NOT_EFFECTIVE, now, "创建", "system"),
+                null, null, TENANT_ID);
     }
 
     /** 匹配指定 childId 与子单计数的 SubPolicyLinkedEvent（忽略时间戳） */

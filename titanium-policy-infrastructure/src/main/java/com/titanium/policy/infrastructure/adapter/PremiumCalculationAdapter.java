@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
 import com.titanium.billing.api.PremiumCalculationApi;
 import com.titanium.billing.api.PremiumCalculationApi.PremiumCalculationRequest;
 import com.titanium.billing.api.PremiumCalculationApi.PremiumCalculationResponse;
-import com.titanium.billing.api.response.ApiResponse;
+import com.titanium.metadata.response.ApiResponse;
 import com.titanium.policy.port.PremiumCalculationGateway;
 
 import lombok.RequiredArgsConstructor;

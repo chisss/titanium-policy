@@ -4,9 +4,9 @@ import java.util.Map;
 
 import org.springframework.stereotype.Component;
 
+import com.titanium.metadata.response.ApiResponse;
 import com.titanium.policy.port.RuleEngineServicePort;
 import com.titanium.ruleengine.api.RuleEngineApi;
-import com.titanium.ruleengine.api.response.ApiResponse;
 import com.titanium.ruleengine.api.response.RuleExecutionResultResponse;
 import com.titanium.ruleengine.api.response.ValidationResultResponse;
 

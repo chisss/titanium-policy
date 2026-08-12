@@ -1,11 +1,13 @@
 package com.titanium.policy.web.provider;
 
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.titanium.metadata.errorcode.PolicyErrorCode;
+import com.titanium.metadata.response.ApiResponse;
 import com.titanium.policy.api.PolicyApi;
 import com.titanium.policy.api.request.AccountValueWriteBackRequest;
 import com.titanium.policy.api.request.CreatePolicyRequest;
-import com.titanium.policy.api.response.ApiResponse;
 import com.titanium.policy.api.response.PolicyResponse;
 import com.titanium.policy.api.response.PolicyStatusResponse;
 import com.titanium.policy.application.command.PolicyApplicationService;
@@ -27,6 +29,7 @@ import lombok.RequiredArgsConstructor;
  * </p>
  */
 @RestController
+@RequestMapping("/api/v1/policies")
 @RequiredArgsConstructor
 public class PolicyApiProvider implements PolicyApi {
 
@@ -58,7 +61,7 @@ public class PolicyApiProvider implements PolicyApi {
         return policyAppQueryService.findById(new FindPolicyByIdQuery(policyId, tenantId))
                 .map(policyWebMapper::toResponse)
                 .map(ApiResponse::success)
-                .orElseGet(() -> ApiResponse.error(404, "保单不存在: " + policyId));
+                .orElseGet(() -> ApiResponse.error(PolicyErrorCode.POLICY_NOT_EXIST, "保单不存在: " + policyId));
     }
 
     @Override
@@ -66,7 +69,7 @@ public class PolicyApiProvider implements PolicyApi {
         return policyAppQueryService.findById(new FindPolicyByIdQuery(policyId, tenantId))
                 .map(policyWebMapper::toStatusResponse)
                 .map(ApiResponse::success)
-                .orElseGet(() -> ApiResponse.error(404, "保单不存在: " + policyId));
+                .orElseGet(() -> ApiResponse.error(PolicyErrorCode.POLICY_NOT_EXIST, "保单不存在: " + policyId));
     }
 
     @Override

@@ -1,10 +1,12 @@
 package com.titanium.policy.web.provider;
 
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.titanium.metadata.errorcode.PolicyErrorCode;
+import com.titanium.metadata.response.ApiResponse;
 import com.titanium.policy.api.ProposalApi;
 import com.titanium.policy.api.request.CreateProposalRequest;
-import com.titanium.policy.api.response.ApiResponse;
 import com.titanium.policy.api.response.ProposalResponse;
 import com.titanium.policy.application.command.ProposalApplicationService;
 import com.titanium.policy.application.query.ProposalAppQueryService;
@@ -23,6 +25,7 @@ import lombok.RequiredArgsConstructor;
  * </p>
  */
 @RestController
+@RequestMapping("/api/v1/proposals")
 @RequiredArgsConstructor
 public class ProposalApiProvider implements ProposalApi {
 
@@ -46,7 +49,7 @@ public class ProposalApiProvider implements ProposalApi {
         return proposalAppQueryService.findById(proposalId, tenantId)
                 .map(proposalWebMapper::toResponse)
                 .map(ApiResponse::success)
-                .orElseGet(() -> ApiResponse.error(404, "投保意向单不存在: " + proposalId));
+                .orElseGet(() -> ApiResponse.error(PolicyErrorCode.PROPOSAL_NOT_EXIST, "投保意向单不存在: " + proposalId));
     }
 
     @Override

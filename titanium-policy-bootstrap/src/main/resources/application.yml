@@ -4,6 +4,14 @@ server:
 spring:
   application:
     name: titanium-policy
+  main:
+    allow-bean-definition-overriding: true
+
+  # 事件溯源兼容：容忍事件 payload 中的派生 getter 字段（如 Money.zero / LineCoveragePeriod.wholeLife），
+  # 否则历史事件反序列化失败会导致读模型投影永久卡死（详见 AxonSerializerConfig）
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: false
   
   # 数据库配置
   datasource:
@@ -23,7 +31,7 @@ spring:
     properties:
       hibernate:
         format_sql: true
-        dialect: org.hibernate.dialect.MySQL8Dialect
+        dialect: org.hibernate.dialect.MySQLDialect
   
   # Kafka配置
   kafka:
@@ -70,8 +78,10 @@ axon:
           cache:
             enabled: true # 补充：DLQ缓存，源码默认false，需手动开启缓存（提升性能）,生产环境按需开启
             size: 2048 # 补充：缓存大小，默认1000（需手动加）
-        # 可选优化：提升批量消费效率（源码默认batchSize=1，生产建议调大）
-        batchSize: 10
+        # 🔴 批量改为1：投影handler含delete+insert操作，batch>1时多事件共享同一事务，
+        # 首个handler失败标记tx回滚但后续event的insert已入Hibernate队列，commit时撞主键。
+        # 改为1保证每事件独立tx，delete+flush+insert原子化，幂等重放不再重复键冲突。
+        batchSize: 1
   eventstore:
     jpa:
       entity-manager-provider: default

@@ -1,10 +1,12 @@
 package com.titanium.policy.web.provider;
 
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.titanium.metadata.errorcode.PolicyErrorCode;
+import com.titanium.metadata.response.ApiResponse;
 import com.titanium.policy.api.InsuranceApi;
 import com.titanium.policy.api.request.ConvertToInsuranceRequest;
-import com.titanium.policy.api.response.ApiResponse;
 import com.titanium.policy.api.response.InsuranceResponse;
 import com.titanium.policy.application.command.InsuranceApplicationService;
 import com.titanium.policy.application.query.InsuranceAppQueryService;
@@ -23,6 +25,7 @@ import lombok.RequiredArgsConstructor;
  * </p>
  */
 @RestController
+@RequestMapping("/api/v1/insurances")
 @RequiredArgsConstructor
 public class InsuranceApiProvider implements InsuranceApi {
 
@@ -46,7 +49,7 @@ public class InsuranceApiProvider implements InsuranceApi {
         return insuranceAppQueryService.findById(insuranceId, tenantId)
                 .map(insuranceWebMapper::toResponse)
                 .map(ApiResponse::success)
-                .orElseGet(() -> ApiResponse.error(404, "投保单不存在: " + insuranceId));
+                .orElseGet(() -> ApiResponse.error(PolicyErrorCode.INSURANCE_NOT_EXIST, "投保单不存在: " + insuranceId));
     }
 
     @Override

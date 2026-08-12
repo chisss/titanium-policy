@@ -11,6 +11,7 @@ import org.axonframework.modelling.command.AggregateLifecycle;
 import org.axonframework.spring.stereotype.Aggregate;
 
 import com.titanium.common.domain.BaseAggregate;
+import com.titanium.metadata.enums.billing.PremiumCollectionMode;
 import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.enums.underwriting.UnderwritingEnum.ConclusionType;
@@ -20,7 +21,7 @@ import com.titanium.policy.command.CreateInsuranceDirectlyCommand;
 import com.titanium.policy.command.ReceiveUnderwritingResultCommand;
 import com.titanium.policy.command.SubmitUnderwritingCommand;
 import com.titanium.policy.command.TriggerIssuanceCommand;
-import com.titanium.policy.entity.insurance.InsuranceProduct;
+import com.titanium.policy.entity.insurance.InsuranceLine;
 import com.titanium.policy.entity.insurance.InsuredPartyList;
 import com.titanium.policy.event.insurance.InsuranceCreatedEvent;
 import com.titanium.policy.event.insurance.InsuranceIssuedEvent;
@@ -30,6 +31,7 @@ import com.titanium.policy.exception.PolicyBusinessRuleException;
 import com.titanium.policy.valueobject.insurance.InsuranceBasicInfo;
 import com.titanium.policy.valueobject.insurance.InsuranceStatus;
 import com.titanium.policy.valueobject.insurance.UnderwritingResult;
+import com.titanium.policy.valueobject.policy.ChannelInfo;
 
 import lombok.Getter;
 import lombok.experimental.SuperBuilder;
@@ -53,20 +55,40 @@ public class Insurance extends BaseAggregate {
     private String                 proposalId;
     /** 保单形态 */
     private PolicyForm             policyForm;
-    /** 父投保单ID */
-    private String                 parentInsuranceId;
     /** 投保单基本信息 */
     private InsuranceBasicInfo     basicInfo;
-    /** 投保险种列表 */
-    private List<InsuranceProduct> insuranceProducts;
+    /**
+     * 投保险种段列表（L2，一单多险的载体）
+     * <p>
+     * 取代原 {@code insuranceProducts}（仅编码+保额，且 {@code addInsuranceLine} 零调用方致恒空）
+     * 与 {@code basicInfo.productCodeList}（裸编码列表）。每段独立持有保额/保费/期间/缴费/
+     * 标的与<b>段级核保结论</b>——后者是「主险通过、附加险拒保」的建模基础。
+     * </p>
+     */
+    private List<InsuranceLine>    insuranceLines;
     /** 投保参与方清单 */
     private InsuredPartyList       insuredPartyList;
-    /** 核保结果 */
+    /**
+     * 投保单级核保结果（整单结论）
+     * <p>
+     * 与段级结论并存而非重复：本字段表达「这张投保单整体能否承保」（由核保域出具的单据级结论），
+     * 段级 {@code InsuranceLine.underwritingConclusion} 表达「每个险种各自的结论」。
+     * 整单拒保时全部段拒保；整单通过时仍可能有个别段被拒。
+     * </p>
+     */
     private UnderwritingResult     underwritingResult;
     /** 投保单状态 */
     private InsuranceStatus        status;
-    /** 险种三级分类（自意向单/直接创建透传，可空以兼容存量事件） */
+    /** 险种三级分类（主险冗余，自意向单/直接创建透传，可空以兼容存量事件） */
     private InsuranceProductType   insuranceType;
+    /** 收费方式（出单期确定，透传至保单） */
+    private PremiumCollectionMode  collectionMode;
+    /** 渠道信息（透传至保单） */
+    private ChannelInfo            channelInfo;
+    /** 出单业务流水号（幂等与进度追溯） */
+    private String                 bizNo;
+    /** 营销包ID（弱引用，可空） */
+    private String                 marketPackageId;
 
     // ==================== CommandHandler ====================
 
@@ -78,8 +100,9 @@ public class Insurance extends BaseAggregate {
         AggregateLifecycle.apply(new InsuranceCreatedEvent(command.insuranceId(), command.insuranceNo(),
                 command.proposalId(), command.policyForm(), command.applicantId(), command.insuredCount(),
                 command.exactPremium() != null ? command.exactPremium().value() : null, command.insurancePeriodStart(),
-                command.insurancePeriodEnd(), command.productCodes(), command.underwritingPriority(),
-                command.insuredPartyList(), command.insuranceType(), LocalDateTime.now(), command.tenantId(),
+                command.insurancePeriodEnd(), command.insuranceLines(), command.underwritingPriority(),
+                command.insuredPartyList(), command.insuranceType(), command.collectionMode(), command.channelInfo(),
+                command.bizNo(), command.marketPackageId(), LocalDateTime.now(), command.tenantId(),
                 command.sumInsured(), command.paymentMode(), command.premiumPaymentYears()));
     }
 
@@ -90,10 +113,11 @@ public class Insurance extends BaseAggregate {
     public Insurance(CreateInsuranceDirectlyCommand command) {
         AggregateLifecycle.apply(new InsuranceCreatedEvent(command.insuranceId(), command.insuranceNo(), null,
                 command.policyForm(), command.holderId(), command.insuredCount(), command.exactPremium(),
-                command.insurancePeriodStart(), command.insurancePeriodEnd(), command.productCodes(),
+                command.insurancePeriodStart(), command.insurancePeriodEnd(), command.insuranceLines(),
                 command.underwritingPriority(), command.insuredPartyList(), command.insuranceType(),
-                LocalDateTime.now(), command.tenantId(),
-                command.sumInsured(), command.paymentMode(), command.premiumPaymentYears()));
+                command.collectionMode(), command.channelInfo(), command.bizNo(), command.marketPackageId(),
+                LocalDateTime.now(), command.tenantId(), command.sumInsured(), command.paymentMode(),
+                command.premiumPaymentYears()));
     }
 
     /**
@@ -118,9 +142,8 @@ public class Insurance extends BaseAggregate {
                 this.basicInfo.holderId(), this.basicInfo.insuredCount(),
                 this.basicInfo.exactPremium() != null ? this.basicInfo.exactPremium().value() : null,
                 this.basicInfo.exactPremium() != null ? this.basicInfo.exactPremium().currency() : "CNY",
-                this.basicInfo.insurancePeriodStart(), this.basicInfo.insurancePeriodEnd(),
-                this.basicInfo.productCodeList(), this.basicInfo.underwritingPriority(), this.policyForm,
-                this.tenantId));
+                this.basicInfo.insurancePeriodStart(), this.basicInfo.insurancePeriodEnd(), lineProductCodes(),
+                this.basicInfo.underwritingPriority(), this.policyForm, this.tenantId));
     }
 
     /**
@@ -163,7 +186,14 @@ public class Insurance extends BaseAggregate {
         this.tenantId = event.tenantId();
         this.createTime = event.createTime();
         this.updateTime = event.createTime();
-        this.insuranceProducts = new ArrayList<>();
+        // 险种段列表（L2）：事件携带则落地，缺失时置空列表（兼容存量事件；改造后出单链路必带）
+        this.insuranceLines = event.insuranceLines() != null
+                ? new ArrayList<>(event.insuranceLines())
+                : new ArrayList<>();
+        this.collectionMode = event.collectionMode();
+        this.channelInfo = event.channelInfo();
+        this.bizNo = event.bizNo();
+        this.marketPackageId = event.marketPackageId();
         // 参与方清单从事件初始化；事件无清单时置 null，兼容存量事件（SubmitUnderwriting 有 null 校验保护）
         this.insuredPartyList = event.insuredPartyList();
         this.status = new InsuranceStatus(InsuranceStatus.StatusCode.DRAFT, event.createTime(),
@@ -199,6 +229,14 @@ public class Insurance extends BaseAggregate {
             case POSTPONE -> "核保暂缓";
         };
         this.status = this.status.transitionStatus(newStatus, changeReason);
+        // 整单结论下发到各险种段：核保域当前出具单据级结论，段级差异化结论（主险通过/附加险拒保）
+        // 待核保域支持分段核保后由 UpdateLineUnderwritingResultCommand 逐段覆盖。
+        if (this.insuranceLines != null) {
+            for (int i = 0; i < this.insuranceLines.size(); i++) {
+                this.insuranceLines.set(i,
+                        this.insuranceLines.get(i).withUnderwritingResult(resultCode, event.extraPremiumRatio()));
+            }
+        }
         this.updateTime = LocalDateTime.now();
     }
 
@@ -211,16 +249,90 @@ public class Insurance extends BaseAggregate {
     // ==================== 业务方法 ====================
 
     /**
-     * 新增投保险种
+     * 主险段（一张投保单有且仅有一个）。
+     *
+     * @return 主险段；无段时返回 null
      */
-    public void addInsuranceLine(InsuranceProduct insuranceProduct) {
-        ensureDraftStatus();
-        if (!insuranceProduct.verifyLineConstraint()) {
-            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION",
-                    "Invalid insurance line constraint: " + insuranceProduct.productCode());
+    public InsuranceLine mainLine() {
+        if (this.insuranceLines == null) {
+            return null;
         }
-        this.insuranceProducts.add(insuranceProduct);
-        this.updateTime = LocalDateTime.now();
+        return this.insuranceLines.stream().filter(InsuranceLine::isMain).findFirst().orElse(null);
+    }
+
+    /**
+     * 附加险段列表。
+     *
+     * @return 附加险段列表
+     */
+    public List<InsuranceLine> riderLines() {
+        if (this.insuranceLines == null) {
+            return List.of();
+        }
+        return this.insuranceLines.stream().filter(InsuranceLine::isRider).toList();
+    }
+
+    /**
+     * 按段ID查找险种段。
+     *
+     * @param lineId 段ID
+     * @return 匹配的段；未找到返回 null
+     */
+    public InsuranceLine lineOf(String lineId) {
+        if (this.insuranceLines == null || lineId == null) {
+            return null;
+        }
+        return this.insuranceLines.stream()
+                .filter(line -> lineId.equals(line.lineId()))
+                .findFirst()
+                .orElse(null);
+    }
+
+    /**
+     * 投保单应付总保费（Σ 计入段的加费后保费；拒保段不计入）。
+     * <p>
+     * 核保加费按段计算后再汇总——不同险种加费率可不同（附加重疾加费 30%、主险不加费）。
+     * </p>
+     *
+     * @return 应付总保费；无有效段时返回 null
+     */
+    public Money payableTotalPremium() {
+        if (this.insuranceLines == null || this.insuranceLines.isEmpty()) {
+            return this.basicInfo != null ? this.basicInfo.exactPremium() : null;
+        }
+        Money total = null;
+        for (InsuranceLine line : this.insuranceLines) {
+            Money linePremium = line.payablePremium();
+            if (linePremium == null) {
+                continue;
+            }
+            total = total == null ? linePremium : total.add(linePremium);
+        }
+        return total;
+    }
+
+    /**
+     * 是否至少有一个险种段核保通过（整单可承保的前提——个别段拒保不阻断出单）。
+     *
+     * @return 存在可承保段返回 {@code true}
+     */
+    public boolean hasApprovedLine() {
+        return this.insuranceLines != null
+                && this.insuranceLines.stream().anyMatch(InsuranceLine::isUnderwritingApproved);
+    }
+
+    /**
+     * 险种段的产品编码列表（供核保请求与保费计算等按编码消费的下游使用）。
+     *
+     * @return 产品编码列表；无段时回退基本信息中的编码列表
+     */
+    public List<String> lineProductCodes() {
+        if (this.insuranceLines == null || this.insuranceLines.isEmpty()) {
+            return this.basicInfo != null && this.basicInfo.productCodeList() != null
+                    ? this.basicInfo.productCodeList()
+                    : List.of();
+        }
+        return this.insuranceLines.stream().map(InsuranceLine::productCode).filter(code -> code != null).toList();
     }
 
     /**
@@ -243,14 +355,28 @@ public class Insurance extends BaseAggregate {
         }
     }
 
+    /**
+     * 校验险种段构成：至少一段、有且仅一个主险、附加险依附合法。
+     * <p>
+     * 段级不变量在提交核保前校验（核保按段出结论，段结构非法则核保无从进行）。
+     * 投保要素的业务校验（年龄/保额/职业等依产品条件）由 application 层的
+     * {@code IssuanceEligibilityDomainService} 在出单受理阶段完成，不在此重复。
+     * </p>
+     */
     private void validateInsuranceLines() {
-        if (this.insuranceProducts == null || this.insuranceProducts.isEmpty()) {
-            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "At least one insurance line is required");
+        if (this.insuranceLines == null || this.insuranceLines.isEmpty()) {
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "投保单至少须含一个险种段");
         }
-        for (InsuranceProduct line : this.insuranceProducts) {
-            if (!line.verifyLineConstraint()) {
+        long mainCount = this.insuranceLines.stream().filter(InsuranceLine::isMain).count();
+        if (mainCount != 1) {
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION",
+                    "投保单须含且仅含一个主险段，当前有 " + mainCount + " 个");
+        }
+        String mainLineId = mainLine() != null ? mainLine().lineId() : null;
+        for (InsuranceLine line : this.insuranceLines) {
+            if (line.isRider() && (line.parentLineId() == null || !line.parentLineId().equals(mainLineId))) {
                 throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION",
-                        "Invalid insurance line: " + line.productCode());
+                        "附加险段须依附于本单主险段: 段序号 " + line.lineNo());
             }
         }
     }

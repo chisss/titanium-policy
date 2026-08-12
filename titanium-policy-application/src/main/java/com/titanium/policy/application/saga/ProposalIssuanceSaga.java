@@ -2,7 +2,9 @@ package com.titanium.policy.application.saga;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import org.axonframework.commandhandling.gateway.CommandGateway;
@@ -15,10 +17,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.policy.PolicyForm;
+import com.titanium.metadata.enums.policy.PolicyLineStatus;
+import com.titanium.metadata.enums.product.ProductEnum.ProductCategory;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.command.ConvertProposalCommand;
 import com.titanium.policy.command.ConvertProposalToInsuranceCommand;
+import com.titanium.policy.entity.insurance.InsuranceLine;
 import com.titanium.policy.entity.insurance.InsuredPartyList;
+import com.titanium.policy.entity.proposal.ProposalLine;
 import com.titanium.policy.event.proposal.ProposalConvertedEvent;
 import com.titanium.policy.event.proposal.ProposalCreatedEvent;
 import com.titanium.policy.event.proposal.ProposalSubmittedEvent;
@@ -65,8 +71,14 @@ public class ProposalIssuanceSaga {
     private java.time.LocalDateTime insurancePeriodStart;
     /** 保障止期 */
     private java.time.LocalDateTime insurancePeriodEnd;
-    /** 期望险种编码 */
+    /** 期望险种编码（单险种意向的遗留字段；多险种意向以 proposalLines 承载） */
     private String expectedProductCode;
+    /** 意向险种段列表（多险种意向组合，转投保单时精化为投保段） */
+    private List<ProposalLine> proposalLines;
+    /** 出单业务流水号（幂等与进度追溯，透传投保单） */
+    private String bizNo;
+    /** 营销包ID（弱引用，透传投保单） */
+    private String marketPackageId;
     /** 险种三级分类（可空） */
     private InsuranceProductType insuranceType;
     /** 租户ID */
@@ -86,8 +98,49 @@ public class ProposalIssuanceSaga {
         this.insurancePeriodStart = event.insurancePeriodStart();
         this.insurancePeriodEnd = event.insurancePeriodEnd();
         this.expectedProductCode = event.expectedProductCode();
+        this.proposalLines = event.proposalLines();
+        this.bizNo = event.bizNo();
+        this.marketPackageId = event.marketPackageId();
         this.insuranceType = event.insuranceType();
         this.tenantId = event.tenantId();
+    }
+
+    /**
+     * 意向段 → 投保段（渐进精化：意向保额转投保保额，补段ID与投保段状态）。
+     * <p>
+     * 意向阶段以 {@code lineNo} 表达主附险依附关系，此处转换为段ID引用。意向段无缴费条件与
+     * 完整标的（意向阶段未定），故投保段的这两项留空——由后续投保信息补录或核保前补齐。
+     * </p>
+     * <p>
+     * 意向段缺失时（存量事件或单险种意向）回退以 {@code expectedProductCode} 构造单段，
+     * 保证转换链路不断。
+     * </p>
+     *
+     * @return 投保段列表
+     */
+    private List<InsuranceLine> refineToInsuranceLines() {
+        if (proposalLines == null || proposalLines.isEmpty()) {
+            if (expectedProductCode == null) {
+                return List.of();
+            }
+            String lineId = UUID.randomUUID().toString();
+            return List.of(new InsuranceLine(lineId, 1, ProductCategory.MAIN, null, expectedProductCode,
+                    expectedProductCode, null, insuranceType,
+                    intendedPremium != null ? Money.of(intendedPremium, "CNY") : null, null, null, null, List.of(),
+                    null, null, PolicyLineStatus.UNDERWRITING));
+        }
+        Map<Integer, String> lineIdByNo = new HashMap<>();
+        for (ProposalLine line : proposalLines) {
+            lineIdByNo.put(line.lineNo(), UUID.randomUUID().toString());
+        }
+        List<InsuranceLine> lines = new ArrayList<>();
+        for (ProposalLine line : proposalLines) {
+            lines.add(new InsuranceLine(lineIdByNo.get(line.lineNo()), line.lineNo(), line.productCategory(),
+                    line.parentLineNo() != null ? lineIdByNo.get(line.parentLineNo()) : null, line.productId(),
+                    line.productCode(), null, line.insuranceType(), line.intendedSumInsured(), null, null, null,
+                    List.of(), null, null, PolicyLineStatus.UNDERWRITING));
+        }
+        return List.copyOf(lines);
     }
 
     /**
@@ -135,11 +188,13 @@ public class ProposalIssuanceSaga {
                 .exactPremium(premium)
                 .insurancePeriodStart(insurancePeriodStart)
                 .insurancePeriodEnd(insurancePeriodEnd)
-                .productCodes(productCodes)
+                .insuranceLines(refineToInsuranceLines())
                 .underwritingPriority(0)
                 .changeReason("意向单自动转投保单")
                 .insuredPartyList(minimalPartyList)
                 .insuranceType(insuranceType)
+                .bizNo(bizNo)
+                .marketPackageId(marketPackageId)
                 .tenantId(tenantId)
                 .build();
 

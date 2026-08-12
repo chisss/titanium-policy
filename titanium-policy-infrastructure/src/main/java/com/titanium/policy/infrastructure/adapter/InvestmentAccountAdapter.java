@@ -6,9 +6,9 @@ import org.springframework.stereotype.Component;
 
 import com.titanium.investment.api.InvestmentAccountApi;
 import com.titanium.investment.api.InvestmentAccountApi.CreateAccountRequest;
-import com.titanium.investment.api.response.ApiResponse;
 import com.titanium.investment.query.result.InvestmentAccountQueryResult;
 import com.titanium.metadata.enums.policy.PolicyForm;
+import com.titanium.metadata.response.ApiResponse;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.port.InvestmentAccountPort;
 
@@ -28,8 +28,6 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class InvestmentAccountAdapter implements InvestmentAccountPort {
 
-    /** 投资域 ApiResponse 成功码 */
-    private static final int SUCCESS_CODE = 200;
     /** 默认初始单位净值 1.00（开户时净值，后续由投资域估值调整） */
     private static final BigDecimal DEFAULT_INITIAL_UNIT_PRICE = BigDecimal.ONE;
     /** 默认管理费率（年化） */
@@ -48,7 +46,7 @@ public class InvestmentAccountAdapter implements InvestmentAccountPort {
         request.setManagementFeeRate(DEFAULT_MANAGEMENT_FEE_RATE);
 
         ApiResponse<InvestmentAccountQueryResult> response = investmentAccountApi.createAccount(request);
-        if (response == null || response.getCode() != SUCCESS_CODE || response.getData() == null) {
+        if (response == null || !response.isSuccess() || response.getData() == null) {
             log.error("为保单开立投资账户失败: policyId={}, message={}", policyId,
                     response != null ? response.getMessage() : "无响应");
             return null;
@@ -59,7 +57,7 @@ public class InvestmentAccountAdapter implements InvestmentAccountPort {
     @Override
     public Money accountValue(String accountId, String tenantId) {
         ApiResponse<InvestmentAccountQueryResult> response = investmentAccountApi.getAccount(accountId);
-        if (response == null || response.getCode() != SUCCESS_CODE || response.getData() == null) {
+        if (response == null || !response.isSuccess() || response.getData() == null) {
             log.warn("查询投资账户价值失败: accountId={}", accountId);
             return null;
         }

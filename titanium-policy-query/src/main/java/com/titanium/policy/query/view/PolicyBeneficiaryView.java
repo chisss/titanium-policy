@@ -38,7 +38,14 @@ public class PolicyBeneficiaryView extends BaseView {
     private String policyId;
 
     /** 受益人客户ID（引用 customer 域主数据） */
-    @Column(name = "customer_id", nullable = false, length = 36)
+    /**
+     * 受益人客户ID
+     * <p>
+     * 🔴 可空：受益人未必是本平台注册客户——投保时常只提供「姓名 + 证件类型 + 证件号」而不建客户档案
+     * （如指定未成年子女、父母为身故受益人）。故此列不设非空约束，身份以 name/certNo 承载。
+     * </p>
+     */
+    @Column(name = "customer_id", length = 36)
     private String customerId;
 
     /** 受益人姓名（出单快照） */

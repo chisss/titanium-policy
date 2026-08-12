@@ -1,5 +1,7 @@
 package com.titanium.policy.valueobject;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import com.titanium.metadata.enums.policy.PolicyEnum;
 
 /**
@@ -32,6 +34,7 @@ public record PolicyRelation(PolicyEnum.PolicyLevel policyLevel, String parentPo
      *
      * @return true 表示父保单
      */
+    @JsonIgnore
     public boolean isParent() {
         return this.policyLevel == PolicyEnum.PolicyLevel.PARENT;
     }
@@ -41,6 +44,7 @@ public record PolicyRelation(PolicyEnum.PolicyLevel policyLevel, String parentPo
      *
      * @return true 表示子保单
      */
+    @JsonIgnore
     public boolean isChild() {
         return this.policyLevel == PolicyEnum.PolicyLevel.CHILD;
     }
@@ -50,6 +54,7 @@ public record PolicyRelation(PolicyEnum.PolicyLevel policyLevel, String parentPo
      *
      * @return true 表示独立保单
      */
+    @JsonIgnore
     public boolean isIndependent() {
         return this.policyLevel == PolicyEnum.PolicyLevel.INDEPENDENT;
     }

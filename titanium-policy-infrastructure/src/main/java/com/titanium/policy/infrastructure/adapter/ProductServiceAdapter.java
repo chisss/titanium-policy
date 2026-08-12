@@ -1,15 +1,25 @@
 package com.titanium.policy.infrastructure.adapter;
 
+import java.util.List;
+
 import org.springframework.stereotype.Component;
 
-import com.alibaba.fastjson2.JSON;
-import com.alibaba.fastjson2.JSONObject;
-
-import com.titanium.metadata.enums.product.ProductEnum;
+import com.titanium.metadata.enums.policy.PolicyForm;
+import com.titanium.metadata.enums.product.ProductEnum.IssuanceMode;
+import com.titanium.metadata.enums.product.ProductEnum.PolicyFormType;
+import com.titanium.metadata.response.ApiResponse;
 import com.titanium.policy.port.ProductServicePort;
+import com.titanium.policy.valueobject.product.ProductBasicInfo;
+import com.titanium.policy.valueobject.product.ProductClauseRef;
+import com.titanium.policy.valueobject.product.ProductIssueRules;
 import com.titanium.product.api.ProductApi;
-import com.titanium.product.api.response.ApiResponse;
+import com.titanium.product.api.response.CoveragePeriodConfigResponse;
+import com.titanium.product.api.response.InsureConditionResponse;
+import com.titanium.product.api.response.IssuanceProcessConfigResponse;
+import com.titanium.product.api.response.PaymentConfigResponse;
+import com.titanium.product.api.response.PolicyFormConfigResponse;
 import com.titanium.product.api.response.ProductResponse;
+import com.titanium.product.api.response.UnderwritingConfigResponse;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,8 +27,13 @@ import lombok.extern.slf4j.Slf4j;
 /**
  * 产品服务适配器
  * <p>
- * {@link ProductServicePort} 的基础设施实现，直接调用产品域 {@link ProductApi}（Feign）并解包
- * {@link ApiResponse}，将跨进程弱类型配置解析为领域侧需要的类型化结果（六边形架构 Adapter）。
+ * {@link ProductServicePort} 的基础设施实现，调用产品域 {@link ProductApi}（Feign）并把产品域
+ * Response 翻译为保单域防腐 record（六边形架构 Adapter）。
+ * </p>
+ * <p>
+ * 🔴 <b>去 JSON 拆包</b>：改造前 Port 返回 {@code Object}，本适配器需 {@code JSON.parseObject}
+ * 手工取 {@code issuanceMode} 字段。实测产品域 {@link ProductResponse} 各配置段<b>本就是强类型
+ * record</b>，故改为直接字段映射，弱类型拆包与相应异常处理一并删除。
  * </p>
  */
 @Slf4j
@@ -29,66 +44,107 @@ public class ProductServiceAdapter implements ProductServicePort {
     private final ProductApi productApi;
 
     @Override
-    public Object getProductById(String productId, String tenantId) {
-        log.info("获取产品详情, productId={}, tenantId={}", productId, tenantId);
-        ApiResponse<ProductResponse> response = productApi.getProductById(productId, tenantId);
-        if (response.isSuccess()) {
-            return response.getData();
+    public ProductBasicInfo getProductBasicInfo(String productId, String tenantId) {
+        ProductResponse product = fetchProduct(productId, tenantId);
+        if (product == null) {
+            return null;
         }
-        log.error("获取产品详情失败, productId={}, error={}", productId, response.getMessage());
-        throw new RuntimeException("获取产品详情失败: " + response.getMessage());
+        return new ProductBasicInfo(product.getProductId(), product.getProductCode(), product.getProductName(),
+                product.getVersion(), product.getInsuranceType(),
+                product.getStatus() != null ? product.getStatus().getCode() : null);
     }
 
     @Override
-    public Object getIssuanceConfig(String productId, String tenantId) {
-        log.info("获取产品出单流程配置, productId={}, tenantId={}", productId, tenantId);
-        ApiResponse<Object> response = productApi.getIssuanceConfig(productId, tenantId);
-        if (response.isSuccess()) {
-            return response.getData();
-        }
-        log.error("获取产品出单流程配置失败, productId={}, error={}", productId, response.getMessage());
-        throw new RuntimeException("获取产品出单流程配置失败: " + response.getMessage());
-    }
-
-    @Override
-    public ProductEnum.IssuanceMode getIssuanceMode(String productId, String tenantId) {
-        Object config = getIssuanceConfig(productId, tenantId);
-        if (config == null) {
+    public IssuanceMode getIssuanceMode(String productId, String tenantId) {
+        ProductResponse product = fetchProduct(productId, tenantId);
+        IssuanceProcessConfigResponse config = product != null ? product.getIssuanceProcessConfig() : null;
+        if (config == null || config.issuanceMode() == null) {
             throw new IllegalStateException(String.format("产品[%s]未配置出单流程，无法决定出单模式", productId));
         }
-        // 弱类型配置经 Feign 跨进程返回为 Map/JSON，出单模式的解析细节封装在适配器（基础设施关注点），
-        // 领域侧只依赖 ProductServicePort 返回的类型化枚举
-        JSONObject json = config instanceof JSONObject jo ? jo : JSON.parseObject(JSON.toJSONString(config));
-        String mode = json.getString("issuanceMode");
-        if (mode == null || mode.isBlank()) {
-            throw new IllegalStateException(String.format("产品[%s]出单配置缺少 issuanceMode 字段", productId));
-        }
-        try {
-            return ProductEnum.IssuanceMode.valueOf(mode);
-        } catch (IllegalArgumentException e) {
-            throw new IllegalStateException(String.format("产品[%s]出单模式取值非法: %s", productId, mode), e);
-        }
+        log.info("产品出单模式: productId={}, mode={}", productId, config.issuanceMode());
+        return config.issuanceMode();
     }
 
     @Override
-    public Object getUnderwritingConfig(String productId, String tenantId) {
-        log.info("获取产品核保配置, productId={}, tenantId={}", productId, tenantId);
-        ApiResponse<Object> response = productApi.getUnderwritingConfig(productId, tenantId);
-        if (response.isSuccess()) {
-            return response.getData();
+    public ProductIssueRules getIssueRules(String productId, String tenantId) {
+        ProductResponse product = fetchProduct(productId, tenantId);
+        if (product == null) {
+            return null;
         }
-        log.error("获取产品核保配置失败, productId={}, error={}", productId, response.getMessage());
-        throw new RuntimeException("获取产品核保配置失败: " + response.getMessage());
+        InsureConditionResponse condition = product.getInsureCondition();
+        CoveragePeriodConfigResponse period = product.getCoveragePeriod();
+        PaymentConfigResponse payment = product.getPaymentConfig();
+        PolicyFormConfigResponse formConfig = product.getPolicyFormConfig();
+        UnderwritingConfigResponse underwriting = product.getUnderwritingConfig();
+        IssuanceProcessConfigResponse issuance = product.getIssuanceProcessConfig();
+
+        return new ProductIssueRules(
+                condition != null ? condition.minAge() : null,
+                condition != null ? condition.maxAge() : null,
+                condition != null ? condition.minInsuredAmount() : null,
+                condition != null ? condition.maxInsuredAmount() : null,
+                condition != null ? condition.maxInsuredCount() : null,
+                condition != null ? condition.minGroupSize() : null,
+                condition != null ? condition.forbiddenOccupations() : List.of(),
+                condition != null ? condition.allowedRegions() : List.of(),
+                condition != null ? condition.forbiddenRegions() : List.of(),
+                condition != null ? condition.waitingPeriodDays() : null,
+                condition != null ? condition.hesitationPeriodDays() : null,
+                toPolicyForm(formConfig),
+                formConfig != null && formConfig.beneficiaryRequired(),
+                payment != null ? payment.allowedFrequencies() : List.of(),
+                payment != null ? payment.allowedPaymentTerms() : List.of(),
+                period != null ? period.periodUnit() : null,
+                period != null ? period.fixedTermOptions() : List.of(),
+                underwriting != null ? underwriting.underwritingMode() : null,
+                underwriting != null ? underwriting.manualReviewAmountThreshold() : null,
+                issuance != null && issuance.underwritingSkippable(),
+                issuance != null && issuance.prepaymentRequired());
     }
 
     @Override
-    public Object getPolicyFormConfig(String productId, String tenantId) {
-        log.info("获取产品保单形态配置, productId={}, tenantId={}", productId, tenantId);
-        ApiResponse<Object> response = productApi.getPolicyFormConfig(productId, tenantId);
-        if (response.isSuccess()) {
-            return response.getData();
+    public List<ProductClauseRef> getClauseRefs(String productId, String tenantId) {
+        ApiResponse<List<com.titanium.product.api.response.ProductClauseResponse>> response = productApi
+                .getProductClauses(productId, tenantId);
+        if (response == null || !response.isSuccess() || response.getData() == null) {
+            log.warn("产品未绑定条款或查询失败: productId={}, tenantId={}", productId, tenantId);
+            return List.of();
         }
-        log.error("获取产品保单形态配置失败, productId={}, error={}", productId, response.getMessage());
-        throw new RuntimeException("获取产品保单形态配置失败: " + response.getMessage());
+        return response.getData().stream()
+                .map(rel -> new ProductClauseRef(rel.getClauseId(), rel.getClauseVersion(),
+                        Boolean.TRUE.equals(rel.getMainClause())))
+                .toList();
+    }
+
+    /**
+     * 取产品详情并解包 {@link ApiResponse}（失败返回 null 由调用方按语义决定兜底）。
+     */
+    private ProductResponse fetchProduct(String productId, String tenantId) {
+        ApiResponse<ProductResponse> response = productApi.getProductById(productId, tenantId);
+        if (response == null || !response.isSuccess()) {
+            log.error("获取产品详情失败: productId={}, error={}", productId,
+                    response != null ? response.getMessage() : "响应为空");
+            return null;
+        }
+        return response.getData();
+    }
+
+    /**
+     * 产品保单形态类型 → 保单域保单形态枚举。
+     * <p>
+     * 二者是同一业务概念在两域的表述：产品侧 {@code PolicyFormType}（个单/团单/家庭单/联合保单）
+     * 决定保单侧 {@code PolicyForm}。联合保单在保单域暂按个单处理（无独立形态语义）。
+     * </p>
+     */
+    private PolicyForm toPolicyForm(PolicyFormConfigResponse formConfig) {
+        if (formConfig == null || formConfig.policyFormType() == null) {
+            return null;
+        }
+        PolicyFormType type = formConfig.policyFormType();
+        return switch (type) {
+            case INDIVIDUAL, JOINT -> PolicyForm.INDIVIDUAL;
+            case GROUP -> PolicyForm.GROUP;
+            case FAMILY -> PolicyForm.FAMILY;
+        };
     }
 }

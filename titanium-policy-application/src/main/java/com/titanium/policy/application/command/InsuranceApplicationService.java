@@ -61,11 +61,15 @@ public class InsuranceApplicationService {
                                       List<String> productCodes, int underwritingPriority, String changeReason,
                                       InsuranceProductType insuranceType, String tenantId) {
         Money premium = exactPremium != null ? Money.of(exactPremium, currency != null ? currency : "CNY") : null;
-        // 标量重载无参与方清单上下文，传 null（Web 层调用方可改用命令重载传递完整清单）
-        ConvertProposalToInsuranceCommand command = new ConvertProposalToInsuranceCommand(insuranceId, insuranceNo,
-                proposalId, policyForm, applicantId, insuredCount, premium, insurancePeriodStart, insurancePeriodEnd,
-                productCodes, underwritingPriority, changeReason, null, insuranceType, tenantId,
-                null, null, 0);
+        // 🔴 标量重载为遗留兼容路径：无参与方清单、无结构化险种段（productCodes 裸编码无法承载段级
+        // 保额/期间/缴费/标的）。产出的投保单在读侧查不到险种段明细。完整出单请走
+        // PolicyIssuanceApi → IssuanceOrchestrator（装配段与快照）。
+        ConvertProposalToInsuranceCommand command = ConvertProposalToInsuranceCommand.builder()
+                .insuranceId(insuranceId).insuranceNo(insuranceNo).proposalId(proposalId).policyForm(policyForm)
+                .applicantId(applicantId).insuredCount(insuredCount).exactPremium(premium)
+                .insurancePeriodStart(insurancePeriodStart).insurancePeriodEnd(insurancePeriodEnd)
+                .insuranceLines(List.of()).underwritingPriority(underwritingPriority).changeReason(changeReason)
+                .insuranceType(insuranceType).tenantId(tenantId).build();
         commandGateway.sendAndWait(command);
         return insuranceId;
     }

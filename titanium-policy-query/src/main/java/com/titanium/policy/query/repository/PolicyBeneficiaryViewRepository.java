@@ -36,4 +36,13 @@ public interface PolicyBeneficiaryViewRepository extends JpaRepository<PolicyBen
     @Modifying
     @Query("DELETE FROM PolicyBeneficiaryView v WHERE v.policyId = :policyId AND v.tenantId = :tenantId")
     void deleteByPolicyIdAndTenantId(String policyId, String tenantId);
+
+    /**
+     * 按客户查询其作为<b>受益人</b>的保单ID列表（支撑「我作为受益人的保单」查询）。
+     *
+     * @param customerId 客户ID
+     * @param tenantId   租户ID
+     * @return 受益人记录列表
+     */
+    List<PolicyBeneficiaryView> findByCustomerIdAndTenantId(String customerId, String tenantId);
 }

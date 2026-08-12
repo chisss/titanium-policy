@@ -2,6 +2,7 @@ package com.titanium.policy.application.command;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 import org.axonframework.commandhandling.gateway.CommandGateway;
 import org.springframework.stereotype.Service;
@@ -55,9 +56,15 @@ public class ProposalApplicationService {
                                  String currency, LocalDateTime insurancePeriodStart, LocalDateTime insurancePeriodEnd,
                                  String expectedProductCode, InsuranceProductType insuranceType, String tenantId) {
         String resolvedCurrency = currency != null ? currency : "CNY";
-        CreateProposalCommand command = new CreateProposalCommand(proposalId, proposalNo, policyForm, channel,
-                customerId, toMoney(intendedSumInsured, resolvedCurrency), toMoney(intendedPremium, resolvedCurrency),
-                insurancePeriodStart, insurancePeriodEnd, expectedProductCode, insuranceType, tenantId);
+        // 🔴 标量重载为遗留兼容路径：单值 expectedProductCode 无法表达多险种意向组合
+        // （客户在 App 勾选「重疾 + 医疗」时意向单本就多段）。完整出单请走 PolicyIssuanceApi。
+        CreateProposalCommand command = CreateProposalCommand.builder()
+                .proposalId(proposalId).proposalNo(proposalNo).policyForm(policyForm).channel(channel)
+                .customerId(customerId).intendedSumInsured(toMoney(intendedSumInsured, resolvedCurrency))
+                .intendedPremium(toMoney(intendedPremium, resolvedCurrency))
+                .insurancePeriodStart(insurancePeriodStart).insurancePeriodEnd(insurancePeriodEnd)
+                .expectedProductCode(expectedProductCode).proposalLines(List.of()).insuranceType(insuranceType)
+                .tenantId(tenantId).build();
         commandGateway.sendAndWait(command);
         return proposalId;
     }

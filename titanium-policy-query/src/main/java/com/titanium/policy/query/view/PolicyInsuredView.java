@@ -36,7 +36,7 @@ public class PolicyInsuredView extends BaseView {
     private String policyId;
 
     /** 被保险人客户ID（引用 customer 域主数据） */
-    @Column(name = "customer_id", nullable = false, length = 36)
+    @Column(name = "customer_id", length = 36)
     private String customerId;
 
     /** 被保险人姓名（出单快照） */

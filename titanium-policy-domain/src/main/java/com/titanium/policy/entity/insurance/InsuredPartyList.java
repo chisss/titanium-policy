@@ -5,6 +5,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import com.titanium.metadata.enums.customer.CustomerEnum.CustomerGender;
 import com.titanium.metadata.enums.customer.CustomerEnum.IdCardType;
 import com.titanium.metadata.enums.policy.BeneficiaryType;
@@ -67,6 +69,7 @@ public record InsuredPartyList(
      *
      * @return 份额合法返回 {@code true}
      */
+    @JsonIgnore
     public boolean isBeneficiaryRatioValid() {
         if (beneficiaryList == null || beneficiaryList.isEmpty()) {
             return true;

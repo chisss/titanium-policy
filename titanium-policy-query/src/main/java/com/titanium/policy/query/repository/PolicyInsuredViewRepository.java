@@ -36,4 +36,13 @@ public interface PolicyInsuredViewRepository extends JpaRepository<PolicyInsured
     @Modifying
     @Query("DELETE FROM PolicyInsuredView v WHERE v.policyId = :policyId AND v.tenantId = :tenantId")
     void deleteByPolicyIdAndTenantId(String policyId, String tenantId);
+
+    /**
+     * 按客户查询其作为<b>被保险人</b>的保单ID列表（支撑「我作为被保险人的保单」查询）。
+     *
+     * @param customerId 客户ID
+     * @param tenantId   租户ID
+     * @return 被保险人记录列表
+     */
+    List<PolicyInsuredView> findByCustomerIdAndTenantId(String customerId, String tenantId);
 }

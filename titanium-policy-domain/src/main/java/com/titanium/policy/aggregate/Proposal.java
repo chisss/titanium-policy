@@ -20,6 +20,7 @@ import com.titanium.policy.command.CreateProposalCommand;
 import com.titanium.policy.command.SubmitProposalCommand;
 import com.titanium.policy.command.VoidProposalCommand;
 import com.titanium.policy.entity.proposal.ProposalHolder;
+import com.titanium.policy.entity.proposal.ProposalLine;
 import com.titanium.policy.entity.proposal.ProposalSubject;
 import com.titanium.policy.event.proposal.ProposalConvertedEvent;
 import com.titanium.policy.event.proposal.ProposalCreatedEvent;
@@ -50,20 +51,31 @@ public class Proposal extends BaseAggregate {
     private String                proposalNo;
     /** 保单形态：个单/团单/父子 */
     private PolicyForm            policyForm;
-    /** 父意向单ID */
-    private String                parentProposalId;
     /** 销售渠道 */
     private SalesChannel          channel;
     /** 意向单基本信息 */
     private ProposalBasicInfo     basicInfo;
+    /**
+     * 意向险种段列表（意向阶段的 L2，轻量）
+     * <p>
+     * 客户在 App 勾选「重疾 + 医疗 + 意外」组合时，意向单阶段就已是多险种。取代
+     * {@code basicInfo.expectedProductCode}（单值 String，无法表达组合意图）。
+     * 转投保单时精化为 {@code InsuranceLine}。
+     * </p>
+     */
+    private List<ProposalLine>    proposalLines;
     /** 申请人列表 */
     private List<ProposalHolder>  applicants;
     /** 标的列表 */
     private List<ProposalSubject> subjects;
     /** 意向单状态 */
     private ProposalStatus        status;
-    /** 险种三级分类（源头捕获，可空以兼容存量事件） */
+    /** 险种三级分类（主险冗余，源头捕获，可空以兼容存量事件） */
     private InsuranceProductType  insuranceType;
+    /** 出单业务流水号（幂等与进度追溯，可空） */
+    private String                bizNo;
+    /** 营销包ID（弱引用，可空） */
+    private String                marketPackageId;
 
     // ==================== CommandHandler ====================
 
@@ -77,7 +89,8 @@ public class Proposal extends BaseAggregate {
                 command.intendedSumInsured() != null ? command.intendedSumInsured().value() : null,
                 command.intendedPremium() != null ? command.intendedPremium().value() : null,
                 command.insurancePeriodStart(), command.insurancePeriodEnd(), command.expectedProductCode(),
-                command.insuranceType(), LocalDateTime.now(), command.tenantId()));
+                command.proposalLines(), command.insuranceType(), command.bizNo(), command.marketPackageId(),
+                LocalDateTime.now(), command.tenantId()));
     }
 
     /**
@@ -138,6 +151,12 @@ public class Proposal extends BaseAggregate {
         this.updateTime = event.createTime();
         this.applicants = new ArrayList<>();
         this.subjects = new ArrayList<>();
+        // 意向险种段（L2 轻量）：事件携带则落地，缺失时置空列表（兼容存量事件）
+        this.proposalLines = event.proposalLines() != null
+                ? new ArrayList<>(event.proposalLines())
+                : new ArrayList<>();
+        this.bizNo = event.bizNo();
+        this.marketPackageId = event.marketPackageId();
         this.status = new ProposalStatus(ProposalStatus.StatusCode.DRAFT, event.createTime(), "创建草稿");
         this.basicInfo = new ProposalBasicInfo(event.customerId(),
                 event.intendedSumInsured() != null ? Money.of(event.intendedSumInsured(), "CNY") : null,

@@ -128,4 +128,66 @@ public class PolicyView extends BaseView {
     /** 投资账户最新价值（investment 域回写，展示型最终一致数据，非投连类为空） */
     @Column(name = "investment_account_value", precision = 18, scale = 2)
     private BigDecimal    investmentAccountValue;
+
+    // ==================== 一单多险与收费/渠道/期间（本期新增） ====================
+
+    /** 关联意向单ID（三步出单来源；支撑 Proposal→Insurance→Policy 三级贯通查询） */
+    @Column(name = "proposal_id", length = 36)
+    private String        proposalId;
+
+    /** 关联核保单ID（承保依据溯源） */
+    @Column(name = "underwriting_id", length = 36)
+    private String        underwritingId;
+
+    /** 营销包ID（弱引用 marketing 域，用于渠道转化率统计） */
+    @Column(name = "market_package_id", length = 36)
+    private String        marketPackageId;
+
+    /** 主险产品ID（险种段真相在 t_policy_product，此列为高频查询冗余） */
+    @Column(name = "product_id", length = 36)
+    private String        productId;
+
+    /** 主险保额（各段保额见 t_policy_product） */
+    @Column(name = "sum_insured", precision = 18, scale = 2)
+    private BigDecimal    sumInsured;
+
+    /** 保单总保费（= Σ 计入段的保费，拒保段已剔除） */
+    @Column(name = "total_premium", precision = 18, scale = 2)
+    private BigDecimal    totalPremium;
+
+    /** 险种段数量（单险种保单为 1，一单多险 > 1） */
+    @Column(name = "line_count")
+    private Integer       lineCount;
+
+    /** 等待期届满日（此前疾病类责任不赔） */
+    @Column(name = "waiting_period_end_date")
+    private LocalDateTime waitingPeriodEndDate;
+
+    /** 犹豫期届满日（此前可无条件退保） */
+    @Column(name = "hesitation_period_end_date")
+    private LocalDateTime hesitationPeriodEndDate;
+
+    /** 收费方式码（OFFLINE/ONLINE/FREE/PAY_AFTER_USE/WITHHOLD） */
+    @Column(name = "collection_mode", length = 32)
+    private String        collectionMode;
+
+    /** 收讫状态码（UNCOLLECTED/PARTIALLY_COLLECTED/COLLECTED/DEFERRED/OVERDUE） */
+    @Column(name = "collection_status", length = 32)
+    private String        collectionStatus;
+
+    /** 已收保费金额 */
+    @Column(name = "collected_amount", precision = 18, scale = 2)
+    private BigDecimal    collectedAmount;
+
+    /** 渠道ID（指向 channel 域） */
+    @Column(name = "channel_id", length = 36)
+    private String        channelId;
+
+    /** 销售渠道大类码（AGENT/BANCASSURANCE/ONLINE/BROKER/...） */
+    @Column(name = "sales_channel", length = 32)
+    private String        salesChannel;
+
+    /** 代理人/业务员ID */
+    @Column(name = "agent_id", length = 36)
+    private String        agentId;
 }

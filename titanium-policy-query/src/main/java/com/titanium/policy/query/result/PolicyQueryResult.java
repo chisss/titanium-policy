@@ -1,5 +1,6 @@
 package com.titanium.policy.query.result;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -120,6 +121,51 @@ public class PolicyQueryResult {
      * 保单项目列表
      */
     private List<PolicyItemQueryResult> policyItems;
+
+
+    // ==================== 一单多险 / 收费 / 渠道 / 期间（本期新增） ====================
+
+    /** 关联意向单ID（三步出单来源，支撑三级贯通溯源） */
+    private String                      proposalId;
+
+    /** 关联核保单ID（承保依据溯源） */
+    private String                      underwritingId;
+
+    /** 营销包ID（弱引用 marketing 域） */
+    private String                      marketPackageId;
+
+    /** 主险产品ID（险种真相在险种段上，此为高频查询冗余） */
+    private String                      productId;
+
+    /** 保单总保费（= Σ 计入段的保费，拒保段已剔除） */
+    private BigDecimal                  totalPremium;
+
+    /** 险种段数量（单险种为 1，一单多险 > 1） */
+    private Integer                     lineCount;
+
+    /** 等待期届满日（此前疾病类责任不赔） */
+    private LocalDateTime               waitingPeriodEndDate;
+
+    /** 犹豫期届满日（此前可无条件退保） */
+    private LocalDateTime               hesitationPeriodEndDate;
+
+    /** 收费方式码（OFFLINE/ONLINE/FREE/PAY_AFTER_USE/WITHHOLD） */
+    private String                      collectionMode;
+
+    /** 收讫状态码 */
+    private String                      collectionStatus;
+
+    /** 已收保费金额 */
+    private BigDecimal                  collectedAmount;
+
+    /** 渠道ID（指向 channel 域） */
+    private String                      channelId;
+
+    /** 销售渠道大类码 */
+    private String                      salesChannel;
+
+    /** 代理人/业务员ID */
+    private String                      agentId;
 
     /**
      * 保单项目查询结果

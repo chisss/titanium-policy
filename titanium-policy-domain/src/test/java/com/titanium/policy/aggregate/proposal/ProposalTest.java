@@ -50,7 +50,7 @@ class ProposalTest {
         // 初始化标的
         subject = new ProposalSubject(
                 "subject-123",
-                com.titanium.policy.common.enums.SubjectType.VEHICLE,
+                com.titanium.metadata.enums.insurance.SubjectType.VEHICLE,
                 "京A12345",
                 com.titanium.metadata.enums.underwriting.UnderwritingEnum.RiskLevel.STANDARD
         );

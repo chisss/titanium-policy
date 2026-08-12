@@ -1,7 +1,7 @@
 package com.titanium.policy.entity;
 
+import com.titanium.metadata.enums.insurance.SubjectType;
 import com.titanium.metadata.enums.underwriting.UnderwritingEnum;
-import com.titanium.policy.common.enums.SubjectType;
 
 /**
  * 保险标的实体

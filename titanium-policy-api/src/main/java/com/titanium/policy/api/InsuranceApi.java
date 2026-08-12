@@ -7,10 +7,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.RequestMapping;
 
+import com.titanium.metadata.response.ApiResponse;
 import com.titanium.policy.api.request.ConvertToInsuranceRequest;
-import com.titanium.policy.api.response.ApiResponse;
 import com.titanium.policy.api.response.InsuranceResponse;
 
 /**
@@ -25,8 +24,7 @@ import com.titanium.policy.api.response.InsuranceResponse;
  * 否则 Spring 启动报「Multiple @FeignClient with the same name」Bean 冲突。
  * </p>
  */
-@FeignClient(name = "titanium-policy", contextId = "insuranceApi")
-@RequestMapping("/api/v1/insurances")
+@FeignClient(name = "titanium-policy", contextId = "insuranceApi", path = "/api/v1/insurances")
 public interface InsuranceApi {
 
     /**

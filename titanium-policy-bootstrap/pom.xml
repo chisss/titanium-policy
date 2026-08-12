@@ -77,6 +77,26 @@
             <artifactId>titanium-common</artifactId>
         </dependency>
 
+        <!-- ============ Feign API 显式依赖（确保扫描到） ============ -->
+        <dependency>
+            <groupId>com.titanium</groupId>
+            <artifactId>titanium-payment-api</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+
+        <!-- ============ Jackson 2.x 兼容依赖（Axon 4.10 需要） ============ -->
+        <!-- Spring Boot 4 升级到 Jackson 3.x，但 Axon 4.10 还依赖 Jackson 2.x -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+            <version>2.20.1</version>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>2.20.1</version>
+        </dependency>
+
         <!-- ============ 架构守护测试（仅 test 作用域，不进运行时） ============ -->
         <!-- 共享 ArchUnit 基类制品：提供 AbstractArchitectureGuardTest -->
         <dependency>

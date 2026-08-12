@@ -17,10 +17,8 @@
     
     <properties>
         <java.version>21</java.version>
-        <spring.boot.version>4.0.1</spring.boot.version>
+        <spring.boot.version>4.0.7</spring.boot.version>
         <spring.security.version>7.0.1</spring.security.version>
-        <spring.data.jpa.version>4.0.1</spring.data.jpa.version>
-        <spring.kafka.version>4.0.1</spring.kafka.version>
         <mysql.connector.version>9.5.0</mysql.connector.version>
         <jjwt.version>0.11.5</jjwt.version>
         <lombok.version>1.18.30</lombok.version>
@@ -28,10 +26,9 @@
         <commons-lang3.version>3.14.0</commons-lang3.version>
         <axon.version>4.10.0</axon.version>
         <liquibase.version>4.26.0</liquibase.version>
-        <spring.boot.liquibase.starter.version>4.0.1</spring.boot.liquibase.starter.version>
         <mapstruct.version>1.5.5.Final</mapstruct.version>
         <!-- Spring Cloud BOM：统一管理 openfeign 等 cloud 组件版本（修复 application 模块 openfeign 缺失版本问题） -->
-        <spring-cloud.version>2023.0.2</spring-cloud.version>
+        <spring-cloud.version>2025.1.2</spring-cloud.version>
     </properties>
 
     <dependencyManagement>
@@ -69,14 +66,9 @@
                 <artifactId>spring-boot-starter-validation</artifactId>
                 <version>${spring.boot.version}</version>
             </dependency>
-            
-            <!-- Spring Kafka -->
-            <dependency>
-                <groupId>org.springframework.kafka</groupId>
-                <artifactId>spring-kafka</artifactId>
-                <version>${spring.kafka.version}</version>
-            </dependency>
-            
+
+            <!-- Spring Kafka：版本由 Spring Boot BOM 统一托管，不在此声明条目（空条目会遮蔽 BOM 版本） -->
+
             <!-- MySQL Connector -->
             <dependency>
                 <groupId>com.mysql</groupId>
@@ -123,12 +115,7 @@
                 <artifactId>liquibase-core</artifactId>
                 <version>${liquibase.version}</version>
             </dependency>
-            <!-- Spring Boot整合Liquibase（可选，简化配置） -->
-            <dependency>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-starter-liquibase</artifactId>
-                <version>${spring.boot.liquibase.starter.version}</version>
-            </dependency>
+            <!-- Spring Boot整合Liquibase：版本由 Spring Boot BOM 统一托管，不在此声明条目（空条目会遮蔽 BOM 版本） -->
             
             <!-- Commons Lang3 -->
             <dependency>
