@@ -57,7 +57,7 @@ public class ProposalQueryHandler {
      */
     @QueryHandler
     public List<ProposalQueryResult> handle(FindProposalsByConditionQuery query) {
-        return proposalQueryService.findProposalsByConditions(query.proposalNo(), query.expectedProductCode(),
-                query.status(), query.tenantId(), query.page(), query.size());
+        return proposalQueryService.findProposalsByConditions(query.proposalNo(), query.customerId(),
+                query.expectedProductCode(), query.status(), query.tenantId(), query.page(), query.size());
     }
 }

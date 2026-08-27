@@ -3,6 +3,7 @@ package com.titanium.policy.api.response;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.enums.product.ProductEnum.SalesChannel;
 
@@ -50,6 +51,21 @@ public class ProposalResponse {
 
     @Schema(description = "期望险种编码", example = "PROD_A")
     private String        expectedProductCode;
+
+    @Schema(description = "险种三级分类")
+    private InsuranceProductType insuranceType;
+
+    @Schema(description = "出单业务流水号")
+    private String        bizNo;
+
+    @Schema(description = "渠道ID")
+    private String        channelId;
+
+    @Schema(description = "营销包ID")
+    private String        marketPackageId;
+
+    @Schema(description = "意向险种段数量")
+    private Integer       lineCount;
 
     @Schema(description = "意向单状态", example = "DRAFT")
     private String        status;

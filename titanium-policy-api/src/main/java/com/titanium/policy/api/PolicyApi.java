@@ -1,5 +1,7 @@
 package com.titanium.policy.api;
 
+import java.util.List;
+
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -11,8 +13,15 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import com.titanium.metadata.response.ApiResponse;
 import com.titanium.policy.api.request.AccountValueWriteBackRequest;
 import com.titanium.policy.api.request.CreatePolicyRequest;
+import com.titanium.policy.api.request.RecordPremiumCollectionRequest;
+import com.titanium.policy.api.request.maintenance.ApplyPolicyMaintenanceRequest;
+import com.titanium.policy.api.response.PolicyEndorsementResponse;
+import com.titanium.policy.api.response.PolicyMaintenanceSnapshotResponse;
 import com.titanium.policy.api.response.PolicyResponse;
 import com.titanium.policy.api.response.PolicyStatusResponse;
+import com.titanium.policy.api.response.maintenance.PolicyMaintenanceApplicationResponse;
+
+import jakarta.validation.Valid;
 
 /**
  * 保单聚合对外契约（Feign）
@@ -28,6 +37,14 @@ import com.titanium.policy.api.response.PolicyStatusResponse;
  */
 @FeignClient(name = "titanium-policy", contextId = "policyApi", path = "/api/v1/policies")
 public interface PolicyApi {
+
+    /** 立即应用保全案件的结构化合同变更。 */
+    @PostMapping("/{policyId}/maintenance-applications")
+    ApiResponse<PolicyMaintenanceApplicationResponse> applyMaintenance(
+            @PathVariable("policyId") String policyId,
+            @Valid @RequestBody ApplyPolicyMaintenanceRequest request,
+            @RequestHeader("X-Operator-Id") String operatorId,
+            @RequestHeader("X-Tenant-Id") String tenantId);
 
     /**
      * 创建保单（从投保单创建）
@@ -73,6 +90,18 @@ public interface PolicyApi {
     ApiResponse<PolicyStatusResponse> getPolicyStatus(@PathVariable("policyId") String policyId,
                                                  @RequestHeader("X-Tenant-Id") String tenantId);
 
+    /** 查询保全建案使用的不可变 Policy 基准快照。 */
+    @GetMapping("/{policyId}/maintenance-snapshot")
+    ApiResponse<PolicyMaintenanceSnapshotResponse> getMaintenanceSnapshot(
+            @PathVariable("policyId") String policyId,
+            @RequestHeader("X-Tenant-Id") String tenantId);
+
+    /** 查询保单租户隔离的批改历史，供跨域影响分析取证。 */
+    @GetMapping("/{policyId}/endorsements")
+    ApiResponse<List<PolicyEndorsementResponse>> getEndorsements(
+            @PathVariable("policyId") String policyId,
+            @RequestHeader("X-Tenant-Id") String tenantId);
+
     /**
      * 签发保单
      *
@@ -96,6 +125,14 @@ public interface PolicyApi {
     @PutMapping("/{policyId}/activate")
     ApiResponse<Void> activatePolicy(@PathVariable("policyId") String policyId,
                                      @RequestHeader("X-Tenant-Id") String tenantId);
+
+    /** Payment 或 Billing 回写已核验的保费收讫事实。 */
+    @PostMapping("/{policyId}/collections")
+    ApiResponse<Void> recordPremiumCollection(
+            @PathVariable("policyId") String policyId,
+            @Valid @RequestBody RecordPremiumCollectionRequest request,
+            @RequestHeader("X-Operator-Id") String operatorId,
+            @RequestHeader("X-Tenant-Id") String tenantId);
 
     /**
      * 回写投资账户价值（investment 域调用，投连/万能保单账户价值变更后回写）

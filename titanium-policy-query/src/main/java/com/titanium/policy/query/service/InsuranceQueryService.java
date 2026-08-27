@@ -2,6 +2,8 @@ package com.titanium.policy.query.service;
 
 import java.util.List;
 
+import org.springframework.data.domain.Page;
+
 import com.titanium.policy.query.result.InsuranceQueryResult;
 
 /**
@@ -35,12 +37,21 @@ public interface InsuranceQueryService {
      *
      * @param insuranceNo 投保单编号（模糊，可空）
      * @param holderId    投保人ID（精确，可空）
+     * @param productId   主险产品ID（精确，可空）
      * @param status      状态枚举 name（可空）
      * @param tenantId    租户ID
      * @param page        页码（从0开始）
      * @param size        每页条数
      * @return 投保单查询结果列表
      */
-    List<InsuranceQueryResult> findInsurancesByConditions(String insuranceNo, String holderId,
+    List<InsuranceQueryResult> findInsurancesByConditions(String insuranceNo, String holderId, String productId,
                                                           String status, String tenantId, int page, int size);
+
+    /**
+     * 多条件分页查询投保单，并保留总条数等分页元数据。
+     *
+     * @return 投保单分页查询结果
+     */
+    Page<InsuranceQueryResult> findInsurancesPageByConditions(String insuranceNo, String holderId, String productId,
+                                                              String status, String tenantId, int page, int size);
 }

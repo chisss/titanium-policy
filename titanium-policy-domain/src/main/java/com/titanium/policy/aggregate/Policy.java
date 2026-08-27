@@ -1,8 +1,13 @@
 package com.titanium.policy.aggregate;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeMap;
 
 import org.axonframework.commandhandling.CommandHandler;
 import org.axonframework.eventsourcing.EventSourcingHandler;
@@ -14,12 +19,15 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import com.titanium.common.domain.BaseAggregate;
 import com.titanium.metadata.enums.insurance.InsuranceProductType;
+import com.titanium.metadata.enums.maintenance.PolicyMaintenanceAction;
 import com.titanium.metadata.enums.policy.PolicyEnum;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.command.ActivatePolicyCommand;
 import com.titanium.policy.command.AddInsuredMemberCommand;
 import com.titanium.policy.command.ApplyPolicyEndorsementCommand;
+import com.titanium.policy.command.ApplyPolicyMaintenanceCommand;
+import com.titanium.policy.command.AssociatePremiumBillingCommand;
 import com.titanium.policy.command.CancelPolicyCommand;
 import com.titanium.policy.command.CreatePolicyCommand;
 import com.titanium.policy.command.CreatePolicyDirectlyCommand;
@@ -42,6 +50,7 @@ import com.titanium.policy.command.UpdateAccountValueCommand;
 import com.titanium.policy.command.UpdateLineUnderwritingResultCommand;
 import com.titanium.policy.command.WaivePremiumCommand;
 import com.titanium.policy.common.constant.PolicyConstants;
+import com.titanium.policy.common.enums.PolicyDataUpdateType;
 import com.titanium.policy.common.enums.PremiumWaiverReason;
 import com.titanium.policy.entity.Endorsement;
 import com.titanium.policy.entity.PaymentRecord;
@@ -62,17 +71,23 @@ import com.titanium.policy.event.PolicyEndorsedEvent;
 import com.titanium.policy.event.PolicyExpiredEvent;
 import com.titanium.policy.event.PolicyIssuedEvent;
 import com.titanium.policy.event.PolicyLapsedEvent;
+import com.titanium.policy.event.PolicyMaintenanceAppliedEvent;
+import com.titanium.policy.event.PolicyMaintenanceRetroactiveEvidenceRecordedEvent;
+import com.titanium.policy.event.PolicyMaintenanceStateAppliedEvent;
 import com.titanium.policy.event.PolicyMaturedEvent;
 import com.titanium.policy.event.PolicyPaymentRecordedEvent;
 import com.titanium.policy.event.PolicyReinstatedEvent;
 import com.titanium.policy.event.PolicyResumedEvent;
 import com.titanium.policy.event.PolicySuspendedEvent;
 import com.titanium.policy.event.PolicyTerminatedEvent;
+import com.titanium.policy.event.PremiumBillingAssociatedEvent;
 import com.titanium.policy.event.PremiumCollectedEvent;
 import com.titanium.policy.event.PremiumWaivedEvent;
 import com.titanium.policy.event.SubPolicyLinkedEvent;
 import com.titanium.policy.exception.PolicyBusinessRuleException;
 import com.titanium.policy.service.PolicyCompositionDomainService;
+import com.titanium.policy.service.maintenance.PolicyMaintenanceFieldExecutorRegistry;
+import com.titanium.policy.service.maintenance.PolicyMaintenanceHashing;
 import com.titanium.policy.valueobject.AnnuityPayoutPlan;
 import com.titanium.policy.valueobject.PolicyDocument;
 import com.titanium.policy.valueobject.PolicyNo;
@@ -80,6 +95,11 @@ import com.titanium.policy.valueobject.PolicyRelation;
 import com.titanium.policy.valueobject.PolicyStatus;
 import com.titanium.policy.valueobject.PremiumPlan;
 import com.titanium.policy.valueobject.RuleDecision;
+import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceApplicationReceipt;
+import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceExecutionState;
+import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceFieldChange;
+import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceSnapshotFieldValue;
+import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceSnapshotReference;
 import com.titanium.policy.valueobject.policy.ChannelInfo;
 import com.titanium.policy.valueobject.policy.CollectionInfo;
 import com.titanium.policy.valueobject.policy.PolicyPeriod;
@@ -100,6 +120,10 @@ import lombok.experimental.SuperBuilder;
 @Getter
 @SuperBuilder(toBuilder = true)
 public class Policy extends BaseAggregate {
+    private static final Set<String> SUPPORTED_MAINTENANCE_EFFECTIVE_TIME_TYPES = Set.of(
+            "IMMEDIATE", "FUTURE", "SPECIFIED_DATE", "NEXT_BILLING_DATE", "POLICY_ANNIVERSARY",
+            "RETROACTIVE");
+
     /** 聚合根唯一标识 */
     @AggregateIdentifier
     private String                 policyId;
@@ -117,6 +141,8 @@ public class Policy extends BaseAggregate {
     private String                 underwritingId;
     /** 营销包ID（弱引用 marketing 域，仅溯源与转化统计；无营销来源时为 null） */
     private String                 marketPackageId;
+    /** 出单业务流水号（进度回写关联键，可空以兼容存量保单） */
+    private String                 bizNo;
     /**
      * 保单总保费（= Σ 计入段的保费；拒保段不计入）
      * <p>
@@ -164,6 +190,8 @@ public class Policy extends BaseAggregate {
     private List<PolicyDocument>   policyDocuments;
     /** 批单列表（数据/要素类批改留痕） */
     private List<Endorsement>      endorsements;
+    /** 正式保全应用回执（按请求ID幂等恢复）。 */
+    private List<PolicyMaintenanceApplicationReceipt> maintenanceApplications;
     /** 保单状态 */
     private PolicyStatus           status;
     /** 险种三级分类（自投保单链路落地，可空以兼容存量事件） */
@@ -195,8 +223,9 @@ public class Policy extends BaseAggregate {
         validateComposition(compositionDomainService, command.policyProducts(), command.premium());
         AggregateLifecycle.apply(new PolicyCreatedEvent(command.policyId(), new PolicyNo(command.policyNo()),
                 command.policyForm(), command.productId(), command.insuranceId(), command.proposalId(),
-                command.underwritingId(), command.marketPackageId(), command.policyPeriod(), command.premium(),
-                command.sumInsured(), command.policyProducts(), command.premiumPlan(), command.collectionInfo(),
+                command.underwritingId(), command.bizNo(), command.marketPackageId(), command.policyPeriod(),
+                command.standardPremium(), command.premium(), command.sumInsured(), command.policyProducts(),
+                command.premiumPlan(), command.collectionInfo(),
                 command.channelInfo(),
                 new PolicyStatus(PolicyStatus.StatusCode.NOT_EFFECTIVE, LocalDateTime.now(), "创建保单",
                         PolicyConstants.POLICY_SYSTEM),
@@ -217,9 +246,9 @@ public class Policy extends BaseAggregate {
     public Policy(CreatePolicyDirectlyCommand command, PolicyCompositionDomainService compositionDomainService) {
         validateComposition(compositionDomainService, command.policyProducts(), command.totalPremium());
         AggregateLifecycle.apply(new PolicyCreatedEvent(command.policyId(), new PolicyNo(command.policyNo()),
-                command.policyForm(), command.productId(), null, null, null, command.marketPackageId(),
-                command.policyPeriod(), command.totalPremium(), command.sumInsured(), command.policyProducts(),
-                command.premiumPlan(), command.collectionInfo(), command.channelInfo(),
+                command.policyForm(), command.productId(), null, null, null, command.bizNo(), command.marketPackageId(),
+                command.policyPeriod(), command.totalPremium(), command.totalPremium(), command.sumInsured(),
+                command.policyProducts(), command.premiumPlan(), command.collectionInfo(), command.channelInfo(),
                 new PolicyStatus(PolicyStatus.StatusCode.NOT_EFFECTIVE, LocalDateTime.now(), "一步出单创建保单",
                         PolicyConstants.POLICY_SYSTEM),
                 command.insuredPartyList(), command.insuranceType(), command.tenantId()));
@@ -284,7 +313,8 @@ public class Policy extends BaseAggregate {
         if (this.policyPeriod != null && !this.policyPeriod.hasStarted(LocalDateTime.now())) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "Insurance period has not started yet");
         }
-        AggregateLifecycle.apply(new PolicyActivatedEvent(this.policyId, LocalDateTime.now(), this.tenantId));
+        AggregateLifecycle.apply(new PolicyActivatedEvent(this.policyId, this.insuranceId, this.bizNo,
+                LocalDateTime.now(), this.tenantId));
     }
 
     /**
@@ -379,6 +409,86 @@ public class Policy extends BaseAggregate {
                 command.sourceMaintenanceId(), LocalDateTime.now(), command.operatorId(), this.tenantId));
     }
 
+    /** 立即原子应用保全案件的结构化字段与合同状态动作。 */
+    @CommandHandler
+    public PolicyMaintenanceApplicationReceipt handle(
+            ApplyPolicyMaintenanceCommand command,
+            PolicyMaintenanceFieldExecutorRegistry executorRegistry) {
+        validateMaintenanceRequestIdentity(command);
+        PolicyMaintenanceApplicationReceipt existing = findMaintenanceApplication(command.requestId());
+        if (existing != null) {
+            if (existing.requestPayloadHash().equals(command.requestPayloadHash())
+                    && existing.expectedPolicyVersion() == command.expectedPolicyVersion()) {
+                return existing;
+            }
+            throw new PolicyBusinessRuleException(
+                    "POLICY_MAINTENANCE_IDEMPOTENCY_CONFLICT", "同一保全请求ID不能提交不同载荷");
+        }
+        validateNewMaintenanceRequest(command);
+        if (this.policyVersion != command.expectedPolicyVersion()) {
+            throw new PolicyBusinessRuleException(
+                    "POLICY_MAINTENANCE_VERSION_CONFLICT",
+                    "Policy 版本冲突，期望 " + command.expectedPolicyVersion() + "，实际 " + this.policyVersion);
+        }
+        String calculatedRequestHash = PolicyMaintenanceHashing.requestHash(
+                command.tenantId(), command.policyId(), command.requestId(), command.sourceMaintenanceId(),
+                command.expectedPolicyVersion(), command.proposedSnapshotHash(), command.effectiveTimeType(),
+                command.effectiveAt(), command.changeSummary(), command.changes(), command.stateAction(),
+                command.stateReason(), command.terminationReason(), command.retroactiveEvidence());
+        if (!calculatedRequestHash.equalsIgnoreCase(command.requestPayloadHash())) {
+            throw new PolicyBusinessRuleException(
+                    "POLICY_MAINTENANCE_REQUEST_HASH_MISMATCH", "保全请求摘要与结构化载荷不一致");
+        }
+
+        PolicyMaintenanceExecutionState beforeState =
+                new PolicyMaintenanceExecutionState(this.insuredPartyList, this.policyProducts);
+        PolicyMaintenanceFieldExecutorRegistry.ExecutionResult execution = command.changes().isEmpty()
+                ? new PolicyMaintenanceFieldExecutorRegistry.ExecutionResult(beforeState, List.of())
+                : executorRegistry.execute(this.policyId, beforeState, command.changes());
+        PolicyStatus.StatusCode statusBefore = this.status.statusCode();
+        PolicyStatus.StatusCode statusAfter = maintenanceStatusAfter(command.stateAction(), statusBefore);
+        int actualVersion = this.policyVersion + 1;
+        LocalDateTime appliedAt = LocalDateTime.now();
+        String endorsementNo = PolicyMaintenanceHashing.stableEndorsementNo(
+                this.tenantId, this.policyId, command.requestId());
+        String originalSnapshotHash = maintenanceSnapshotHash(
+                this.policyVersion, beforeState, statusBefore);
+        String appliedSnapshotHash = maintenanceSnapshotHash(
+                actualVersion, execution.state(), statusAfter);
+        String snapshotStorageKey = "axon-event://policy/" + this.tenantId + "/" + this.policyId
+                + "/maintenance-applications/" + command.requestId() + "?version=" + actualVersion;
+        String applicationHash = PolicyMaintenanceHashing.applicationHash(
+                command.requestId(), endorsementNo, command.expectedPolicyVersion(), actualVersion,
+                appliedSnapshotHash, execution.appliedFields());
+        if (command.stateAction().changesStatus()) {
+            AggregateLifecycle.apply(new PolicyMaintenanceStateAppliedEvent(
+                    this.policyId, command.requestId(), command.requestPayloadHash().toLowerCase(),
+                    command.sourceMaintenanceId(), endorsementNo, command.stateAction().name(),
+                    com.titanium.policy.common.enums.EndorsementCategory.LIFECYCLE,
+                    command.expectedPolicyVersion(), actualVersion, command.effectiveAt(), command.changeSummary(),
+                    command.proposedSnapshotHash().toLowerCase(), originalSnapshotHash, snapshotStorageKey,
+                    appliedSnapshotHash, applicationHash, execution.appliedFields(), execution.state(),
+                    command.stateAction(), statusBefore, statusAfter, command.stateReason(),
+                    command.terminationReason(), appliedAt, command.operatorId(), this.tenantId));
+        } else {
+            PolicyDataUpdateType updateType = maintenanceUpdateType(command.changes());
+            AggregateLifecycle.apply(new PolicyMaintenanceAppliedEvent(
+                    this.policyId, command.requestId(), command.requestPayloadHash().toLowerCase(),
+                    command.sourceMaintenanceId(), endorsementNo, updateType,
+                    updateType.getCategory(), command.expectedPolicyVersion(),
+                    actualVersion, command.effectiveAt(), command.changeSummary(),
+                    command.proposedSnapshotHash().toLowerCase(), originalSnapshotHash, snapshotStorageKey,
+                    appliedSnapshotHash, applicationHash, execution.appliedFields(), execution.state(), appliedAt,
+                    command.operatorId(), this.tenantId));
+        }
+        if (command.retroactiveEvidence() != null) {
+            AggregateLifecycle.apply(new PolicyMaintenanceRetroactiveEvidenceRecordedEvent(
+                    this.policyId, command.requestId(), command.sourceMaintenanceId(),
+                    command.retroactiveEvidence(), appliedAt, command.operatorId(), this.tenantId));
+        }
+        return findMaintenanceApplication(command.requestId());
+    }
+
     /**
      * 记录保费收讫（billing / payment 收费回调驱动，事件溯源）
      * <p>
@@ -408,6 +518,49 @@ public class Policy extends BaseAggregate {
         AggregateLifecycle.apply(new PremiumCollectedEvent(this.policyId, command.paymentId(), command.paymentNo(),
                 command.collectedAmount(), collected.collectedAmount(), collected.collectionStatus(),
                 command.paymentMethod(), collectedAt, command.operatorId(), this.tenantId));
+    }
+
+    /**
+     * 关联收费编排创建的账单与支付单。
+     * <p>
+     * 单据关联与实收事实分离：本命令不改变收讫金额，只把外部单据标识写入事件流。相同关联重复
+     * 投递时直接忽略；已关联其他账单时拒绝覆盖，避免一张保单被静默改绑到另一张账单。
+     * </p>
+     */
+    @CommandHandler
+    public void handle(AssociatePremiumBillingCommand command) {
+        if (command.billId() == null || command.billId().isBlank()) {
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "账单ID不能为空");
+        }
+        if (this.collectionInfo == null) {
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "保单缺少收费信息");
+        }
+        if (this.collectionInfo.billId() != null) {
+            boolean sameBill = this.collectionInfo.billId().equals(command.billId());
+            String currentPaymentOrderId = this.collectionInfo.paymentOrderId();
+            boolean samePaymentOrder = Objects.equals(currentPaymentOrderId, command.paymentOrderId());
+            if (sameBill && samePaymentOrder) {
+                return;
+            }
+            // 账单开立后立即关联，支付单创建成功后允许在同一账单上补充一次支付单ID。
+            if (sameBill && currentPaymentOrderId == null && command.paymentOrderId() != null) {
+                CollectionInfo enriched = this.collectionInfo.withBilling(command.billId(), command.paymentOrderId());
+                AggregateLifecycle.apply(new PremiumBillingAssociatedEvent(this.policyId, this.bizNo,
+                        command.billId(), command.paymentOrderId(), enriched.collectionStatus(), this.tenantId));
+                return;
+            }
+            throw new PolicyBusinessRuleException("POLICY_BILLING_ALREADY_ASSOCIATED", "保单已关联其他收费单据");
+        }
+        CollectionInfo associated = this.collectionInfo.withBilling(command.billId(), command.paymentOrderId());
+        AggregateLifecycle.apply(new PremiumBillingAssociatedEvent(this.policyId, this.bizNo, command.billId(),
+                command.paymentOrderId(), associated.collectionStatus(), this.tenantId));
+    }
+
+    @EventSourcingHandler
+    public void on(PremiumBillingAssociatedEvent event) {
+        if (this.collectionInfo != null) {
+            this.collectionInfo = this.collectionInfo.withBilling(event.billId(), event.paymentOrderId());
+        }
     }
 
     @EventSourcingHandler
@@ -511,11 +664,13 @@ public class Policy extends BaseAggregate {
         this.proposalId = event.proposalId();
         this.underwritingId = event.underwritingId();
         this.marketPackageId = event.marketPackageId();
+        this.bizNo = event.bizNo();
         this.tenantId = event.tenantId();
         this.createTime = LocalDateTime.now();
         this.paymentRecords = new ArrayList<>();
         this.policyDocuments = new ArrayList<>();
         this.endorsements = new ArrayList<>();
+        this.maintenanceApplications = new ArrayList<>();
         this.status = event.status();
         this.policyRelation = new PolicyRelation(PolicyEnum.PolicyLevel.INDEPENDENT, null, 0, null);
         // 险种段列表（L2）：事件携带则落地，缺失时置空列表（兼容存量事件；改造后出单链路必带）
@@ -546,6 +701,63 @@ public class Policy extends BaseAggregate {
         this.endorsements.add(new Endorsement(event.endorsementNo(), event.updateType(), event.category(),
                 currentVersion, event.endorsementEffectiveDate(), event.changeSummary(), event.originalSnapshot(),
                 event.requiresPremiumRecalc(), event.sourceMaintenanceId(), event.endorsedAt(), event.operatorId()));
+    }
+
+    @EventSourcingHandler
+    public void on(PolicyMaintenanceAppliedEvent event) {
+        applyMaintenanceExecutionState(event.executionStateAfter());
+        incrementVersion();
+        if (this.policyVersion != event.actualPolicyVersion()) {
+            throw new IllegalStateException("Policy 保全应用事件版本与聚合版本不一致");
+        }
+        if (this.endorsements == null) {
+            this.endorsements = new ArrayList<>();
+        }
+        this.endorsements.add(new Endorsement(
+                event.endorsementNo(), event.updateType(), event.category(), this.policyVersion,
+                event.effectiveAt(), event.changeSummary(), event.originalSnapshotHash(),
+                event.updateType().needsPremiumRecalc(), event.sourceMaintenanceId(), event.appliedAt(),
+                event.operatorId()));
+        if (this.maintenanceApplications == null) {
+            this.maintenanceApplications = new ArrayList<>();
+        }
+        this.maintenanceApplications.add(toReceipt(event));
+    }
+
+    @EventSourcingHandler
+    public void on(PolicyMaintenanceStateAppliedEvent event) {
+        if (this.status == null || this.status.statusCode() != event.statusBefore()) {
+            throw new IllegalStateException("Policy 状态保全事件的变更前状态与聚合不一致");
+        }
+        applyMaintenanceExecutionState(event.executionStateAfter());
+        incrementVersion();
+        if (this.policyVersion != event.actualPolicyVersion()) {
+            throw new IllegalStateException("Policy 状态保全事件版本与聚合版本不一致");
+        }
+        this.status = this.status.transitionStatus(
+                event.statusAfter(), event.stateReason(), event.operatorId());
+        if (event.stateAction() == PolicyMaintenanceAction.TERMINATE && this.annuityPayoutPlan != null) {
+            this.annuityPayoutPlan = this.annuityPayoutPlan.stop();
+        }
+        if (this.maintenanceApplications == null) {
+            this.maintenanceApplications = new ArrayList<>();
+        }
+        this.maintenanceApplications.add(toReceipt(event));
+    }
+
+    @EventSourcingHandler
+    public void on(PolicyMaintenanceRetroactiveEvidenceRecordedEvent event) {
+        if (this.maintenanceApplications == null) {
+            throw new IllegalStateException("Policy追溯证据缺少对应保全应用回执");
+        }
+        for (int index = 0; index < this.maintenanceApplications.size(); index++) {
+            PolicyMaintenanceApplicationReceipt receipt = this.maintenanceApplications.get(index);
+            if (event.requestId().equals(receipt.requestId())) {
+                this.maintenanceApplications.set(index, receipt.withRetroactiveEvidence(event.evidence()));
+                return;
+            }
+        }
+        throw new IllegalStateException("Policy追溯证据缺少对应请求ID");
     }
 
     @EventSourcingHandler
@@ -866,7 +1078,8 @@ public class Policy extends BaseAggregate {
         // 家庭险场景以事件携带的家庭关系覆盖成员关系，保证清单内关系一致
         if (event.familyRelation() != null) {
             member = new InsuredPartyList.InsuredInfo(member.customerId(), member.insuredId(), member.name(),
-                    member.certType(), member.certNo(), member.age(), member.gender(), event.familyRelation());
+                    member.certType(), member.certNo(), member.age(), member.gender(), member.phone(),
+                    member.relationToHolder(), event.familyRelation());
         }
         if (this.insuredPartyList != null) {
             this.insuredPartyList = this.insuredPartyList.addInsured(member);
@@ -1113,6 +1326,258 @@ public class Policy extends BaseAggregate {
     }
 
     // ==================== 内部方法 ====================
+
+    private void validateMaintenanceRequestIdentity(ApplyPolicyMaintenanceCommand command) {
+        if (!Objects.equals(this.policyId, command.policyId()) || !Objects.equals(this.tenantId, command.tenantId())) {
+            throw new PolicyBusinessRuleException(
+                    "POLICY_MAINTENANCE_CONTEXT_INVALID", "Policy 保全请求的聚合或租户上下文不一致");
+        }
+        if (isBlank(command.requestId()) || isBlank(command.sourceMaintenanceId()) || isBlank(command.operatorId())) {
+            throw new PolicyBusinessRuleException(
+                    "POLICY_MAINTENANCE_REQUEST_INVALID", "请求ID、案件ID和操作人不能为空");
+        }
+        if (!isSha256(command.requestPayloadHash()) || !isSha256(command.proposedSnapshotHash())) {
+            throw new PolicyBusinessRuleException(
+                    "POLICY_MAINTENANCE_REQUEST_INVALID", "请求摘要和拟变更快照摘要必须为 SHA-256");
+        }
+    }
+
+    private void validateNewMaintenanceRequest(ApplyPolicyMaintenanceCommand command) {
+        if (isBlank(command.changeSummary())) {
+            throw new PolicyBusinessRuleException(
+                    "POLICY_MAINTENANCE_REQUEST_INVALID", "变更摘要不能为空");
+        }
+        if (!SUPPORTED_MAINTENANCE_EFFECTIVE_TIME_TYPES.contains(command.effectiveTimeType())
+                || command.effectiveAt() == null) {
+            throw new PolicyBusinessRuleException(
+                    "POLICY_MAINTENANCE_EFFECTIVE_TIME_UNSUPPORTED", "当前生效时态不受 Policy 正式应用支持");
+        }
+        if ("IMMEDIATE".equals(command.effectiveTimeType())
+                && command.effectiveAt().isAfter(LocalDateTime.now().plusMinutes(5))) {
+            throw new PolicyBusinessRuleException(
+                    "POLICY_MAINTENANCE_EFFECTIVE_TIME_UNSUPPORTED", "保全生效时间尚未到达");
+        }
+        if ("RETROACTIVE".equals(command.effectiveTimeType())) {
+            if (command.retroactiveEvidence() == null
+                    || command.effectiveAt().isAfter(LocalDateTime.now())) {
+                throw new PolicyBusinessRuleException(
+                        "POLICY_MAINTENANCE_RETROACTIVE_EVIDENCE_REQUIRED",
+                        "追溯生效必须包含完整跨域证据且生效时间不能晚于当前时间");
+            }
+        } else if (command.retroactiveEvidence() != null) {
+            throw new PolicyBusinessRuleException(
+                    "POLICY_MAINTENANCE_RETROACTIVE_EVIDENCE_INVALID",
+                    "非追溯保全不得提交追溯证据");
+        }
+        if (this.status == null) {
+            throw new PolicyBusinessRuleException(
+                    "POLICY_MAINTENANCE_STATUS_INVALID", "Policy 缺少当前合同状态");
+        }
+        PolicyMaintenanceAction action = command.stateAction();
+        if (command.changes().isEmpty() && !action.changesStatus()) {
+            throw new PolicyBusinessRuleException(
+                    "POLICY_MAINTENANCE_REQUEST_INVALID", "字段变更和状态动作不能同时为空");
+        }
+        if (!action.changesStatus()) {
+            if (this.status.statusCode() != PolicyStatus.StatusCode.EFFECTIVE) {
+                throw new PolicyBusinessRuleException(
+                        "POLICY_MAINTENANCE_STATUS_INVALID", "仅生效保单可应用字段型保全变更");
+            }
+            if (!isBlank(command.stateReason()) || command.terminationReason() != null) {
+                throw new PolicyBusinessRuleException(
+                        "POLICY_MAINTENANCE_REQUEST_INVALID", "无状态动作时不得提交状态原因或终止原因");
+            }
+            return;
+        }
+        if (isBlank(command.stateReason())) {
+            throw new PolicyBusinessRuleException(
+                    "POLICY_MAINTENANCE_REQUEST_INVALID", "状态类保全必须包含变更原因");
+        }
+        if (action == PolicyMaintenanceAction.TERMINATE && command.terminationReason() == null) {
+            throw new PolicyBusinessRuleException(
+                    "POLICY_MAINTENANCE_REQUEST_INVALID", "终止保单必须包含终止原因");
+        }
+        if (action != PolicyMaintenanceAction.TERMINATE && command.terminationReason() != null) {
+            throw new PolicyBusinessRuleException(
+                    "POLICY_MAINTENANCE_REQUEST_INVALID", "非终止动作不得包含终止原因");
+        }
+        maintenanceStatusAfter(action, this.status.statusCode());
+    }
+
+    private PolicyStatus.StatusCode maintenanceStatusAfter(
+            PolicyMaintenanceAction action,
+            PolicyStatus.StatusCode currentStatus) {
+        return switch (action) {
+            case NONE -> currentStatus;
+            case SUSPEND -> {
+                requireMaintenanceStatus(currentStatus, PolicyStatus.StatusCode.EFFECTIVE, action);
+                yield PolicyStatus.StatusCode.SUSPENDED;
+            }
+            case RESUME -> {
+                requireMaintenanceStatus(currentStatus, PolicyStatus.StatusCode.SUSPENDED, action);
+                yield PolicyStatus.StatusCode.EFFECTIVE;
+            }
+            case REINSTATE -> {
+                requireMaintenanceStatus(currentStatus, PolicyStatus.StatusCode.LAPSED, action);
+                yield PolicyStatus.StatusCode.EFFECTIVE;
+            }
+            case TERMINATE -> {
+                if (currentStatus != PolicyStatus.StatusCode.EFFECTIVE
+                        && currentStatus != PolicyStatus.StatusCode.SUSPENDED
+                        && currentStatus != PolicyStatus.StatusCode.LAPSED) {
+                    throw new PolicyBusinessRuleException(
+                            "POLICY_MAINTENANCE_STATUS_INVALID",
+                            "仅 EFFECTIVE、SUSPENDED 或 LAPSED 保单可终止");
+                }
+                yield PolicyStatus.StatusCode.TERMINATED;
+            }
+        };
+    }
+
+    private void requireMaintenanceStatus(
+            PolicyStatus.StatusCode actual,
+            PolicyStatus.StatusCode expected,
+            PolicyMaintenanceAction action) {
+        if (actual != expected) {
+            throw new PolicyBusinessRuleException(
+                    "POLICY_MAINTENANCE_STATUS_INVALID",
+                    action.name() + " 要求保单状态为 " + expected + "，实际为 " + actual);
+        }
+    }
+
+    private PolicyMaintenanceApplicationReceipt findMaintenanceApplication(String requestId) {
+        if (this.maintenanceApplications == null || requestId == null) {
+            return null;
+        }
+        return this.maintenanceApplications.stream()
+                .filter(application -> requestId.equals(application.requestId()))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private PolicyMaintenanceApplicationReceipt toReceipt(PolicyMaintenanceAppliedEvent event) {
+        PolicyMaintenanceSnapshotReference snapshot = new PolicyMaintenanceSnapshotReference(
+                event.appliedSnapshotStorageKey(), event.appliedSnapshotContentHash(),
+                event.actualPolicyVersion(), event.appliedAt().atOffset(ZoneOffset.ofHours(8)));
+        return new PolicyMaintenanceApplicationReceipt(
+                event.requestId(), event.requestPayloadHash(), event.endorsementNo(),
+                event.expectedPolicyVersion(), event.actualPolicyVersion(), event.applicationHash(),
+                snapshot, event.appliedFields(), event.appliedAt());
+    }
+
+    private PolicyMaintenanceApplicationReceipt toReceipt(PolicyMaintenanceStateAppliedEvent event) {
+        PolicyMaintenanceSnapshotReference snapshot = new PolicyMaintenanceSnapshotReference(
+                event.appliedSnapshotStorageKey(), event.appliedSnapshotContentHash(),
+                event.actualPolicyVersion(), event.appliedAt().atOffset(ZoneOffset.ofHours(8)));
+        return new PolicyMaintenanceApplicationReceipt(
+                event.requestId(), event.requestPayloadHash(), event.endorsementNo(),
+                event.expectedPolicyVersion(), event.actualPolicyVersion(), event.applicationHash(),
+                snapshot, event.appliedFields(), event.appliedAt(), event.stateAction(),
+                event.statusBefore(), event.statusAfter());
+    }
+
+    private String maintenanceSnapshotHash(
+            long version,
+            PolicyMaintenanceExecutionState executionState,
+            PolicyStatus.StatusCode snapshotStatus) {
+        PolicyProduct mainProduct = requireMainProductForMaintenance(executionState.policyProducts());
+        Map<String, PolicyMaintenanceSnapshotFieldValue> fields = maintenanceSnapshotFields(
+                mainProduct, executionState.insuredPartyList(), snapshotStatus);
+        return PolicyMaintenanceHashing.snapshotHash(
+                this.tenantId, this.policyId, version, mainProduct.productId(),
+                mainProduct.productVersion(), mainProduct.pricingPlanVersion(), fields);
+    }
+
+    private Map<String, PolicyMaintenanceSnapshotFieldValue> maintenanceSnapshotFields(
+            PolicyProduct mainProduct,
+            InsuredPartyList parties,
+            PolicyStatus.StatusCode snapshotStatus) {
+        TreeMap<String, PolicyMaintenanceSnapshotFieldValue> fields = new TreeMap<>();
+        InsuredPartyList.HolderInfo holder = parties != null ? parties.holderInfo() : null;
+        Money lineCurrencySource = mainProduct.premium() != null ? mainProduct.premium() : mainProduct.sumInsured();
+        fields.put("policy.collection.mode", snapshotField("ENUM",
+                this.collectionInfo != null && this.collectionInfo.collectionMode() != null
+                        ? this.collectionInfo.collectionMode().getCode() : null));
+        fields.put("policy.coverage.sumInsured", snapshotField("DECIMAL", amount(mainProduct.sumInsured())));
+        fields.put("policy.currency", snapshotField("ENUM",
+                lineCurrencySource != null ? lineCurrencySource.currency() : null));
+        fields.put("policy.holder.id", snapshotField("TEXT", holder != null ? holder.customerId() : null));
+        fields.put("policy.holder.mobile", snapshotField("TEXT", holder != null ? holder.phone() : null));
+        fields.put("policy.holder.name", snapshotField("TEXT", holder != null ? holder.name() : null));
+        fields.put("policy.number", snapshotField("TEXT", this.policyNo != null ? this.policyNo.value() : null));
+        fields.put("policy.period.end", snapshotField("DATETIME", dateTime(
+                this.policyPeriod != null ? this.policyPeriod.insurancePeriodEnd() : null)));
+        fields.put("policy.period.start", snapshotField("DATETIME", dateTime(
+                this.policyPeriod != null ? this.policyPeriod.insurancePeriodStart() : null)));
+        fields.put("policy.premium.total", snapshotField("DECIMAL", amount(this.totalPremium)));
+        fields.put("policy.product.id", snapshotField("TEXT", mainProduct.productId()));
+        fields.put("policy.product.planVersion", snapshotField("TEXT", mainProduct.pricingPlanVersion()));
+        fields.put("policy.product.version", snapshotField("TEXT", mainProduct.productVersion()));
+        fields.put("policy.status", snapshotField("ENUM", snapshotStatus.name()));
+        return Map.copyOf(fields);
+    }
+
+    private PolicyProduct requireMainProductForMaintenance(List<PolicyProduct> products) {
+        List<PolicyProduct> mainProducts = products == null ? List.of() : products.stream()
+                .filter(Objects::nonNull)
+                .filter(PolicyProduct::isMain)
+                .toList();
+        if (mainProducts.size() != 1) {
+            throw new PolicyBusinessRuleException(
+                    "POLICY_MAINTENANCE_CONTRACT_INCOMPLETE", "Policy 必须且只能存在一个主险段");
+        }
+        PolicyProduct mainProduct = mainProducts.getFirst();
+        if (isBlank(mainProduct.productId()) || isBlank(mainProduct.productVersion())
+                || isBlank(mainProduct.pricingPlanVersion())) {
+            throw new PolicyBusinessRuleException(
+                    "POLICY_MAINTENANCE_CONTRACT_INCOMPLETE", "Policy 缺少产品或定价计划版本");
+        }
+        return mainProduct;
+    }
+
+    private void applyMaintenanceExecutionState(PolicyMaintenanceExecutionState executionState) {
+        if (executionState == null) {
+            return;
+        }
+        if (executionState.insuredPartyList() != null) {
+            this.insuredPartyList = executionState.insuredPartyList();
+        }
+        if (executionState.policyProducts() != null) {
+            this.policyProducts = List.copyOf(executionState.policyProducts());
+            this.sumInsured = requireMainProductForMaintenance(this.policyProducts).sumInsured();
+        }
+    }
+
+    private PolicyDataUpdateType maintenanceUpdateType(List<PolicyMaintenanceFieldChange> changes) {
+        List<PolicyDataUpdateType> updateTypes = changes.stream()
+                .map(PolicyMaintenanceFieldChange::itemCode)
+                .map(PolicyDataUpdateType::byMaintenanceType)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        return updateTypes.size() == 1 ? updateTypes.getFirst() : PolicyDataUpdateType.POLICY_INFO_CHANGE;
+    }
+
+    private PolicyMaintenanceSnapshotFieldValue snapshotField(String dataType, String value) {
+        return new PolicyMaintenanceSnapshotFieldValue(dataType, value);
+    }
+
+    private String amount(Money money) {
+        return money == null || money.value() == null
+                ? null : money.value().stripTrailingZeros().toPlainString();
+    }
+
+    private String dateTime(LocalDateTime value) {
+        return value == null ? null : value.atOffset(ZoneOffset.ofHours(8)).toString();
+    }
+
+    private boolean isSha256(String value) {
+        return value != null && value.matches("[a-fA-F0-9]{64}");
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
+    }
 
     private void generateDocument() {
         PolicyDocument document = new PolicyDocument("doc-" + LocalDateTime.now(), "E-" + this.policyNo.value(),

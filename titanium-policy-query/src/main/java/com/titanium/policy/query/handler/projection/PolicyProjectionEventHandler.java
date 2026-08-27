@@ -2,6 +2,7 @@ package com.titanium.policy.query.handler.projection;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 
 import org.axonframework.config.ProcessingGroup;
 import org.axonframework.eventhandling.EventHandler;
@@ -11,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.titanium.common.jpa.BasePersistable;
 import com.titanium.metadata.enums.policy.PolicyEnum;
 import com.titanium.policy.entity.insurance.InsuredPartyList;
+import com.titanium.policy.entity.policy.PolicyProduct;
 import com.titanium.policy.event.AccountValueUpdatedEvent;
 import com.titanium.policy.event.DividendDistributedEvent;
 import com.titanium.policy.event.InvestmentAccountLinkedEvent;
@@ -20,6 +22,7 @@ import com.titanium.policy.event.PolicyCreatedEvent;
 import com.titanium.policy.event.PolicyExpiredEvent;
 import com.titanium.policy.event.PolicyIssuedEvent;
 import com.titanium.policy.event.PolicyLapsedEvent;
+import com.titanium.policy.event.PolicyMaintenanceStateAppliedEvent;
 import com.titanium.policy.event.PolicyMaturedEvent;
 import com.titanium.policy.event.PolicyReinstatedEvent;
 import com.titanium.policy.event.PolicyResumedEvent;
@@ -71,6 +74,23 @@ public class PolicyProjectionEventHandler {
 
         // 事件字段 → 读模型的结构映射收敛到 MapStruct（保单号/保费值对象拆解、起止期改名），消除逐字段 set
         policyViewMapper.applyCreated(view, event);
+        if (event.policyProducts() != null) {
+            view.setLineCount(event.policyProducts().size());
+            List<PolicyProduct> mainProducts = event.policyProducts().stream()
+                    .filter(Objects::nonNull)
+                    .filter(PolicyProduct::isMain)
+                    .toList();
+            if (mainProducts.size() == 1 && mainProducts.get(0).productCode() != null
+                    && !mainProducts.get(0).productCode().isBlank()) {
+                view.setProductCode(mainProducts.get(0).productCode());
+            }
+        } else if (view.getLineCount() == null && event.productId() != null && !event.productId().isBlank()) {
+            // 历史事件没有段列表；仅能由主险产品ID确认至少一段，不能把“未知”错误投影为 0 段
+            view.setLineCount(1);
+        }
+        if (view.getCurrentVersion() == null) {
+            view.setCurrentVersion(0);
+        }
         // 状态含 null 兜底 + 本地状态机→metadata 枚举映射，属处理器职责，不下沉映射器
         view.setPolicyStatus(event.status() != null ? mapStatus(event.status().statusCode())
                 : PolicyEnum.PolicyStatus.PENDING_EFFECTIVE);
@@ -80,6 +100,9 @@ public class PolicyProjectionEventHandler {
             if (holder != null) {
                 view.setPolicyHolderId(holder.customerId());
                 view.setPolicyHolderName(holder.name());
+                view.setPolicyHolderIdType(holder.certType() != null ? holder.certType().getCode() : null);
+                view.setPolicyHolderIdNo(holder.certNo());
+                view.setPolicyHolderPhone(holder.phone());
             }
             List<InsuredPartyList.InsuredInfo> insuredList = event.insuredPartyList().insuredList();
             if (insuredList != null && !insuredList.isEmpty()) {
@@ -161,6 +184,13 @@ public class PolicyProjectionEventHandler {
     @Transactional
     public void on(PolicyReinstatedEvent event) {
         applyStatus(event.policyId(), event.tenantId(), PolicyStatus.StatusCode.EFFECTIVE);
+    }
+
+    /** 状态类保全以统一权威事件刷新保单状态读模型。 */
+    @EventHandler
+    @Transactional
+    public void on(PolicyMaintenanceStateAppliedEvent event) {
+        applyStatus(event.policyId(), event.tenantId(), event.statusAfter());
     }
 
     /**

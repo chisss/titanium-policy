@@ -53,6 +53,8 @@ import lombok.extern.slf4j.Slf4j;
 @Transactional(readOnly = true)
 public class PolicyLineQueryServiceImpl implements PolicyLineQueryService {
 
+    private static final String MAIN_PRODUCT_CATEGORY = "MAIN";
+
     private final PolicyViewRepository            policyViewRepository;
     private final PolicyProductViewRepository     policyProductViewRepository;
     private final PolicyClauseViewRepository      policyClauseViewRepository;
@@ -149,12 +151,34 @@ public class PolicyLineQueryServiceImpl implements PolicyLineQueryService {
         List<PolicyQueryResult> results = new ArrayList<>();
         for (String policyId : paged) {
             policyViewRepository.findByPolicyIdAndTenantId(policyId, tenantId)
-                    .map(mapper::toPolicyResult)
+                    .map(view -> assembleCustomerPolicy(view, tenantId))
                     .ifPresent(results::add);
         }
         log.info("按客户角色查保单: customerId={}, 角色={}, 命中={}, 返回={}", customerId, role, policyIds.size(),
                 results.size());
         return results;
+    }
+
+    /**
+     * 装配客户关联保单摘要，并从出单快照补充主险展示字段。
+     */
+    private PolicyQueryResult assembleCustomerPolicy(PolicyView view, String tenantId) {
+        PolicyQueryResult result = mapper.toPolicyResult(view);
+        List<PolicyProductView> productViews = policyProductViewRepository
+                .findByPolicyIdAndTenantIdOrderByLineNoAsc(view.getPolicyId(), tenantId);
+        if (productViews.isEmpty()) {
+            return result;
+        }
+
+        PolicyProductView mainProduct = productViews.stream()
+                .filter(product -> MAIN_PRODUCT_CATEGORY.equals(product.getProductCategory()))
+                .findFirst()
+                .orElse(productViews.getFirst());
+        result.setProductName(mainProduct.getProductName());
+        if (result.getProductCode() == null) {
+            result.setProductCode(mainProduct.getProductCode());
+        }
+        return result;
     }
 
     /**

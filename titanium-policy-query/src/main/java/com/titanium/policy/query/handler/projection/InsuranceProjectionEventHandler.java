@@ -9,7 +9,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.titanium.common.jpa.BasePersistable;
+import com.titanium.metadata.enums.BaseEnum;
+import com.titanium.metadata.enums.product.ProductEnum.PaymentFrequency;
 import com.titanium.metadata.enums.underwriting.UnderwritingEnum.ConclusionType;
+import com.titanium.policy.entity.insurance.InsuranceLine;
 import com.titanium.policy.event.insurance.InsuranceCreatedEvent;
 import com.titanium.policy.event.insurance.InsuranceIssuedEvent;
 import com.titanium.policy.event.insurance.InsuranceSubmittedForUnderwritingEvent;
@@ -59,6 +62,28 @@ public class InsuranceProjectionEventHandler {
 
         // 事件字段 → 读模型的同名结构映射收敛到 MapStruct，消除逐字段 set
         insuranceViewMapper.applyCreated(view, event);
+        InsuranceLine mainLine = event.mainLine();
+        if (mainLine != null) {
+            if (mainLine.productId() != null) {
+                view.setProductId(mainLine.productId());
+            }
+            if (mainLine.paymentTerms() != null) {
+                view.setPaymentFrequency(mainLine.paymentTerms().paymentFrequency());
+                view.setPremiumPaymentYears(mainLine.paymentTerms().premiumPaymentYears());
+            }
+        }
+        if (event.insuranceLines() != null && !event.insuranceLines().isEmpty()) {
+            view.setLineCount(event.insuranceLines().size());
+        }
+        if (mainLine == null || mainLine.paymentTerms() == null) {
+            PaymentFrequency paymentFrequency = BaseEnum.fromCode(PaymentFrequency.class, event.paymentMode());
+            if (paymentFrequency != null) {
+                view.setPaymentFrequency(paymentFrequency);
+            }
+            if (event.premiumPaymentYears() > 0) {
+                view.setPremiumPaymentYears(event.premiumPaymentYears());
+            }
+        }
         // 初始状态 DRAFT 属创建期语义，由处理器显式赋值，不下沉映射器
         view.setStatus(InsuranceStatus.StatusCode.DRAFT);
         stampAuditTime(view);

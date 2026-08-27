@@ -26,7 +26,9 @@ public enum EndorsementCategory implements BaseEnum {
     /** 保险期间类：起止期延长/缩短 */
     PERIOD(6, "PERIOD", "保险期间变更"),
     /** 信息登记类：不影响要素的纯信息更正 */
-    INFO(7, "INFO", "信息变更");
+    INFO(7, "INFO", "信息变更"),
+    /** 合同生命周期类：暂停、恢复、复效、终止等状态交易 */
+    LIFECYCLE(8, "LIFECYCLE", "合同状态变更");
 
     private final Integer enumCode;
     private final String  code;

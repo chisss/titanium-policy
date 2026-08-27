@@ -12,7 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 /**
  * 死信队列监控 + 重试服务
  * <p>
- * 定时扫描 {@code policy-query-group} 处理组的死信队列（DLQ），重试此前投影失败的事件。 配合 bootstrap
+ * 定时扫描保单读模型处理组的死信队列（DLQ），重试此前失败的事件。配合 bootstrap
  * 中开启的 DLQ 配置使用，保证读模型投影的最终一致性。
  * </p>
  * <p>
@@ -28,7 +28,7 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 public class DeadLetterQueueService {
 
-    /** 投影处理组名，与 PolicyProjectionEventHandler 的 @ProcessingGroup 一致 */
+    /** 投影处理组名，与读模型 handler 的 @ProcessingGroup 一致 */
     private static final String PROCESSING_GROUP = "policy-query-group";
 
     private final EventProcessingConfiguration eventProcessingConfig;

@@ -4,8 +4,10 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 import com.titanium.common.jpa.BaseView;
+import com.titanium.metadata.enums.billing.PremiumCollectionMode;
 import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.policy.PolicyForm;
+import com.titanium.metadata.enums.product.ProductEnum.PaymentFrequency;
 import com.titanium.metadata.enums.underwriting.UnderwritingEnum.ConclusionType;
 import com.titanium.policy.valueobject.insurance.InsuranceStatus;
 
@@ -58,6 +60,44 @@ public class InsuranceView extends BaseView {
     @Enumerated(EnumType.STRING)
     @Column(name = "insurance_type", length = 64)
     private InsuranceProductType     insuranceType;
+
+    /** 主险产品ID */
+    @Column(name = "product_id", length = 36)
+    private String                   productId;
+
+    /** 主险基本保额 */
+    @Column(name = "sum_insured", precision = 18, scale = 2)
+    private BigDecimal               sumInsured;
+
+    /** 主险缴费频率 */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_frequency", length = 32)
+    private PaymentFrequency         paymentFrequency;
+
+    /** 主险缴费年数 */
+    @Column(name = "premium_payment_years")
+    private Integer                  premiumPaymentYears;
+
+    /** 收费方式 */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "collection_mode", length = 32)
+    private PremiumCollectionMode    collectionMode;
+
+    /** 渠道ID（指向 channel 域） */
+    @Column(name = "channel_id", length = 36)
+    private String                   channelId;
+
+    /** 出单业务流水号 */
+    @Column(name = "biz_no", length = 64)
+    private String                   bizNo;
+
+    /** 营销包ID（弱引用） */
+    @Column(name = "market_package_id", length = 36)
+    private String                   marketPackageId;
+
+    /** 险种段数量 */
+    @Column(name = "line_count")
+    private Integer                  lineCount;
 
     /** 投保人ID */
     @Column(name = "holder_id", length = 36)

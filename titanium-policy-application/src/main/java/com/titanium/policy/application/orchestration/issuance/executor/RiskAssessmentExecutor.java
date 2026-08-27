@@ -6,12 +6,13 @@ import java.util.Map;
 import org.springframework.stereotype.Service;
 
 import com.titanium.policy.common.enums.RiskAssessmentStep;
+import com.titanium.policy.common.enums.RuleEngineDecision;
 import com.titanium.policy.port.RuleEngineServicePort;
 import com.titanium.policy.service.RiskAssessmentDomainService;
 import com.titanium.policy.valueobject.IssuanceRequest;
 import com.titanium.policy.valueobject.RiskAssessmentDecision;
 
-import jakarta.annotation.Resource;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -25,13 +26,11 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class RiskAssessmentExecutor {
 
-    @Resource
-    private RuleEngineServicePort       ruleEngineServicePort;
-
-    @Resource
-    private RiskAssessmentDomainService riskAssessmentDomainService;
+    private final RuleEngineServicePort       ruleEngineServicePort;
+    private final RiskAssessmentDomainService riskAssessmentDomainService;
 
     /**
      * 执行风控校验步骤
@@ -46,8 +45,8 @@ public class RiskAssessmentExecutor {
         // 编排：按领域服务声明的数据需求决定是否取规则引擎外部数据，取数后交领域服务裁决
         RiskAssessmentDecision decision;
         if (riskAssessmentDomainService.requiresRuleEngine(step)) {
-            boolean ruleEnginePassed = invokeRuleEngine(step, request);
-            decision = riskAssessmentDomainService.judge(step, ruleEnginePassed);
+            RuleEngineDecision ruleEngineDecision = invokeRuleEngine(step, request);
+            decision = riskAssessmentDomainService.judge(step, ruleEngineDecision);
         } else {
             decision = riskAssessmentDomainService.judgeLocal(step);
         }
@@ -61,29 +60,26 @@ public class RiskAssessmentExecutor {
     /**
      * 调用规则引擎取得外部裁决数据（应用层 I/O，非业务判断）
      * <p>
-     * 调用成功（无异常）视为规则引擎裁决通过，调用失败视为不通过；裁决语义由领域服务解读。
+     * 保留规则引擎 PASS/REJECT/REFER 三态；技术异常原样向上抛出，由入口释放可重试基线。
      * </p>
      *
      * @param step 风控步骤
      * @param request 出单请求
-     * @return 规则引擎是否裁决通过
+     * @return 规则引擎三态裁决
      */
-    private boolean invokeRuleEngine(RiskAssessmentStep step, IssuanceRequest request) {
-        try {
-            Map<String, Object> variables = new HashMap<>();
-            variables.put("policyHolderId", request.holderCustomerId());
-            variables.put("productId", request.mainProductId());
-            variables.put("sumInsured", request.mainSumInsured());
-            variables.put("quotedPremium", request.quotedPremium());
-            variables.put("insuredCount", request.insuredCount());
-            variables.put("lineCount", request.planLines() != null ? request.planLines().size() : 0);
+    private RuleEngineDecision invokeRuleEngine(RiskAssessmentStep step, IssuanceRequest request) {
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("policyHolderId", request.holderCustomerId());
+        variables.put("productId", request.mainProductId());
+        variables.put("sumInsured", request.mainSumInsured() != null ? request.mainSumInsured().value() : null);
+        variables.put("quotedPremium", request.quotedPremium() != null ? request.quotedPremium().value() : null);
+        variables.put("insuredCount", request.insuredCount());
+        variables.put("insuredAges", request.insuredAges());
+        variables.put("lineCount", request.planLines() != null ? request.planLines().size() : 0);
 
-            ruleEngineServicePort.executeRule(step.getCode(), variables, request.tenantId());
-            log.info("规则引擎裁决完成: 步骤={}", step.getName());
-            return true;
-        } catch (Exception e) {
-            log.error("规则引擎调用失败: 步骤={}, 错误={}", step.getName(), e.getMessage());
-            return false;
-        }
+        RuleEngineDecision decision = ruleEngineServicePort.executeRule(step.getCode(), variables,
+                request.tenantId());
+        log.info("规则引擎裁决完成: 步骤={}, 结果={}", step.getName(), decision);
+        return decision;
     }
 }

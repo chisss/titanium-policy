@@ -1,5 +1,6 @@
 package com.titanium.policy.valueobject.policy;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 
@@ -87,6 +88,20 @@ public record LineCoveragePeriod(CoveragePeriodType periodType, LocalDateTime pe
         if (isWholeLife() || periodStart == null) {
             return 0;
         }
-        return (int) ChronoUnit.YEARS.between(periodStart.toLocalDate(), periodEnd.toLocalDate());
+        if (periodValue != null && periodValue > 0 && periodUnit != null) {
+            return switch (periodUnit) {
+                case YEAR -> periodValue;
+                // Product pricing accepts a year dimension; a sub-year cover is one pricing year.
+                case MONTH, DAY -> 1;
+            };
+        }
+        if (periodEnd == null || periodEnd.isBefore(periodStart)) {
+            return 0;
+        }
+        // 保险止期通常按“周年日前一日”表示，先转为排他上界再计算自然年。
+        LocalDate start = periodStart.toLocalDate();
+        LocalDate exclusiveEnd = periodEnd.toLocalDate().plusDays(1);
+        long fullYears = ChronoUnit.YEARS.between(start, exclusiveEnd);
+        return (int) Math.max(1, fullYears);
     }
 }

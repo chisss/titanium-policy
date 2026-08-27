@@ -3,7 +3,10 @@ package com.titanium.policy.web.response;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+import com.titanium.metadata.enums.billing.PremiumCollectionMode;
+import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.policy.PolicyForm;
+import com.titanium.metadata.enums.product.ProductEnum.PaymentFrequency;
 import com.titanium.metadata.enums.underwriting.UnderwritingEnum.ConclusionType;
 import com.titanium.policy.valueobject.insurance.InsuranceStatus;
 
@@ -32,6 +35,36 @@ public class InsuranceVO {
 
     @Schema(description = "保单形态")
     private PolicyForm                 policyForm;
+
+    @Schema(description = "险种三级分类")
+    private InsuranceProductType       insuranceType;
+
+    @Schema(description = "主险产品ID")
+    private String                     productId;
+
+    @Schema(description = "主险基本保额")
+    private BigDecimal                 sumInsured;
+
+    @Schema(description = "主险缴费频率")
+    private PaymentFrequency           paymentFrequency;
+
+    @Schema(description = "主险缴费年数")
+    private Integer                    premiumPaymentYears;
+
+    @Schema(description = "收费方式")
+    private PremiumCollectionMode      collectionMode;
+
+    @Schema(description = "渠道ID")
+    private String                     channelId;
+
+    @Schema(description = "出单业务流水号")
+    private String                     bizNo;
+
+    @Schema(description = "营销包ID")
+    private String                     marketPackageId;
+
+    @Schema(description = "险种段数量")
+    private Integer                    lineCount;
 
     @Schema(description = "投保人ID")
     private String                     holderId;
@@ -62,4 +95,10 @@ public class InsuranceVO {
 
     @Schema(description = "承保时间")
     private LocalDateTime              issuedTime;
+
+    @Schema(description = "创建时间")
+    private LocalDateTime              createTime;
+
+    @Schema(description = "更新时间")
+    private LocalDateTime              updateTime;
 }

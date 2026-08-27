@@ -3,6 +3,7 @@ package com.titanium.policy.web.controller;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -81,14 +82,12 @@ public class InsuranceController {
     /**
      * 多条件分页查询投保单（承保申请）列表
      * <p>
-     * 面向管理后台组合检索：投保单编号（模糊）/投保人ID/状态任意组合。{@code holderName} 参数暂不支持
-     * （投保单读模型仅存 holderId，无投保人姓名快照，避免跨域联查破坏 CQRS 隔离），传入的
-     * {@code holderName} 会作为 holderId 匹配。{@code productCode} 读模型暂无对应字段，忽略。
+     * 面向管理后台组合检索：投保单编号（模糊）/投保人ID/主险产品ID/状态任意组合。
      * </p>
      *
      * @param insuranceNo 投保单编号（可空）
-     * @param holderName  投保人（当前按 holderId 匹配）
-     * @param productCode 险种编码（当前读模型不支持，保留占位）
+     * @param holderId    投保人客户ID
+     * @param productId   主险产品ID
      * @param status      投保单状态（可空）
      * @param page        页码（从0开始）
      * @param size        每页条数
@@ -98,17 +97,35 @@ public class InsuranceController {
     @GetMapping
     public ResponseEntity<List<InsuranceVO>> listInsurances(
             @RequestParam(value = "insuranceNo", required = false) String insuranceNo,
-            @RequestParam(value = "holderName", required = false) String holderName,
-            @RequestParam(value = "productCode", required = false) String productCode,
+            @RequestParam(value = "holderId", required = false) String holderId,
+            @RequestParam(value = "productId", required = false) String productId,
             @RequestParam(value = "status", required = false) String status,
             @RequestParam(value = "page", defaultValue = "0") int page,
             @RequestParam(value = "size", defaultValue = "20") int size,
             @RequestHeader("X-Tenant-Id") String tenantId) {
         List<InsuranceVO> insurances = insuranceAppQueryService
-                .findByConditions(insuranceNo, holderName, productCode, status, tenantId, page, size)
+                .findByConditions(insuranceNo, holderId, productId, status, tenantId, page, size)
                 .stream()
                 .map(insuranceWebMapper::toVO)
                 .toList();
+        return ResponseEntity.ok(insurances);
+    }
+
+    /**
+     * 多条件分页查询投保单，返回完整分页元数据。
+     */
+    @GetMapping("/page")
+    public ResponseEntity<Page<InsuranceVO>> pageInsurances(
+            @RequestParam(value = "insuranceNo", required = false) String insuranceNo,
+            @RequestParam(value = "holderId", required = false) String holderId,
+            @RequestParam(value = "productId", required = false) String productId,
+            @RequestParam(value = "status", required = false) String status,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "20") int size,
+            @RequestHeader("X-Tenant-Id") String tenantId) {
+        Page<InsuranceVO> insurances = insuranceAppQueryService
+                .findPageByConditions(insuranceNo, holderId, productId, status, tenantId, page, size)
+                .map(insuranceWebMapper::toVO);
         return ResponseEntity.ok(insurances);
     }
 

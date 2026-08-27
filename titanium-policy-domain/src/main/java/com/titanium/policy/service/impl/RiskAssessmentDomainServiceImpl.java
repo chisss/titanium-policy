@@ -3,6 +3,7 @@ package com.titanium.policy.service.impl;
 import org.springframework.stereotype.Service;
 
 import com.titanium.policy.common.enums.RiskAssessmentStep;
+import com.titanium.policy.common.enums.RuleEngineDecision;
 import com.titanium.policy.service.RiskAssessmentDomainService;
 import com.titanium.policy.valueobject.RiskAssessmentDecision;
 
@@ -24,12 +25,15 @@ public class RiskAssessmentDomainServiceImpl implements RiskAssessmentDomainServ
     }
 
     @Override
-    public RiskAssessmentDecision judge(RiskAssessmentStep step, boolean ruleEnginePassed) {
-        // 规则：依赖规则引擎的步骤，其通过与否由规则引擎裁决结果决定
-        if (ruleEnginePassed) {
-            return RiskAssessmentDecision.pass(step);
+    public RiskAssessmentDecision judge(RiskAssessmentStep step, RuleEngineDecision ruleEngineDecision) {
+        if (ruleEngineDecision == null) {
+            throw new IllegalArgumentException("规则引擎裁决不能为空");
         }
-        return RiskAssessmentDecision.reject(step, step.getName() + "未通过（规则引擎裁决拒绝）");
+        return switch (ruleEngineDecision) {
+            case PASS -> RiskAssessmentDecision.pass(step);
+            case REJECT -> RiskAssessmentDecision.reject(step, step.getName() + "未通过（规则引擎裁决拒绝）");
+            case REFER -> RiskAssessmentDecision.refer(step);
+        };
     }
 
     @Override

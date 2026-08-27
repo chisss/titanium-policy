@@ -55,6 +55,12 @@ public class PolicyPartyQueryServiceImpl implements PolicyPartyQueryService {
         result.setPolicyId(view.getPolicyId());
         result.setCustomerId(view.getCustomerId());
         result.setInsuredName(view.getInsuredName());
+        result.setIdType(view.getIdType());
+        result.setIdNo(view.getIdNo());
+        result.setAge(view.getAge());
+        result.setGender(view.getGender());
+        result.setPhone(view.getPhone());
+        result.setRelationToHolder(view.getRelation());
         result.setFamilyRelation(view.getFamilyRelation());
         result.setTenantId(view.getTenantId());
         return result;
@@ -66,6 +72,10 @@ public class PolicyPartyQueryServiceImpl implements PolicyPartyQueryService {
         result.setPolicyId(view.getPolicyId());
         result.setCustomerId(view.getCustomerId());
         result.setBeneficiaryName(view.getBeneficiaryName());
+        result.setIdType(view.getIdType());
+        result.setIdNo(view.getIdNo());
+        result.setGender(view.getGender());
+        result.setPhone(view.getPhone());
         result.setBeneficiaryType(view.getBeneficiaryType());
         result.setOrderNo(view.getOrderNo());
         result.setShareRatio(view.getShareRatio());

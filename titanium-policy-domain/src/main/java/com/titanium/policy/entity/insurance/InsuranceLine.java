@@ -52,11 +52,25 @@ import com.titanium.policy.valueobject.policy.LinePaymentTerms;
  * @param lineStatus             本险种投保段状态
  */
 public record InsuranceLine(String lineId, int lineNo, ProductCategory productCategory, String parentLineId,
-                            String productId, String productCode, String productName,
+                            String productId, String productCode, String productName, String productVersion,
                             InsuranceProductType insuranceType, Money sumInsured, Money premium,
                             LineCoveragePeriod coveragePeriod, LinePaymentTerms paymentTerms,
                             List<InsuredSubject> insuredSubjects, ConclusionType underwritingConclusion,
                             BigDecimal extraPremiumRatio, PolicyLineStatus lineStatus) {
+
+    /**
+     * 兼容产品版本字段加入前的历史事件和既有调用方。
+     */
+    public InsuranceLine(String lineId, int lineNo, ProductCategory productCategory, String parentLineId,
+                         String productId, String productCode, String productName,
+                         InsuranceProductType insuranceType, Money sumInsured, Money premium,
+                         LineCoveragePeriod coveragePeriod, LinePaymentTerms paymentTerms,
+                         List<InsuredSubject> insuredSubjects, ConclusionType underwritingConclusion,
+                         BigDecimal extraPremiumRatio, PolicyLineStatus lineStatus) {
+        this(lineId, lineNo, productCategory, parentLineId, productId, productCode, productName, null,
+                insuranceType, sumInsured, premium, coveragePeriod, paymentTerms, insuredSubjects,
+                underwritingConclusion, extraPremiumRatio, lineStatus);
+    }
 
     /**
      * 是否为主险段。
@@ -121,8 +135,40 @@ public record InsuranceLine(String lineId, int lineNo, ProductCategory productCa
             case POSTPONE -> PolicyLineStatus.UNDERWRITING;
         };
         return new InsuranceLine(lineId, lineNo, productCategory, parentLineId, productId, productCode, productName,
-                insuranceType, sumInsured, premium, coveragePeriod, paymentTerms, insuredSubjects, conclusion,
+                productVersion, insuranceType, sumInsured, premium, coveragePeriod, paymentTerms, insuredSubjects, conclusion,
                 extraPremiumRatio, newStatus);
+    }
+
+    /**
+     * 回写本险种段试算保费。
+     * <p>
+     * {@code InsuranceLine} 是不可变实体，应用层逐段调用计费域后通过本方法产生新实例，避免装配器
+     * 直接复制字段并遗漏后续新增属性。
+     * </p>
+     *
+     * @param resolvedPremium 计费域返回的本段保费
+     * @return 回写保费后的新实例
+     */
+    public InsuranceLine withPremium(Money resolvedPremium) {
+        return new InsuranceLine(lineId, lineNo, productCategory, parentLineId, productId, productCode, productName,
+                productVersion, insuranceType, sumInsured, resolvedPremium, coveragePeriod, paymentTerms, insuredSubjects,
+                underwritingConclusion, extraPremiumRatio, lineStatus);
+    }
+
+    /**
+     * 冻结 Product 返回的最终确认保费。
+     * <p>
+     * Product 已按核保调整逐步舍入，故回写后清空本地加费率，避免 {@link #payablePremium()} 再次加费。
+     * 核保结论仍保留在段快照中。
+     * </p>
+     *
+     * @param confirmedPremium Product 确认的最终保费
+     * @return 已冻结最终保费的新实例
+     */
+    public InsuranceLine withConfirmedPremium(Money confirmedPremium) {
+        return new InsuranceLine(lineId, lineNo, productCategory, parentLineId, productId, productCode, productName,
+                productVersion, insuranceType, sumInsured, confirmedPremium, coveragePeriod, paymentTerms,
+                insuredSubjects, underwritingConclusion, null, lineStatus);
     }
 
     /**

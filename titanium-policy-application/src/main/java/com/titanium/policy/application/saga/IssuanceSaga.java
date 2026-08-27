@@ -13,12 +13,18 @@ import org.axonframework.modelling.saga.StartSaga;
 import org.axonframework.spring.stereotype.Saga;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility;
+
 import com.titanium.metadata.enums.billing.PremiumCollectionMode;
 import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.valueobject.Money;
+import com.titanium.policy.application.orchestration.issuance.InsuranceLinePremiumConfirmationService;
+import com.titanium.policy.application.orchestration.issuance.InsuranceLinePremiumConfirmationService.ConfirmationSummary;
 import com.titanium.policy.application.orchestration.issuance.assembler.PolicyProductAssembler;
 import com.titanium.policy.application.orchestration.issuance.orchestrator.PremiumCollectionOrchestrator;
+import com.titanium.policy.application.orchestration.issuance.orchestrator.PremiumScheduleOrchestrator;
 import com.titanium.policy.command.ActivatePolicyCommand;
 import com.titanium.policy.command.CreatePolicyCommand;
 import com.titanium.policy.command.LinkInvestmentAccountCommand;
@@ -34,9 +40,7 @@ import com.titanium.policy.event.insurance.InsuranceIssuedEvent;
 import com.titanium.policy.event.insurance.InsuranceSubmittedForUnderwritingEvent;
 import com.titanium.policy.event.insurance.UnderwritingResultReceivedEvent;
 import com.titanium.policy.generator.PolicyNoGenerator;
-import com.titanium.policy.port.BillingServicePort;
 import com.titanium.policy.port.InvestmentAccountPort;
-import com.titanium.policy.port.PremiumCalculationGateway;
 import com.titanium.policy.port.ProductServicePort;
 import com.titanium.policy.port.UnderwritingDecisionGateway;
 import com.titanium.policy.service.PolicyIssuanceDomainService;
@@ -72,6 +76,8 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Slf4j
 @Saga
+@JsonAutoDetect(fieldVisibility = Visibility.ANY, getterVisibility = Visibility.NONE,
+        isGetterVisibility = Visibility.NONE)
 public class IssuanceSaga {
 
     @Autowired
@@ -87,19 +93,19 @@ public class IssuanceSaga {
     private transient PolicyIssuanceDomainService policyIssuanceDomainService;
 
     @Autowired
-    private transient BillingServicePort billingServicePort;
-
-    @Autowired
     private transient InvestmentAccountPort investmentAccountPort;
-
-    @Autowired
-    private transient PremiumCalculationGateway premiumCalculationGateway;
 
     @Autowired
     private transient PolicyProductAssembler policyProductAssembler;
 
     @Autowired
+    private transient InsuranceLinePremiumConfirmationService premiumConfirmationService;
+
+    @Autowired
     private transient PremiumCollectionOrchestrator premiumCollectionOrchestrator;
+
+    @Autowired
+    private transient PremiumScheduleOrchestrator premiumScheduleOrchestrator;
 
     @Autowired
     private transient ProductServicePort productServicePort;
@@ -138,6 +144,8 @@ public class IssuanceSaga {
     private String underwritingId;
     /** 营销包ID（弱引用，透传保单供转化统计） */
     private String marketPackageId;
+    /** 出单业务流水号（透传保单供进度回写） */
+    private String bizNo;
     /** 收费方式（出单期确定，决定保单生效是否以收讫为前提） */
     private PremiumCollectionMode collectionMode;
     /** 渠道信息（透传保单，此前保单查不到来源渠道） */
@@ -156,9 +164,9 @@ public class IssuanceSaga {
         log.info("[IssuanceSaga] 启动: insuranceId={}, tenantId={}", event.insuranceId(), event.tenantId());
         this.policyForm = event.policyForm();
         this.holderId = event.holderId();
-        // 取投保险种编码列表首个作为产品ID（承保载体），供出单事件透传下游
-        this.productId = event.productCodes() != null && !event.productCodes().isEmpty()
-                ? event.productCodes().get(0) : null;
+        // 主险产品ID必须取结构化险种段；产品编码不是产品主键，不能用于远程取数或保单冗余字段。
+        InsuranceLine mainLine = event.mainLine();
+        this.productId = mainLine != null ? mainLine.productId() : null;
         this.exactPremium = event.exactPremium();
         this.insurancePeriodStart = event.insurancePeriodStart();
         this.insurancePeriodEnd = event.insurancePeriodEnd();
@@ -174,6 +182,7 @@ public class IssuanceSaga {
         this.insuranceLines = event.insuranceLines();
         this.proposalId = event.proposalId();
         this.marketPackageId = event.marketPackageId();
+        this.bizNo = event.bizNo();
         this.collectionMode = event.collectionMode();
         this.channelInfo = event.channelInfo();
         // 取产品投保条件的等待期/犹豫期配置（此前 policy 域完全未消费该配置）
@@ -218,8 +227,8 @@ public class IssuanceSaga {
         // 清单缺失时各要素为 null，核保域按保守标准体兜底。
         InsuredInfo primaryInsured = extractPrimaryInsured();
         UnderwritingDecisionRequest request = new UnderwritingDecisionRequest(event.insuranceId(), event.holderId(),
-                event.insuredCount(), event.exactPremium(), event.currency(), event.productCodes(), event.tenantId(),
-                primaryInsured != null ? primaryInsured.age() : null,
+                event.insuredCount(), this.sumInsured, event.exactPremium(), event.currency(), event.productCodes(),
+                event.tenantId(), primaryInsured != null ? primaryInsured.age() : null,
                 primaryInsured != null ? primaryInsured.gender() : null,
                 null, null);
         UnderwritingResult result = underwritingDecisionGateway.requestDecision(request);
@@ -275,19 +284,16 @@ public class IssuanceSaga {
     @SagaEventHandler(associationProperty = "insuranceId")
     public void on(InsuranceIssuedEvent event) {
         String policyId = UUID.randomUUID().toString();
-        String policyNo = policyNoGenerator.generatePolicyNo();
+        String policyNo = policyNoGenerator.generatePolicyNo(tenantId);
 
-        // BILL-2：调 billing 计算真实标准保费；失败时回退 exactPremium 不阻断出单
-        Money basePremium = calculateBasePremium();
-
-        // UW-3：核保加费并入保费——最终应付保费 = 标准保费 ×(1 + 加费率)；无加费时等于标准保费
-        Money finalPremium = applyExtraPremium(basePremium);
-
-        // 装配承保段：把投保段精化为保单段，冻结条款与责任快照（一单多险的落地点）
-        List<PolicyProduct> policyProducts = policyProductAssembler.assembleFromInsuranceLines(insuranceLines,
-                tenantId);
-        Money segmentPremium = policyProductAssembler.sumPremium(policyProducts);
-        Money payablePremium = segmentPremium != null ? segmentPremium : finalPremium;
+        String confirmationBizNo = bizNo != null && !bizNo.isBlank() ? bizNo : event.insuranceId();
+        ConfirmationSummary confirmation = premiumConfirmationService.confirm(
+                insuranceLines, insuredPartyList, event.insuranceId(), confirmationBizNo,
+                insurancePeriodStart, tenantId, channelInfo != null ? channelInfo.channelId() : null, 1, true);
+        Money standardPremium = confirmation.standardPremium();
+        Money payablePremium = confirmation.totalPremium();
+        List<PolicyProduct> policyProducts = policyProductAssembler.assembleFromInsuranceLines(
+                confirmation.lines(), tenantId, confirmation.calculationReferences());
 
         CreatePolicyCommand command = new CreatePolicyCommand(
                 policyId,
@@ -295,6 +301,7 @@ public class IssuanceSaga {
                 event.insuranceId(),
                 proposalId,
                 underwritingId,
+                bizNo,
                 marketPackageId,
                 policyForm,
                 productId,
@@ -302,6 +309,7 @@ public class IssuanceSaga {
                 insuredPartyList,
                 policyProducts,
                 sumInsured != null ? Money.of(sumInsured, payablePremium.currency()) : null,
+                standardPremium,
                 payablePremium,
                 PolicyPeriod.of(insurancePeriodStart, insurancePeriodEnd, waitingPeriodDays, hesitationPeriodDays),
                 null,
@@ -313,14 +321,16 @@ public class IssuanceSaga {
         commandGateway.sendAndWait(command);
         log.info(
                 "[IssuanceSaga] 承保出单完成，已创建保单: insuranceId={}, policyId={}, policyNo={}, 标准保费={}, 加费率={}, 最终保费={}",
-                event.insuranceId(), policyId, policyNo, basePremium.value(), extraPremiumRatio,
-                finalPremium.value());
+                event.insuranceId(), policyId, policyNo, standardPremium.value(), extraPremiumRatio,
+                payablePremium.value());
 
         // 出单后收费：按收费方式路由（开账单 → 建支付单 → 收讫回写），取代此前的「只开账单不收钱」。
         // 收费失败不销毁保单——保单停未生效、账单待催缴，可重新发起收款。
+        CollectionResult collection = null;
         try {
-            CollectionResult collection = premiumCollectionOrchestrator.collect(policyId, holderId, payablePremium,
-                    collectionMode, tenantId);
+            collection = premiumCollectionOrchestrator.collect(policyId, holderId, payablePremium,
+                    collectionMode, insurancePeriodStart != null ? insurancePeriodStart.toLocalDate() : null,
+                    tenantId, confirmation.calculationReferences());
             log.info("[IssuanceSaga] 收费编排完成: policyId={}, 收费方式={}, 收讫状态={}, billId={}, 支付单={}",
                     policyId, collectionMode, collection.status(), collection.billId(),
                     collection.paymentOrderId());
@@ -333,31 +343,17 @@ public class IssuanceSaga {
             log.error("[IssuanceSaga] 收费编排异常（不阻断出单，保单停未生效待催缴）: policyId={}", policyId, ex);
         }
 
-        // BILL-3：出单后生成期缴计划（寿险期缴保费，跨服务同步，失败不阻断出单）
-        if (paymentMode != null && premiumPaymentYears > 0) {
-            try {
-                int totalPeriods = calculateTotalPeriods(paymentMode, premiumPaymentYears);
-                java.math.BigDecimal installmentAmount = calculateInstallmentAmount(finalPremium, paymentMode,
-                        premiumPaymentYears);
-                java.time.LocalDate firstDueDate = insurancePeriodStart != null
-                        ? insurancePeriodStart.toLocalDate()
-                        : java.time.LocalDate.now();
-
-                com.titanium.policy.valueobject.billing.PremiumScheduleRequest scheduleRequest =
-                        new com.titanium.policy.valueobject.billing.PremiumScheduleRequest(policyId, paymentMode,
-                                totalPeriods, installmentAmount, finalPremium.currency(), firstDueDate, tenantId);
-                billingServicePort.generatePremiumSchedule(scheduleRequest);
-                log.info("[IssuanceSaga] 期缴计划生成完成: policyId={}, mode={}, periods={}, installment={}",
-                        policyId, paymentMode, totalPeriods, installmentAmount);
-            } catch (Exception ex) {
-                log.error("[IssuanceSaga] 生成期缴计划失败（不阻断出单，待补偿）: policyId={}", policyId, ex);
-            }
-        }
+        // 账单成功后生成期缴计划；失败由编排器隔离，不回滚已创建的保单与账单。
+        premiumScheduleOrchestrator.generate(policyId, collection != null ? collection.billId() : null,
+                collection != null ? collection.billingAccountId() : null, paymentMode, premiumPaymentYears,
+                payablePremium,
+                insurancePeriodStart != null ? insurancePeriodStart.toLocalDate() : LocalDateTime.now().toLocalDate(),
+                tenantId);
 
         // 投连/万能保单：出单后经 InvestmentAccountPort 开立投资账户并挂接到保单（账户失败不阻断出单，待补偿）
         if (policyForm != null && policyForm.isInvestmentLinked()) {
             try {
-                String accountId = investmentAccountPort.openAccount(policyId, policyForm, finalPremium, tenantId);
+                String accountId = investmentAccountPort.openAccount(policyId, policyForm, payablePremium, tenantId);
                 if (accountId != null) {
                     commandGateway.sendAndWait(
                             new LinkInvestmentAccountCommand(policyId, accountId, PolicyConstants.POLICY_SYSTEM,
@@ -398,43 +394,6 @@ public class IssuanceSaga {
         }
     }
 
-    private Money calculateBasePremium() {
-        if (sumInsured != null && productId != null) {
-            try {
-                // 从参与方清单提取首要被保人要素（年龄/性别）作为 subjectData
-                java.util.Map<String, Object> subjectData = new java.util.HashMap<>();
-                InsuredInfo primary = extractPrimaryInsured();
-                if (primary != null) {
-                    subjectData.put("age", primary.age());
-                    if (primary.gender() != null) {
-                        subjectData.put("gender", primary.gender().name());
-                    }
-                }
-                // 推导保障期（年）：从保障起止日期计算
-                int coverageYears = 0;
-                if (insurancePeriodStart != null && insurancePeriodEnd != null) {
-                    coverageYears = (int) java.time.temporal.ChronoUnit.YEARS.between(
-                            insurancePeriodStart.toLocalDate(), insurancePeriodEnd.toLocalDate());
-                }
-                int totalPeriods = premiumPaymentYears > 0 ? premiumPaymentYears : (coverageYears > 0 ? coverageYears : 1);
-                String mode = paymentMode != null ? paymentMode : "ANNUAL";
-                PremiumCalculationGateway.StandardPremiumRequest request =
-                        new PremiumCalculationGateway.StandardPremiumRequest(
-                                productId, sumInsured, "CNY", mode, totalPeriods,
-                                coverageYears, subjectData, tenantId);
-                PremiumCalculationGateway.StandardPremiumResult result =
-                        premiumCalculationGateway.calculatePremium(request);
-                log.info("[IssuanceSaga] billing 真实保费计算成功: productId={}, 总保费={}",
-                        productId, result.totalPremium());
-                return Money.of(result.totalPremium(), result.currency() != null ? result.currency() : "CNY");
-            } catch (Exception ex) {
-                log.warn("[IssuanceSaga] billing 保费计算失败，回退 exactPremium（不阻断出单）: productId={}", productId, ex);
-            }
-        }
-        // 回退：使用投保时透传的 exactPremium
-        return exactPremium != null ? Money.of(exactPremium, "CNY") : Money.zero("CNY");
-    }
-
     /**
      * 提取首要被保人（参与方清单被保险人列表首个），供富核保请求填充年龄/性别等风险要素。
      *
@@ -448,51 +407,4 @@ public class IssuanceSaga {
         return insuredPartyList.insuredList().get(0);
     }
 
-    /**
-     * 核保加费并入保费（UW-3）：最终应付保费 = 标准保费 ×(1 + 加费率)。
-     * <p>
-     * 加费率来自核保域回传（{@link UnderwritingResult#extraPremiumRatio()}），语义与核保域
-     * {@code ExtraPremium.applyTo} 一致。无加费（率为 null 或非正）时原样返回标准保费。
-     * </p>
-     *
-     * @param standardPremium 标准保费
-     * @return 加费后应付保费
-     */
-    private Money applyExtraPremium(Money standardPremium) {
-        if (extraPremiumRatio == null || extraPremiumRatio.compareTo(BigDecimal.ZERO) <= 0) {
-            return standardPremium;
-        }
-        return standardPremium.multiply(BigDecimal.ONE.add(extraPremiumRatio));
-    }
-
-    /**
-     * 计算总期数（BILL-3）：根据缴费模式与缴费年数推算期缴计划总期数
-     *
-     * @param mode 缴费模式（LUMP_SUM/ANNUAL/MONTHLY）
-     * @param years 缴费年数
-     * @return 总期数
-     */
-    private int calculateTotalPeriods(String mode, int years) {
-        if ("LUMP_SUM".equals(mode)) {
-            return 1;
-        } else if ("MONTHLY".equals(mode)) {
-            return years * 12;
-        } else { // ANNUAL
-            return years;
-        }
-    }
-
-    /**
-     * 计算每期应缴金额（BILL-3）：总保费 ÷ 总期数
-     *
-     * @param totalPremium 总保费
-     * @param mode 缴费模式
-     * @param years 缴费年数
-     * @return 每期应缴金额
-     */
-    private java.math.BigDecimal calculateInstallmentAmount(Money totalPremium, String mode, int years) {
-        int periods = calculateTotalPeriods(mode, years);
-        return totalPremium.value().divide(java.math.BigDecimal.valueOf(periods), 2,
-                java.math.RoundingMode.HALF_UP);
-    }
 }

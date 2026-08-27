@@ -15,21 +15,33 @@ import org.axonframework.modelling.saga.StartSaga;
 import org.axonframework.spring.stereotype.Saga;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility;
+
+import com.titanium.metadata.enums.BaseEnum;
+import com.titanium.metadata.enums.billing.PremiumCollectionMode;
+import com.titanium.metadata.enums.insurance.InsuranceCategory;
 import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.enums.policy.PolicyLineStatus;
+import com.titanium.metadata.enums.product.ProductEnum.PaymentFrequency;
 import com.titanium.metadata.enums.product.ProductEnum.ProductCategory;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.command.ConvertProposalCommand;
 import com.titanium.policy.command.ConvertProposalToInsuranceCommand;
+import com.titanium.policy.command.SubmitUnderwritingCommand;
 import com.titanium.policy.entity.insurance.InsuranceLine;
 import com.titanium.policy.entity.insurance.InsuredPartyList;
+import com.titanium.policy.entity.policy.InsuredSubject;
 import com.titanium.policy.entity.proposal.ProposalLine;
 import com.titanium.policy.event.proposal.ProposalConvertedEvent;
 import com.titanium.policy.event.proposal.ProposalCreatedEvent;
 import com.titanium.policy.event.proposal.ProposalSubmittedEvent;
 import com.titanium.policy.event.proposal.ProposalVoidedEvent;
 import com.titanium.policy.generator.PolicyNoGenerator;
+import com.titanium.policy.valueobject.policy.ChannelInfo;
+import com.titanium.policy.valueobject.policy.LineCoveragePeriod;
+import com.titanium.policy.valueobject.policy.LinePaymentTerms;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -53,6 +65,8 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Slf4j
 @Saga
+@JsonAutoDetect(fieldVisibility = Visibility.ANY, getterVisibility = Visibility.NONE,
+        isGetterVisibility = Visibility.NONE)
 public class ProposalIssuanceSaga {
 
     @Autowired
@@ -65,7 +79,7 @@ public class ProposalIssuanceSaga {
     private PolicyForm policyForm;
     /** 客户ID（投保人），供构造投保单命令的 applicantId */
     private String customerId;
-    /** 意向保费（精确保费占位） */
+    /** 意向保费（客户预算或粗略报价，不作为实际保费） */
     private BigDecimal intendedPremium;
     /** 保障起期 */
     private java.time.LocalDateTime insurancePeriodStart;
@@ -83,6 +97,18 @@ public class ProposalIssuanceSaga {
     private InsuranceProductType insuranceType;
     /** 租户ID */
     private String tenantId;
+    /** 参与方清单快照 */
+    private InsuredPartyList insuredPartyList;
+    /** 收费方式 */
+    private PremiumCollectionMode collectionMode;
+    /** 渠道信息 */
+    private ChannelInfo channelInfo;
+    /** 主险缴费模式 */
+    private String paymentMode;
+    /** 主险缴费年数 */
+    private int premiumPaymentYears;
+    /** 主险意向保额 */
+    private BigDecimal intendedSumInsured;
 
     /**
      * 【意向单创建】启动 Saga，记忆后续构造投保单命令所需数据
@@ -95,21 +121,27 @@ public class ProposalIssuanceSaga {
         this.policyForm = event.policyForm();
         this.customerId = event.customerId();
         this.intendedPremium = event.intendedPremium();
+        this.intendedSumInsured = event.intendedSumInsured();
         this.insurancePeriodStart = event.insurancePeriodStart();
         this.insurancePeriodEnd = event.insurancePeriodEnd();
         this.expectedProductCode = event.expectedProductCode();
         this.proposalLines = event.proposalLines();
         this.bizNo = event.bizNo();
         this.marketPackageId = event.marketPackageId();
-        this.insuranceType = event.insuranceType();
+        this.insuranceType = ProposalLine.resolveInsuranceType(event.insuranceType(), event.proposalLines());
         this.tenantId = event.tenantId();
+        this.insuredPartyList = event.insuredPartyList();
+        this.collectionMode = event.collectionMode();
+        this.channelInfo = event.channelInfo();
+        this.paymentMode = event.paymentMode();
+        this.premiumPaymentYears = event.premiumPaymentYears();
     }
 
     /**
      * 意向段 → 投保段（渐进精化：意向保额转投保保额，补段ID与投保段状态）。
      * <p>
-     * 意向阶段以 {@code lineNo} 表达主附险依附关系，此处转换为段ID引用。意向段无缴费条件与
-     * 完整标的（意向阶段未定），故投保段的这两项留空——由后续投保信息补录或核保前补齐。
+     * 意向阶段以 {@code lineNo} 表达主附险依附关系，此处转换为段ID引用。意向保费是客户预算或
+     * 粗略报价，不能提升为投保段试算保费；实际段保费由承保前的系统试算统一写入。
      * </p>
      * <p>
      * 意向段缺失时（存量事件或单险种意向）回退以 {@code expectedProductCode} 构造单段，
@@ -119,14 +151,17 @@ public class ProposalIssuanceSaga {
      * @return 投保段列表
      */
     private List<InsuranceLine> refineToInsuranceLines() {
+        LinePaymentTerms mainPaymentTerms = resolveMainPaymentTerms();
+        LineCoveragePeriod coveragePeriod = resolveCoveragePeriod();
         if (proposalLines == null || proposalLines.isEmpty()) {
             if (expectedProductCode == null) {
                 return List.of();
             }
             String lineId = UUID.randomUUID().toString();
-            return List.of(new InsuranceLine(lineId, 1, ProductCategory.MAIN, null, expectedProductCode,
-                    expectedProductCode, null, insuranceType,
-                    intendedPremium != null ? Money.of(intendedPremium, "CNY") : null, null, null, null, List.of(),
+            Money sumInsured = intendedSumInsured != null ? Money.of(intendedSumInsured, "CNY") : null;
+            return List.of(new InsuranceLine(lineId, 1, ProductCategory.MAIN, null, null,
+                    expectedProductCode, null, null, insuranceType,
+                    sumInsured, null, coveragePeriod, mainPaymentTerms, personalSubjects(insuranceType, sumInsured),
                     null, null, PolicyLineStatus.UNDERWRITING));
         }
         Map<Integer, String> lineIdByNo = new HashMap<>();
@@ -137,10 +172,55 @@ public class ProposalIssuanceSaga {
         for (ProposalLine line : proposalLines) {
             lines.add(new InsuranceLine(lineIdByNo.get(line.lineNo()), line.lineNo(), line.productCategory(),
                     line.parentLineNo() != null ? lineIdByNo.get(line.parentLineNo()) : null, line.productId(),
-                    line.productCode(), null, line.insuranceType(), line.intendedSumInsured(), null, null, null,
-                    List.of(), null, null, PolicyLineStatus.UNDERWRITING));
+                    line.productCode(), null, line.productVersion(), line.insuranceType(), line.intendedSumInsured(),
+                    null, coveragePeriod, line.productCategory() == ProductCategory.MAIN ? mainPaymentTerms : null,
+                    personalSubjects(line.insuranceType(), line.intendedSumInsured()), null, null,
+                    PolicyLineStatus.UNDERWRITING));
         }
         return List.copyOf(lines);
+    }
+
+    private LineCoveragePeriod resolveCoveragePeriod() {
+        if (insurancePeriodStart == null || insurancePeriodEnd == null) {
+            return null;
+        }
+        return LineCoveragePeriod.fixedTerm(insurancePeriodStart, insurancePeriodEnd, null, null);
+    }
+
+    private LinePaymentTerms resolveMainPaymentTerms() {
+        PaymentFrequency paymentFrequency = BaseEnum.fromCode(PaymentFrequency.class, paymentMode);
+        return paymentFrequency != null ? new LinePaymentTerms(paymentFrequency, premiumPaymentYears) : null;
+    }
+
+    /**
+     * 人身险未显式声明标的时，以参与方清单中的被保险人生成核保标的。
+     * <p>
+     * 财产险标的必须由调用方显式提供，不能把被保险人误当成车辆、房屋等财产标的；历史事件缺少
+     * 险种分类时同样保持空列表，避免回放时改变既有语义。
+     * </p>
+     */
+    private List<InsuredSubject> personalSubjects(InsuranceProductType lineInsuranceType, Money sumInsured) {
+        InsuranceProductType resolvedType = lineInsuranceType != null ? lineInsuranceType : insuranceType;
+        if (resolvedType == null || resolvedType.getCategory() != InsuranceCategory.PERSONAL
+                || insuredPartyList == null || insuredPartyList.insuredList() == null
+                || insuredPartyList.insuredList().isEmpty()) {
+            return List.of();
+        }
+
+        List<InsuredSubject> subjects = new ArrayList<>();
+        for (InsuredPartyList.InsuredInfo insured : insuredPartyList.insuredList()) {
+            Map<String, Object> attributes = new HashMap<>();
+            attributes.put("age", insured.age());
+            if (insured.gender() != null) {
+                attributes.put("gender", insured.gender().getCode());
+            }
+            if (insured.relationToHolder() != null && !insured.relationToHolder().isBlank()) {
+                attributes.put("relationToHolder", insured.relationToHolder());
+            }
+            subjects.add(InsuredSubject.ofPerson(UUID.randomUUID().toString(), insured.customerId(), insured.name(),
+                    sumInsured, attributes));
+        }
+        return List.copyOf(subjects);
     }
 
     /**
@@ -165,18 +245,15 @@ public class ProposalIssuanceSaga {
     @EndSaga
     @SagaEventHandler(associationProperty = "proposalId")
     public void on(ProposalConvertedEvent event) {
+        if (tenantId == null || tenantId.isBlank()) {
+            log.error("[ProposalIssuanceSaga] Saga 持久化状态缺失，终止不可恢复的转换事件: proposalId={}",
+                    event.proposalId());
+            return;
+        }
         String insuranceId = UUID.randomUUID().toString();
-        String insuranceNo = policyNoGenerator.generateInsuranceNo();
+        String insuranceNo = policyNoGenerator.generateInsuranceNo(tenantId);
 
-        // 构造最小参与方清单：仅有投保人 customerId 快照，姓名/证件由后续完善
-        InsuredPartyList.HolderInfo holderInfo = new InsuredPartyList.HolderInfo(
-                customerId, customerId, null, null, null, null);
-        InsuredPartyList minimalPartyList = new InsuredPartyList(
-                insuranceId, holderInfo, new ArrayList<>(), new ArrayList<>());
-
-        Money premium = intendedPremium != null ? Money.of(intendedPremium, "CNY") : null;
-        List<String> productCodes = expectedProductCode != null
-                ? List.of(expectedProductCode) : List.of();
+        List<InsuranceLine> insuranceLines = refineToInsuranceLines();
 
         ConvertProposalToInsuranceCommand command = ConvertProposalToInsuranceCommand.builder()
                 .insuranceId(insuranceId)
@@ -184,21 +261,28 @@ public class ProposalIssuanceSaga {
                 .proposalId(event.proposalId())
                 .policyForm(policyForm)
                 .applicantId(customerId)
-                .insuredCount(1)
-                .exactPremium(premium)
+                .insuredCount(insuredPartyList != null && insuredPartyList.insuredList() != null
+                        ? insuredPartyList.insuredList().size() : 0)
+                .exactPremium(null)
                 .insurancePeriodStart(insurancePeriodStart)
                 .insurancePeriodEnd(insurancePeriodEnd)
-                .insuranceLines(refineToInsuranceLines())
+                .insuranceLines(insuranceLines)
                 .underwritingPriority(0)
                 .changeReason("意向单自动转投保单")
-                .insuredPartyList(minimalPartyList)
+                .insuredPartyList(insuredPartyList)
                 .insuranceType(insuranceType)
+                .collectionMode(collectionMode)
+                .channelInfo(channelInfo)
                 .bizNo(bizNo)
                 .marketPackageId(marketPackageId)
                 .tenantId(tenantId)
+                .sumInsured(intendedSumInsured)
+                .paymentMode(paymentMode)
+                .premiumPaymentYears(premiumPaymentYears)
                 .build();
 
         commandGateway.sendAndWait(command);
+        commandGateway.sendAndWait(new SubmitUnderwritingCommand(insuranceId, tenantId));
         log.info("[ProposalIssuanceSaga] 投保单已创建，后续由 IssuanceSaga 接力: proposalId={}, insuranceId={}",
                 event.proposalId(), insuranceId);
     }

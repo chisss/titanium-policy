@@ -89,8 +89,10 @@ public class Proposal extends BaseAggregate {
                 command.intendedSumInsured() != null ? command.intendedSumInsured().value() : null,
                 command.intendedPremium() != null ? command.intendedPremium().value() : null,
                 command.insurancePeriodStart(), command.insurancePeriodEnd(), command.expectedProductCode(),
-                command.proposalLines(), command.insuranceType(), command.bizNo(), command.marketPackageId(),
-                LocalDateTime.now(), command.tenantId()));
+                command.proposalLines(), ProposalLine.resolveInsuranceType(command.insuranceType(),
+                        command.proposalLines()), command.bizNo(), command.marketPackageId(),
+                LocalDateTime.now(), command.tenantId(), command.insuredPartyList(), command.collectionMode(),
+                command.channelInfo(), command.paymentMode(), command.premiumPaymentYears()));
     }
 
     /**
@@ -145,12 +147,12 @@ public class Proposal extends BaseAggregate {
         this.proposalNo = event.proposalNo();
         this.policyForm = event.policyForm();
         this.channel = event.channel();
-        this.insuranceType = event.insuranceType();
+        this.insuranceType = ProposalLine.resolveInsuranceType(event.insuranceType(), event.proposalLines());
         this.tenantId = event.tenantId();
         this.createTime = event.createTime();
         this.updateTime = event.createTime();
-        this.applicants = new ArrayList<>();
-        this.subjects = new ArrayList<>();
+        this.applicants = initialApplicants(event);
+        this.subjects = initialSubjects(event);
         // 意向险种段（L2 轻量）：事件携带则落地，缺失时置空列表（兼容存量事件）
         this.proposalLines = event.proposalLines() != null
                 ? new ArrayList<>(event.proposalLines())
@@ -162,6 +164,42 @@ public class Proposal extends BaseAggregate {
                 event.intendedSumInsured() != null ? Money.of(event.intendedSumInsured(), "CNY") : null,
                 event.intendedPremium() != null ? Money.of(event.intendedPremium(), "CNY") : null,
                 event.insurancePeriodStart(), event.insurancePeriodEnd(), event.expectedProductCode());
+    }
+
+    /**
+     * 统一出单携带完整参与方时，以投保人快照初始化意向申请人，保证自动提交满足聚合校验。
+     */
+    private ArrayList<ProposalHolder> initialApplicants(ProposalCreatedEvent event) {
+        ArrayList<ProposalHolder> initial = new ArrayList<>();
+        if (event.insuredPartyList() == null || event.insuredPartyList().holderInfo() == null) {
+            return initial;
+        }
+        var holder = event.insuredPartyList().holderInfo();
+        initial.add(new ProposalHolder(holder.holderId(), holder.name(), holder.certType(), holder.certNo(),
+                holder.phone(), isHolderInsured(event)));
+        return initial;
+    }
+
+    /**
+     * 统一出单的标的由已校验的方案段承载；意向聚合只需记录至少一个可提交的轻量标的。
+     */
+    private ArrayList<ProposalSubject> initialSubjects(ProposalCreatedEvent event) {
+        ArrayList<ProposalSubject> initial = new ArrayList<>();
+        if (event.insuredPartyList() == null || event.insuredPartyList().insuredList() == null) {
+            return initial;
+        }
+        for (var insured : event.insuredPartyList().insuredList()) {
+            initial.add(new ProposalSubject(insured.insuredId(),
+                    com.titanium.metadata.enums.insurance.SubjectType.PERSON, insured.name(), null));
+        }
+        return initial;
+    }
+
+    private boolean isHolderInsured(ProposalCreatedEvent event) {
+        String holderCustomerId = event.insuredPartyList().holderInfo().customerId();
+        return event.insuredPartyList().insuredList() != null
+                && event.insuredPartyList().insuredList().stream()
+                .anyMatch(insured -> holderCustomerId != null && holderCustomerId.equals(insured.customerId()));
     }
 
     @EventSourcingHandler
@@ -293,7 +331,9 @@ public class Proposal extends BaseAggregate {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "At least one applicant is required");
         }
         for (ProposalHolder applicant : applicants) {
-            if (!applicant.verifyApplicantInfo()) {
+            // 统一出单允许仅携带 customerId：客户主数据是身份真相，快照字段可在后续补录。
+            if (!applicant.verifyApplicantInfo() && (applicant.applicantId() == null
+                    || applicant.applicantId().isBlank())) {
                 throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION",
                         "Invalid applicant info: " + applicant.name());
             }

@@ -112,9 +112,8 @@ public class PaymentServiceAdapter implements PaymentServicePort {
             return null;
         }
         return switch (request.collectionMode()) {
-            case ONLINE -> "ONLINE_GATEWAY";
-            case WITHHOLD -> "BANK_WITHHOLD";
-            case OFFLINE -> "BANK_TRANSFER";
+            case ONLINE -> "UNION_PAY";
+            case WITHHOLD, OFFLINE -> "BANK";
             case FREE, PAY_AFTER_USE -> null;
         };
     }

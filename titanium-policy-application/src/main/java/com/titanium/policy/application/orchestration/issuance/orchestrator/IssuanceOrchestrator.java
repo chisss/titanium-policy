@@ -8,16 +8,23 @@ import org.springframework.stereotype.Service;
 
 import com.titanium.metadata.enums.product.ProductEnum.IssuanceMode;
 import com.titanium.metadata.valueobject.Money;
+import com.titanium.policy.application.exception.IssuanceOrchestrationException;
+import com.titanium.policy.application.orchestration.issuance.InsuranceLinePremiumConfirmationService;
+import com.titanium.policy.application.orchestration.issuance.InsuranceLinePremiumConfirmationService.ConfirmationSummary;
 import com.titanium.policy.application.orchestration.issuance.assembler.InsuranceLineAssembler;
 import com.titanium.policy.application.orchestration.issuance.assembler.PolicyProductAssembler;
 import com.titanium.policy.application.orchestration.issuance.assembler.ProposalLineAssembler;
 import com.titanium.policy.application.orchestration.issuance.executor.RiskAssessmentExecutor;
+import com.titanium.policy.command.ActivatePolicyCommand;
 import com.titanium.policy.command.CreateInsuranceDirectlyCommand;
 import com.titanium.policy.command.CreatePolicyDirectlyCommand;
 import com.titanium.policy.command.CreateProposalCommand;
+import com.titanium.policy.command.SubmitProposalCommand;
+import com.titanium.policy.command.SubmitUnderwritingCommand;
 import com.titanium.policy.common.enums.RiskAssessmentStep;
 import com.titanium.policy.entity.insurance.InsuranceLine;
 import com.titanium.policy.entity.policy.PolicyProduct;
+import com.titanium.policy.entity.proposal.ProposalLine;
 import com.titanium.policy.generator.PolicyNoGenerator;
 import com.titanium.policy.port.ProductServicePort;
 import com.titanium.policy.valueobject.IssuancePlanLine;
@@ -26,6 +33,7 @@ import com.titanium.policy.valueobject.IssuanceRequest;
 import com.titanium.policy.valueobject.IssuanceResult;
 import com.titanium.policy.valueobject.policy.ChannelInfo;
 import com.titanium.policy.valueobject.policy.CollectionInfo;
+import com.titanium.policy.valueobject.policy.CollectionResult;
 import com.titanium.policy.valueobject.policy.PolicyPeriod;
 import com.titanium.policy.valueobject.product.ProductIssueRules;
 
@@ -68,6 +76,9 @@ public class IssuanceOrchestrator {
     private final InsuranceLineAssembler insuranceLineAssembler;
     private final PolicyProductAssembler policyProductAssembler;
     private final ProposalLineAssembler  proposalLineAssembler;
+    private final InsuranceLinePremiumConfirmationService premiumConfirmationService;
+    private final PremiumCollectionOrchestrator premiumCollectionOrchestrator;
+    private final PremiumScheduleOrchestrator premiumScheduleOrchestrator;
 
     /**
      * 产品驱动出单编排：由产品域配置决定出单模式（一步/两步/三步），取代调用方硬编码。
@@ -131,23 +142,51 @@ public class IssuanceOrchestrator {
      */
     private IssuanceResult executeOneStep(IssuanceRequest request) {
         String policyId = UUID.randomUUID().toString();
-        String policyNo = policyNoGenerator.generatePolicyNo();
-        List<PolicyProduct> lines = policyProductAssembler.assemble(request, policyId);
-        Money totalPremium = sumPremium(lines, request);
+        String policyNo = policyNoGenerator.generatePolicyNo(request.tenantId());
+        ConfirmationSummary confirmation = premiumConfirmationService.confirm(
+                insuranceLineAssembler.assemble(request), request.insuredPartyList(), request.bizNo(),
+                request.bizNo(), request.periodStart(), request.tenantId(), request.channelId(), 1, false);
+        List<PolicyProduct> lines = policyProductAssembler.assembleFromInsuranceLines(
+                confirmation.lines(), request.tenantId(), confirmation.calculationReferences());
+        Money totalPremium = confirmation.totalPremium();
 
-        CreatePolicyDirectlyCommand command = new CreatePolicyDirectlyCommand(policyId, policyNo,
+        CreatePolicyDirectlyCommand command = new CreatePolicyDirectlyCommand(policyId, policyNo, request.bizNo(),
                 request.marketPackageId(), resolvePolicyForm(request), request.mainProductId(),
                 request.insuredPartyList(), lines, request.mainSumInsured(), totalPremium, buildPolicyPeriod(request),
                 null, CollectionInfo.initial(request.collectionMode(), totalPremium, java.time.LocalDateTime.now()),
                 buildChannelInfo(request), request.insuranceType(), request.tenantId());
 
         commandGateway.sendAndWait(command);
-        log.info("一步出单完成: bizNo={}, policyId={}, policyNo={}, 险种段数={}", request.bizNo(), policyId,
-                policyNo, lines.size());
-
-        return IssuanceResult.policyIssued(request.bizNo(),
+        IssuanceResult result = IssuanceResult.policyIssued(request.bizNo(),
                 new IssuanceResult.IssuedPolicy(policyId, policyNo, "NOT_EFFECTIVE", lines.size(), totalPremium),
                 totalPremium);
+        try {
+            IssuancePlanLine mainPlan = request.mainLine();
+            CollectionResult collection = premiumCollectionOrchestrator.collect(policyId,
+                    request.holderCustomerId(), totalPremium, request.collectionMode(),
+                    request.periodStart() != null ? request.periodStart().toLocalDate() : null, request.tenantId(),
+                    confirmation.calculationReferences());
+            result = result.withCollection(collection);
+            premiumScheduleOrchestrator.generate(policyId, collection.billId(), collection.billingAccountId(),
+                    mainPlan != null && mainPlan.paymentFrequency() != null
+                            ? mainPlan.paymentFrequency().getCode() : null,
+                    mainPlan != null && mainPlan.premiumPaymentYears() != null
+                            ? mainPlan.premiumPaymentYears() : 0,
+                    totalPremium, request.periodStart() != null ? request.periodStart().toLocalDate() : null,
+                    request.tenantId());
+            if (collection.allowsActivation()) {
+                activateIfPeriodStarted(policyId, request.tenantId());
+            }
+            log.info("一步出单收费完成: bizNo={}, policyId={}, status={}, billId={}, paymentOrderId={}",
+                    request.bizNo(), policyId, collection.status(), collection.billId(), collection.paymentOrderId());
+        } catch (RuntimeException exception) {
+            // 承保事实已经成立，收费失败不销毁保单；保单保持未生效，后续由补偿流程重试收费。
+            log.error("一步出单收费失败（保单保留为未生效）: bizNo={}, policyId={}", request.bizNo(), policyId,
+                    exception);
+        }
+        log.info("一步出单完成: bizNo={}, policyId={}, policyNo={}, 险种段数={}", request.bizNo(), policyId,
+                policyNo, lines.size());
+        return result;
     }
 
     /**
@@ -159,7 +198,7 @@ public class IssuanceOrchestrator {
      */
     private IssuanceResult executeTwoStep(IssuanceRequest request) {
         String insuranceId = UUID.randomUUID().toString();
-        String insuranceNo = policyNoGenerator.generateInsuranceNo();
+        String insuranceNo = policyNoGenerator.generateInsuranceNo(request.tenantId());
         List<InsuranceLine> lines = insuranceLineAssembler.assemble(request);
         IssuancePlanLine mainPlan = request.mainLine();
 
@@ -174,6 +213,13 @@ public class IssuanceOrchestrator {
                 mainPlan != null && mainPlan.premiumPaymentYears() != null ? mainPlan.premiumPaymentYears() : 0);
 
         commandGateway.sendAndWait(command);
+        IssuanceResult partialResult = IssuanceResult.insuranceCreated(request.bizNo(), insuranceId, insuranceNo,
+                request.quotedPremium());
+        try {
+            commandGateway.sendAndWait(new SubmitUnderwritingCommand(insuranceId, request.tenantId()));
+        } catch (RuntimeException exception) {
+            throw new IssuanceOrchestrationException("投保单已创建但提交核保失败", partialResult, exception);
+        }
         log.info("两步出单 - 投保单创建完成: bizNo={}, insuranceId={}, 险种段数={}；后续核保/承保/出单由 IssuanceSaga 接力",
                 request.bizNo(), insuranceId, lines.size());
 
@@ -189,8 +235,13 @@ public class IssuanceOrchestrator {
      */
     private IssuanceResult executeThreeStep(IssuanceRequest request) {
         String proposalId = UUID.randomUUID().toString();
-        String proposalNo = policyNoGenerator.generateProposalNo();
+        String proposalNo = policyNoGenerator.generateProposalNo(request.tenantId());
         IssuancePlanLine mainPlan = request.mainLine();
+        List<ProposalLine> proposalLines = proposalLineAssembler.assemble(request);
+        ProposalLine mainProposalLine = proposalLines.stream()
+                .filter(ProposalLine::isMain)
+                .findFirst()
+                .orElse(null);
 
         CreateProposalCommand command = CreateProposalCommand.builder()
                 .proposalId(proposalId)
@@ -202,15 +253,28 @@ public class IssuanceOrchestrator {
                 .intendedPremium(request.quotedPremium())
                 .insurancePeriodStart(request.periodStart())
                 .insurancePeriodEnd(request.periodEnd())
-                .expectedProductCode(mainPlan != null ? mainPlan.productId() : null)
-                .proposalLines(proposalLineAssembler.assemble(request))
-                .insuranceType(request.insuranceType())
+                .expectedProductCode(mainProposalLine != null ? mainProposalLine.productCode() : null)
+                .proposalLines(proposalLines)
+                .insuranceType(ProposalLine.resolveInsuranceType(request.insuranceType(), proposalLines))
                 .bizNo(request.bizNo())
                 .marketPackageId(request.marketPackageId())
                 .tenantId(request.tenantId())
+                .insuredPartyList(request.insuredPartyList())
+                .collectionMode(request.collectionMode())
+                .channelInfo(buildChannelInfo(request))
+                .paymentMode(mainPlan != null && mainPlan.paymentFrequency() != null
+                        ? mainPlan.paymentFrequency().getCode() : null)
+                .premiumPaymentYears(mainPlan != null && mainPlan.premiumPaymentYears() != null
+                        ? mainPlan.premiumPaymentYears() : 0)
                 .build();
 
         commandGateway.sendAndWait(command);
+        IssuanceResult partialResult = IssuanceResult.proposalCreated(request.bizNo(), proposalId, proposalNo);
+        try {
+            commandGateway.sendAndWait(new SubmitProposalCommand(proposalId, "统一出单自动提交意向单", request.tenantId()));
+        } catch (RuntimeException exception) {
+            throw new IssuanceOrchestrationException("意向单已创建但自动提交失败", partialResult, exception);
+        }
         log.info("三步出单 - 意向单创建完成: bizNo={}, proposalId={}, proposalNo={}", request.bizNo(), proposalId,
                 proposalNo);
 
@@ -251,25 +315,14 @@ public class IssuanceOrchestrator {
     }
 
     /**
-     * 险种段保费合计（一步出单无核保加费，段保费即最终保费）。
-     * <p>
-     * 段保费尚未试算时（保费计算前置尚未接入）回退调用方报价，并记录告警——保费真相应由
-     * 计费域试算产生，报价仅作过渡。
-     * </p>
+     * 收费条件已满足时尝试生效；保障起期未到时保留未生效状态，由后续定时任务激活。
      */
-    private Money sumPremium(List<PolicyProduct> lines, IssuanceRequest request) {
-        Money total = null;
-        for (PolicyProduct line : lines) {
-            Money linePremium = line.effectivePremium();
-            if (linePremium == null) {
-                continue;
-            }
-            total = total == null ? linePremium : total.add(linePremium);
+    private void activateIfPeriodStarted(String policyId, String tenantId) {
+        try {
+            commandGateway.sendAndWait(new ActivatePolicyCommand(policyId, tenantId));
+        } catch (RuntimeException exception) {
+            log.info("一步出单保单暂不可生效，等待保障起期: policyId={}, 原因={}", policyId,
+                    exception.getMessage());
         }
-        if (total == null) {
-            log.warn("险种段无试算保费，回退调用方报价（待接入保费试算前置）: bizNo={}", request.bizNo());
-            return request.quotedPremium();
-        }
-        return total;
     }
 }

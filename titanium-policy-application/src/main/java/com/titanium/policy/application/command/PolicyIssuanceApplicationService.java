@@ -1,22 +1,32 @@
 package com.titanium.policy.application.command;
 
-import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.titanium.metadata.enums.BaseEnum;
+import com.titanium.metadata.enums.product.ProductEnum.IssuanceMode;
 import com.titanium.metadata.valueobject.Money;
+import com.titanium.policy.application.exception.CustomerResolutionException;
+import com.titanium.policy.application.exception.IssuanceOrchestrationException;
+import com.titanium.policy.application.orchestration.issuance.IssuanceCustomerResolver;
 import com.titanium.policy.application.orchestration.issuance.orchestrator.IssuanceOrchestrator;
 import com.titanium.policy.common.enums.IssuanceStage;
 import com.titanium.policy.port.ProductServicePort;
+import com.titanium.policy.query.repository.InsuranceViewRepository;
 import com.titanium.policy.query.repository.IssuanceProgressViewRepository;
+import com.titanium.policy.query.repository.PolicyViewRepository;
+import com.titanium.policy.query.repository.ProposalViewRepository;
+import com.titanium.policy.query.view.InsuranceView;
 import com.titanium.policy.query.view.IssuanceProgressView;
+import com.titanium.policy.query.view.PolicyView;
+import com.titanium.policy.query.view.ProposalView;
 import com.titanium.policy.service.IssuanceEligibilityDomainService;
 import com.titanium.policy.valueobject.IssuancePlanLine;
+import com.titanium.policy.valueobject.IssuanceProcessConfig;
 import com.titanium.policy.valueobject.IssuanceRequest;
 import com.titanium.policy.valueobject.IssuanceResult;
 import com.titanium.policy.valueobject.RuleDecision;
@@ -47,22 +57,30 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class PolicyIssuanceApplicationService {
 
+    private static final String PRODUCT_RULES_UNAVAILABLE = "ISSUANCE_PRODUCT_RULES_UNAVAILABLE";
+    private static final String PRODUCT_RULES_UNAVAILABLE_MESSAGE = "产品投保规则暂不可用，请稍后重试";
+
     private final IssuanceOrchestrator             issuanceOrchestrator;
     private final IssuanceEligibilityDomainService eligibilityDomainService;
     private final ProductServicePort               productServicePort;
     private final IssuanceProgressViewRepository   issuanceProgressViewRepository;
+    private final IssuanceProgressBaselineWriter   progressBaselineWriter;
+    private final IssuanceCustomerResolver          issuanceCustomerResolver;
+    private final ProposalViewRepository            proposalViewRepository;
+    private final InsuranceViewRepository           insuranceViewRepository;
+    private final PolicyViewRepository              policyViewRepository;
 
     /**
      * 提交出单。
      * <p>
      * 流程：幂等判定 → 取产品投保规则 → 要素校验（领域服务裁决）→ 委托编排器路由建单 →
-     * 记录出单进度。要素校验不通过时同步返回拒绝，不产生任何单据。
+     * 建立初始进度。要素校验不通过时同步返回拒绝，不产生任何单据；编排开始后的阶段与单据关联
+     * 由领域事件投影更新。
      * </p>
      *
      * @param request 出单请求
      * @return 出单结果
      */
-    @Transactional
     public IssuanceResult submitIssuance(IssuanceRequest request) {
         // ① 幂等：同一业务流水号重复提交返回首次结果
         Optional<IssuanceProgressView> existing = issuanceProgressViewRepository
@@ -73,25 +91,78 @@ public class PolicyIssuanceApplicationService {
             return toResult(existing.get());
         }
 
-        // ② 取产品投保规则（跨服务取数，属编排职责）
-        Map<String, ProductIssueRules> rulesByProduct = loadIssueRules(request);
+        // ② 先解析客户主数据，再做产品资格校验和建单；解析失败必须形成可追踪的业务拒绝。
+        final IssuanceRequest resolvedRequest;
+        try {
+            resolvedRequest = issuanceCustomerResolver.resolve(request);
+        } catch (CustomerResolutionException exception) {
+            log.warn("[出单入口] 参与方客户解析失败: bizNo={}, 错误码={}", request.bizNo(), exception.errorCode());
+            IssuanceResult rejected = IssuanceResult.rejected(request.bizNo(), exception.errorCode(),
+                    exception.getMessage());
+            if (exception.retryable()) {
+                // 客户服务瞬时故障不写幂等终态；调用方可用同一 bizNo 原样重试。
+                return rejected;
+            }
+            return saveBaselineOrFirstResult(request, rejected).orElse(rejected);
+        }
 
-        // ③ 要素校验：规则裁决在纯领域服务内，本层不写业务判断
-        RuleDecision decision = eligibilityDomainService.validate(request, rulesByProduct);
+        // ③ 取产品投保规则（跨服务取数，属编排职责）；规则缺失时必须故障拒绝，禁止绕过投保限制。
+        final Map<String, ProductIssueRules> rulesByProduct;
+        try {
+            rulesByProduct = loadIssueRules(resolvedRequest);
+        } catch (RuntimeException exception) {
+            log.warn("[出单入口] 产品投保规则不可用: bizNo={}", resolvedRequest.bizNo(), exception);
+            IssuanceResult rejected = IssuanceResult.rejected(resolvedRequest.bizNo(), PRODUCT_RULES_UNAVAILABLE,
+                    PRODUCT_RULES_UNAVAILABLE_MESSAGE);
+            return saveBaselineOrFirstResult(resolvedRequest, rejected).orElse(rejected);
+        }
+
+        // ④ 要素校验：规则裁决在纯领域服务内，本层不写业务判断
+        RuleDecision decision = eligibilityDomainService.validate(resolvedRequest, rulesByProduct);
         if (!decision.passed()) {
             // 🔴 拒绝原因以「错误码 + 参数」承载，不在此拼中文句子——对外文案由 web 层按
             // Accept-Language 经 MessageSource 渲染（红线 15）。此处 defaultMessage 仅用于日志。
             log.warn("[出单入口] 投保要素校验不通过: bizNo={}, 错误码={}, 险种段={}, 默认文案={}", request.bizNo(),
                     decision.code(), decision.lineNo(), decision.defaultMessage());
-            IssuanceResult rejected = IssuanceResult.rejected(request.bizNo(), decision);
-            saveProgress(request, rejected);
-            return rejected;
+            IssuanceResult rejected = IssuanceResult.rejected(resolvedRequest.bizNo(), decision);
+            return saveBaselineOrFirstResult(resolvedRequest, rejected).orElse(rejected);
         }
 
-        // ④ 委托编排器路由建单（一步/两步/三步由产品配置决定）
-        IssuanceResult result = issuanceOrchestrator.orchestrate(request);
-        saveProgress(request, result);
-        return result;
+        // ⑤ 解析一次产品出单配置，基线与后续编排共用，避免重复远程取数造成配置漂移。
+        IssuanceMode issuanceMode = productServicePort.getIssuanceMode(resolvedRequest.mainProductId(),
+                resolvedRequest.tenantId());
+        IssuanceProcessConfig processConfig = IssuanceProcessConfig.forMode(issuanceMode,
+                resolvedRequest.mainProductId());
+
+        // ⑥ 先独立提交进度基线，再发 Axon 命令，避免 tracking processor 先于入口事务读到事件
+        Optional<IssuanceResult> concurrentResult = saveBaselineOrFirstResult(resolvedRequest,
+                acceptedBaseline(resolvedRequest, issuanceMode));
+        if (concurrentResult.isPresent()) {
+            return concurrentResult.get();
+        }
+
+        // ⑦ 委托编排器路由建单（一步/两步/三步由产品配置决定）。从发出首个命令起，进度表只由
+        // 事件投影更新，入口不得与 tracking processor 并发修改同一乐观锁行。
+        try {
+            IssuanceResult result = issuanceOrchestrator.orchestrate(processConfig, resolvedRequest);
+            if (result.currentStage() == IssuanceStage.REJECTED
+                    && !progressBaselineWriter.markRejectedIfUntouched(resolvedRequest, result)) {
+                log.warn("[出单入口] 同步拒绝未覆盖已推进的进度: bizNo={}", resolvedRequest.bizNo());
+            }
+            return result;
+        } catch (IssuanceOrchestrationException exception) {
+            IssuanceResult partialResult = exception.partialResult();
+            if (partialResult != null) {
+                log.warn("[出单入口] 编排部分完成，保留已创建单据: bizNo={}, stage={}", resolvedRequest.bizNo(),
+                        partialResult.currentStage(), exception);
+                return partialResult;
+            }
+            releaseUntouchedBaseline(resolvedRequest, exception);
+            throw exception;
+        } catch (RuntimeException exception) {
+            releaseUntouchedBaseline(resolvedRequest, exception);
+            throw exception;
+        }
     }
 
     /**
@@ -121,62 +192,53 @@ public class PolicyIssuanceApplicationService {
             if (line.productId() == null || rules.containsKey(line.productId())) {
                 continue;
             }
-            try {
-                ProductIssueRules productRules = productServicePort.getIssueRules(line.productId(),
-                        request.tenantId());
-                if (productRules != null) {
-                    rules.put(line.productId(), productRules);
-                }
-            } catch (Exception ex) {
-                log.warn("[出单入口] 取产品投保规则失败，跳过该产品的段级校验: productId={}", line.productId(), ex);
+            ProductIssueRules productRules = productServicePort.getIssueRules(line.productId(), request.tenantId());
+            if (productRules == null) {
+                throw new IllegalStateException("产品未配置投保规则: " + line.productId());
             }
+            rules.put(line.productId(), productRules);
         }
         return rules;
     }
 
+    private IssuanceResult acceptedBaseline(IssuanceRequest request, IssuanceMode issuanceMode) {
+        return new IssuanceResult(true, request.bizNo(), issuanceMode, request.issuanceStrategy(),
+                IssuanceStage.ACCEPTED,
+                null, null, null, null, java.util.List.of(), null, null, null, null, null, null, null, null, null);
+    }
+
     /**
-     * 记录出单进度（幂等依据 + 进度查询数据源）。
-     * <p>
-     * 🔴 本表由应用层直写而非事件投影——出单受理与拒绝发生在任何聚合事件产生之前
-     * （要素校验不通过时根本不建单），无事件可投影。
-     * </p>
+     * 保存幂等基线；并发重复提交撞唯一约束时读取并返回已提交的首次结果。
      */
-    private void saveProgress(IssuanceRequest request, IssuanceResult result) {
-        IssuanceProgressView view = new IssuanceProgressView();
-        LocalDateTime now = LocalDateTime.now();
-        view.setId(request.tenantId() + "_" + request.bizNo());
-        view.setBizNo(request.bizNo());
-        view.setTenantId(request.tenantId());
-        view.setCreateTime(now);
-        view.setUpdateTime(now);
-        view.setMarketPackageId(request.marketPackageId());
-        view.setIssuanceStrategy(code(result.issuanceStrategy()));
-        view.setIssuanceMode(code(result.issuanceMode()));
-        view.setCurrentStage(code(result.currentStage()));
-        view.setProductId(request.mainProductId());
-        view.setHolderCustomerId(request.holderCustomerId());
-        view.setProposalId(result.proposalId());
-        view.setInsuranceId(result.insuranceId());
-        view.setPolicyId(result.firstPolicyId());
-        view.setUnderwritingId(result.underwritingId());
-        view.setBillId(result.billId());
-        view.setPaymentOrderId(result.paymentOrderId());
-        view.setStandardPremium(amount(result.standardPremium()));
-        view.setPayablePremium(amount(result.payablePremium()));
-        view.setLineCount(request.planLines() != null ? request.planLines().size() : 0);
-        view.setRejectCode(result.rejectCode());
-        view.setRejectReason(result.rejectReason());
-        issuanceProgressViewRepository.save(view);
+    private Optional<IssuanceResult> saveBaselineOrFirstResult(IssuanceRequest request, IssuanceResult baseline) {
+        try {
+            progressBaselineWriter.save(request, baseline);
+            return Optional.empty();
+        } catch (DataIntegrityViolationException exception) {
+            Optional<IssuanceProgressView> existing = issuanceProgressViewRepository
+                    .findByBizNoAndTenantId(request.bizNo(), request.tenantId());
+            if (existing.isPresent()) {
+                log.info("[出单入口] 并发请求已建立进度基线，返回首次结果: bizNo={}, currentStage={}",
+                        request.bizNo(), existing.get().getCurrentStage());
+                return existing.map(this::toResult);
+            }
+            throw exception;
+        }
+    }
+
+    private void releaseUntouchedBaseline(IssuanceRequest request, RuntimeException cause) {
+        boolean released = progressBaselineWriter.releaseIfUntouched(request);
+        log.warn("[出单入口] 编排技术失败: bizNo={}, 纯受理基线已释放={}", request.bizNo(), released, cause);
     }
 
     /**
      * 进度读模型 → 出单结果（幂等返回与进度查询共用）。
      */
     private IssuanceResult toResult(IssuanceProgressView view) {
-        IssuanceResult.IssuedPolicy policy = view.getPolicyId() != null
-                ? new IssuanceResult.IssuedPolicy(view.getPolicyId(), null, null,
-                        view.getLineCount() != null ? view.getLineCount() : 0, null)
-                : null;
+        ProposalView proposal = findProposal(view).orElse(null);
+        InsuranceView insurance = findInsurance(view).orElse(null);
+        PolicyView policyView = findPolicy(view).orElse(null);
+        IssuanceResult.IssuedPolicy policy = toIssuedPolicy(view, policyView);
         return new IssuanceResult(view.getRejectCode() == null, view.getBizNo(),
                 view.getIssuanceMode() != null
                         ? com.titanium.metadata.enums.product.ProductEnum.IssuanceMode.fromCode(view.getIssuanceMode())
@@ -184,24 +246,45 @@ public class PolicyIssuanceApplicationService {
                 view.getIssuanceStrategy() != null
                         ? com.titanium.metadata.enums.policy.IssuanceStrategy.fromCode(view.getIssuanceStrategy())
                         : null,
-                IssuanceStage.fromCode(view.getCurrentStage()), view.getProposalId(), null, view.getInsuranceId(),
-                null, policy != null ? java.util.List.of(policy) : java.util.List.of(), view.getUnderwritingId(),
-                money(view.getStandardPremium()), null, money(view.getPayablePremium()), view.getBillId(),
+                IssuanceStage.fromCode(view.getCurrentStage()), view.getProposalId(),
+                proposal != null ? proposal.getProposalNo() : null, view.getInsuranceId(),
+                insurance != null ? insurance.getInsuranceNo() : null,
+                policy != null ? java.util.List.of(policy) : java.util.List.of(), view.getUnderwritingId(),
+                money(view.getStandardPremium()), extraPremium(view), money(view.getPayablePremium()), view.getBillId(),
                 view.getPaymentOrderId(), null, view.getRejectCode(), view.getRejectReason());
     }
 
-    /**
-     * 枚举取 code（空安全）。
-     */
-    private String code(BaseEnum value) {
-        return value != null ? value.getCode() : null;
+    private Optional<ProposalView> findProposal(IssuanceProgressView view) {
+        return view.getProposalId() != null
+                ? proposalViewRepository.findByProposalIdAndTenantId(view.getProposalId(), view.getTenantId())
+                : Optional.empty();
     }
 
-    /**
-     * 金额取值（空安全）。
-     */
-    private java.math.BigDecimal amount(Money money) {
-        return money != null ? money.value() : null;
+    private Optional<InsuranceView> findInsurance(IssuanceProgressView view) {
+        return view.getInsuranceId() != null
+                ? insuranceViewRepository.findByInsuranceIdAndTenantId(view.getInsuranceId(), view.getTenantId())
+                : Optional.empty();
+    }
+
+    private Optional<PolicyView> findPolicy(IssuanceProgressView view) {
+        return view.getPolicyId() != null
+                ? policyViewRepository.findByPolicyIdAndTenantId(view.getPolicyId(), view.getTenantId())
+                : Optional.empty();
+    }
+
+    private IssuanceResult.IssuedPolicy toIssuedPolicy(IssuanceProgressView progress, PolicyView policy) {
+        if (progress.getPolicyId() == null) {
+            return null;
+        }
+        int lineCount = policy != null && policy.getLineCount() != null
+                ? policy.getLineCount() : progress.getLineCount() != null ? progress.getLineCount() : 0;
+        String currency = policy != null && policy.getCurrency() != null ? policy.getCurrency().getCode() : "CNY";
+        Money totalPremium = policy != null && policy.getTotalPremium() != null
+                ? Money.of(policy.getTotalPremium(), currency) : null;
+        return new IssuanceResult.IssuedPolicy(progress.getPolicyId(),
+                policy != null ? policy.getPolicyNo() : null,
+                policy != null && policy.getPolicyStatus() != null ? policy.getPolicyStatus().getCode() : null,
+                lineCount, totalPremium);
     }
 
     /**
@@ -209,5 +292,17 @@ public class PolicyIssuanceApplicationService {
      */
     private Money money(java.math.BigDecimal value) {
         return value != null ? Money.of(value, "CNY") : null;
+    }
+
+    private Money extraPremium(IssuanceProgressView view) {
+        if (view.getStandardPremium() == null || view.getPayablePremium() == null) {
+            return null;
+        }
+        if (view.getPayablePremium().compareTo(view.getStandardPremium()) < 0) {
+            log.warn("[出单进度] 应付保费小于标准保费，跳过加费计算: bizNo={}, standard={}, payable={}",
+                    view.getBizNo(), view.getStandardPremium(), view.getPayablePremium());
+            return null;
+        }
+        return money(view.getPayablePremium().subtract(view.getStandardPremium()));
     }
 }

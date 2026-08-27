@@ -3,6 +3,7 @@ package com.titanium.policy.web.controller;
 
 import java.util.List;
 
+import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -30,6 +31,7 @@ import com.titanium.policy.query.query.FindPolicyByIdQuery;
 import com.titanium.policy.query.result.PolicyBeneficiaryQueryResult;
 import com.titanium.policy.query.result.PolicyEndorsementQueryResult;
 import com.titanium.policy.query.result.PolicyInsuredQueryResult;
+import com.titanium.policy.query.result.PolicyMaintenanceCaseReferenceQueryResult;
 import com.titanium.policy.web.dto.ApplyEndorsementDTO;
 import com.titanium.policy.web.dto.CreatePolicyDTO;
 import com.titanium.policy.web.dto.DistributeDividendDTO;
@@ -174,6 +176,25 @@ public class PolicyController {
     }
 
     /**
+     * 多条件分页查询保单，返回完整分页元数据。
+     */
+    @GetMapping("/page")
+    public ResponseEntity<Page<PolicyDetailVO>> pagePolicies(
+            @RequestParam(value = "policyNo", required = false) String policyNo,
+            @RequestParam(value = "policyHolderName", required = false) String policyHolderName,
+            @RequestParam(value = "insuredName", required = false) String insuredName,
+            @RequestParam(value = "productCode", required = false) String productCode,
+            @RequestParam(value = "status", required = false) String status,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "10") int size,
+            @RequestHeader("X-Tenant-Id") String tenantId) {
+        Page<PolicyDetailVO> policies = policyAppQueryService
+                .findPageByConditions(policyNo, policyHolderName, insuredName, productCode, status, tenantId, page, size)
+                .map(policyWebMapper::toVO);
+        return ResponseEntity.ok(policies);
+    }
+
+    /**
      * 查询保单受益人列表
      *
      * @param policyId 保单ID
@@ -229,6 +250,19 @@ public class PolicyController {
             @PathVariable("policyId") String policyId,
             @RequestHeader("X-Tenant-Id") String tenantId) {
         return ResponseEntity.ok(policyAppQueryService.findEndorsements(policyId, tenantId));
+    }
+
+    /**
+     * 查询已在保单生效的保全案件引用。
+     * <p>
+     * 本端点只读且不提供建案入口；在途保全仍由保全管理页面负责。
+     * </p>
+     */
+    @GetMapping("/{policyId}/maintenance-cases")
+    public ResponseEntity<List<PolicyMaintenanceCaseReferenceQueryResult>> listMaintenanceCaseReferences(
+            @PathVariable("policyId") String policyId,
+            @RequestHeader("X-Tenant-Id") String tenantId) {
+        return ResponseEntity.ok(policyAppQueryService.findMaintenanceCaseReferences(policyId, tenantId));
     }
 
     /**

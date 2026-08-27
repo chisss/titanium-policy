@@ -1,5 +1,7 @@
 package com.titanium.policy.entity.proposal;
 
+import java.util.List;
+
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import com.titanium.metadata.enums.insurance.InsuranceProductType;
@@ -38,8 +40,41 @@ import com.titanium.metadata.valueobject.Money;
  * @param intendedPremium    意向保费（客户预算或粗略报价）
  */
 public record ProposalLine(String lineId, int lineNo, ProductCategory productCategory, Integer parentLineNo,
-                           String productId, String productCode, InsuranceProductType insuranceType,
+                           String productId, String productCode, String productVersion, InsuranceProductType insuranceType,
                            Money intendedSumInsured, Money intendedPremium) {
+
+    /** 兼容产品版本字段加入前的历史事件和既有调用方。 */
+    public ProposalLine(String lineId, int lineNo, ProductCategory productCategory, Integer parentLineNo,
+                        String productId, String productCode, InsuranceProductType insuranceType,
+                        Money intendedSumInsured, Money intendedPremium) {
+        this(lineId, lineNo, productCategory, parentLineNo, productId, productCode, null, insuranceType,
+                intendedSumInsured, intendedPremium);
+    }
+
+    /**
+     * 解析单据级险种分类：显式值优先，否则仅从唯一主险段派生。
+     *
+     * @param explicitType 显式单据级险种分类
+     * @param lines 意向险种段
+     * @return 解析后的险种分类；主险段不唯一或没有分类时返回 null
+     */
+    public static InsuranceProductType resolveInsuranceType(InsuranceProductType explicitType,
+                                                              List<ProposalLine> lines) {
+        if (explicitType != null || lines == null) {
+            return explicitType;
+        }
+        ProposalLine mainLine = null;
+        for (ProposalLine line : lines) {
+            if (line == null || !line.isMain()) {
+                continue;
+            }
+            if (mainLine != null) {
+                return null;
+            }
+            mainLine = line;
+        }
+        return mainLine != null ? mainLine.insuranceType() : null;
+    }
 
     /**
      * 是否为主险段。

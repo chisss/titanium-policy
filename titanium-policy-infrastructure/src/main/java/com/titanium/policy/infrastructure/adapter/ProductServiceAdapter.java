@@ -13,12 +13,14 @@ import com.titanium.policy.valueobject.product.ProductBasicInfo;
 import com.titanium.policy.valueobject.product.ProductClauseRef;
 import com.titanium.policy.valueobject.product.ProductIssueRules;
 import com.titanium.product.api.ProductApi;
+import com.titanium.product.api.ProductTemplateApi;
 import com.titanium.product.api.response.CoveragePeriodConfigResponse;
 import com.titanium.product.api.response.InsureConditionResponse;
 import com.titanium.product.api.response.IssuanceProcessConfigResponse;
 import com.titanium.product.api.response.PaymentConfigResponse;
 import com.titanium.product.api.response.PolicyFormConfigResponse;
 import com.titanium.product.api.response.ProductResponse;
+import com.titanium.product.api.response.ProductTemplateResponse;
 import com.titanium.product.api.response.UnderwritingConfigResponse;
 
 import lombok.RequiredArgsConstructor;
@@ -42,6 +44,7 @@ import lombok.extern.slf4j.Slf4j;
 public class ProductServiceAdapter implements ProductServicePort {
 
     private final ProductApi productApi;
+    private final ProductTemplateApi productTemplateApi;
 
     @Override
     public ProductBasicInfo getProductBasicInfo(String productId, String tenantId) {
@@ -58,11 +61,16 @@ public class ProductServiceAdapter implements ProductServicePort {
     public IssuanceMode getIssuanceMode(String productId, String tenantId) {
         ProductResponse product = fetchProduct(productId, tenantId);
         IssuanceProcessConfigResponse config = product != null ? product.getIssuanceProcessConfig() : null;
-        if (config == null || config.issuanceMode() == null) {
-            throw new IllegalStateException(String.format("产品[%s]未配置出单流程，无法决定出单模式", productId));
+        if (config != null && config.issuanceMode() != null) {
+            log.info("产品出单模式: productId={}, mode={}, source=PRODUCT", productId, config.issuanceMode());
+            return config.issuanceMode();
         }
-        log.info("产品出单模式: productId={}, mode={}", productId, config.issuanceMode());
-        return config.issuanceMode();
+        ProductTemplateResponse template = fetchTemplate(productId, tenantId);
+        if (template == null || template.getIssuanceMode() == null) {
+            throw new IllegalStateException(String.format("产品[%s]及其模板均未配置出单流程，无法决定出单模式", productId));
+        }
+        log.info("产品出单模式: productId={}, mode={}, source=TEMPLATE", productId, template.getIssuanceMode());
+        return template.getIssuanceMode();
     }
 
     @Override
@@ -123,6 +131,17 @@ public class ProductServiceAdapter implements ProductServicePort {
         ApiResponse<ProductResponse> response = productApi.getProductById(productId, tenantId);
         if (response == null || !response.isSuccess()) {
             log.error("获取产品详情失败: productId={}, error={}", productId,
+                    response != null ? response.getMessage() : "响应为空");
+            return null;
+        }
+        return response.getData();
+    }
+
+    /** 产品实例未覆盖行为时，读取其绑定模板的默认行为。 */
+    private ProductTemplateResponse fetchTemplate(String productId, String tenantId) {
+        ApiResponse<ProductTemplateResponse> response = productTemplateApi.getByProductId(productId, tenantId);
+        if (response == null || !response.isSuccess()) {
+            log.error("获取产品模板失败: productId={}, error={}", productId,
                     response != null ? response.getMessage() : "响应为空");
             return null;
         }

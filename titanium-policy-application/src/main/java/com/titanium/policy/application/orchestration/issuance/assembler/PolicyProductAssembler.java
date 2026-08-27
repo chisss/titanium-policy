@@ -1,7 +1,10 @@
 package com.titanium.policy.application.orchestration.issuance.assembler;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
@@ -18,6 +21,8 @@ import com.titanium.policy.port.ProductServicePort;
 import com.titanium.policy.valueobject.IssuanceRequest;
 import com.titanium.policy.valueobject.policy.ClauseSnapshot;
 import com.titanium.policy.valueobject.policy.CoverageSnapshot;
+import com.titanium.policy.valueobject.pricing.PremiumCalculationReference;
+import com.titanium.policy.valueobject.product.ProductBasicInfo;
 import com.titanium.policy.valueobject.product.ProductClauseRef;
 
 import lombok.RequiredArgsConstructor;
@@ -77,12 +82,37 @@ public class PolicyProductAssembler {
      * @return 保单险种段列表
      */
     public List<PolicyProduct> assembleFromInsuranceLines(List<InsuranceLine> insuranceLines, String tenantId) {
+        return assembleFromInsuranceLines(insuranceLines, tenantId, List.of());
+    }
+
+    /**
+     * 由投保段和确认计算引用装配保单段，按险种段ID冻结真实定价计划版本。
+     */
+    public List<PolicyProduct> assembleFromInsuranceLines(
+            List<InsuranceLine> insuranceLines,
+            String tenantId,
+            List<PremiumCalculationReference> calculationReferences) {
         if (insuranceLines == null || insuranceLines.isEmpty()) {
             return List.of();
         }
+        Map<String, String> policyProductIdByLineId = new HashMap<>();
+        Map<String, PremiumCalculationReference> referenceByLineId = referencesByLineId(calculationReferences);
+        boolean requireCalculationReference = calculationReferences != null && !calculationReferences.isEmpty();
+        for (InsuranceLine insuranceLine : insuranceLines) {
+            policyProductIdByLineId.put(insuranceLine.lineId(), UUID.randomUUID().toString());
+        }
+
         List<PolicyProduct> lines = new ArrayList<>();
         for (InsuranceLine insuranceLine : insuranceLines) {
-            lines.add(assembleLine(insuranceLine, tenantId));
+            String parentPolicyProductId = insuranceLine.parentLineId() != null
+                    ? policyProductIdByLineId.get(insuranceLine.parentLineId()) : null;
+            PremiumCalculationReference calculationReference = referenceByLineId.get(insuranceLine.lineId());
+            if (requireCalculationReference && insuranceLine.countsTowardTotalPremium()
+                    && !matches(insuranceLine, calculationReference)) {
+                throw new IllegalArgumentException("险种段缺少匹配的确认计算版本引用: " + insuranceLine.lineId());
+            }
+            lines.add(assembleLine(insuranceLine, tenantId, policyProductIdByLineId.get(insuranceLine.lineId()),
+                    parentPolicyProductId, calculationReference));
         }
         log.info("保单险种段装配完成: 段数={}, 责任数合计={}", lines.size(),
                 lines.stream().mapToInt(line -> line.coverageSnapshots().size()).sum());
@@ -92,10 +122,12 @@ public class PolicyProductAssembler {
     /**
      * 装配单个保单段：取产品条款 → 取条款责任 → 决定挂载 → 组装段。
      */
-    private PolicyProduct assembleLine(InsuranceLine insuranceLine, String tenantId) {
-        String policyProductId = UUID.randomUUID().toString();
+    private PolicyProduct assembleLine(InsuranceLine insuranceLine, String tenantId, String policyProductId,
+                                       String parentPolicyProductId,
+                                       PremiumCalculationReference calculationReference) {
         List<ClauseSnapshot> clauseSnapshots = new ArrayList<>();
         List<CoverageSnapshot> coverageSnapshots = new ArrayList<>();
+        ProductBasicInfo product = productServicePort.getProductBasicInfo(insuranceLine.productId(), tenantId);
 
         for (ProductClauseRef ref : productServicePort.getClauseRefs(insuranceLine.productId(),
                 tenantId)) {
@@ -109,13 +141,47 @@ public class PolicyProductAssembler {
                     insuranceLine.insuredSubjects()));
         }
 
+        String productName = insuranceLine.productName();
+        if ((productName == null || productName.isBlank()) && product != null) {
+            productName = product.productName();
+        }
+        String productVersion = insuranceLine.productVersion() != null
+                ? insuranceLine.productVersion() : product != null ? product.productVersion() : null;
+
         return new PolicyProduct(policyProductId, insuranceLine.lineNo(), insuranceLine.productCategory(),
-                insuranceLine.parentLineId(), insuranceLine.productId(), insuranceLine.productCode(),
-                insuranceLine.productName(), null, insuranceLine.insuranceType(), insuranceLine.sumInsured(),
+                parentPolicyProductId, insuranceLine.productId(), insuranceLine.productCode(),
+                productName, productVersion,
+                calculationReference != null ? calculationReference.pricingPlanVersion() : null,
+                insuranceLine.insuranceType(), insuranceLine.sumInsured(),
                 insuranceLine.payablePremium(), insuranceLine.coveragePeriod(), insuranceLine.paymentTerms(),
                 insuranceLine.underwritingConclusion(), resolveLineStatus(insuranceLine), List.copyOf(clauseSnapshots),
                 insuranceLine.insuredSubjects() != null ? insuranceLine.insuredSubjects() : List.of(),
                 List.copyOf(coverageSnapshots));
+    }
+
+    private Map<String, PremiumCalculationReference> referencesByLineId(
+            List<PremiumCalculationReference> calculationReferences) {
+        if (calculationReferences == null || calculationReferences.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, PremiumCalculationReference> references = new HashMap<>();
+        for (PremiumCalculationReference reference : calculationReferences) {
+            if (reference == null || reference.lineId() == null || reference.lineId().isBlank()) {
+                continue;
+            }
+            PremiumCalculationReference previous = references.put(reference.lineId(), reference);
+            if (previous != null) {
+                throw new IllegalArgumentException("确认计算引用的险种段ID重复: " + reference.lineId());
+            }
+        }
+        return Map.copyOf(references);
+    }
+
+    private boolean matches(InsuranceLine line, PremiumCalculationReference reference) {
+        return reference != null && reference.pricingPlanVersion() != null
+                && !reference.pricingPlanVersion().isBlank()
+                && Objects.equals(line.productId(), reference.productId())
+                && Objects.equals(line.productVersion(), reference.productVersion());
     }
 
     /**
@@ -180,6 +246,26 @@ public class PolicyProductAssembler {
                 continue;
             }
             total = total == null ? linePremium : total.add(linePremium);
+        }
+        return total;
+    }
+
+    /**
+     * 汇总核保加费前的标准保费（拒保段不计入）。
+     *
+     * @param lines 已补齐试算保费的投保险种段
+     * @return 标准保费合计；无有效段保费时返回 null
+     */
+    public Money sumStandardPremium(List<InsuranceLine> lines) {
+        if (lines == null || lines.isEmpty()) {
+            return null;
+        }
+        Money total = null;
+        for (InsuranceLine line : lines) {
+            if (!line.countsTowardTotalPremium() || line.premium() == null) {
+                continue;
+            }
+            total = total == null ? line.premium() : total.add(line.premium());
         }
         return total;
     }

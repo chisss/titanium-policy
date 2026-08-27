@@ -114,6 +114,7 @@ public class PolicyLineProjectionEventHandler {
         view.setProductCode(line.productCode());
         view.setProductName(line.productName());
         view.setProductVersion(line.productVersion());
+        view.setPricingPlanVersion(line.pricingPlanVersion());
         view.setInsuranceType(code(line.insuranceType()));
         view.setSumInsured(amount(line.sumInsured()));
         view.setPremium(amount(line.premium()));

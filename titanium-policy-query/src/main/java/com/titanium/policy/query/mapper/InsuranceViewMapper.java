@@ -35,6 +35,11 @@ public interface InsuranceViewMapper {
      * </p>
      */
     @Mapping(target = "status", ignore = true)
+    @Mapping(target = "productId", ignore = true)
+    @Mapping(target = "paymentFrequency", ignore = true)
+    @Mapping(target = "premiumPaymentYears", ignore = true)
+    @Mapping(target = "channelId", source = "channelInfo.channelId")
+    @Mapping(target = "lineCount", ignore = true)
     @Mapping(target = "createTime", ignore = true)
     @Mapping(target = "updateTime", ignore = true)
     void applyCreated(@MappingTarget InsuranceView view, InsuranceCreatedEvent event);

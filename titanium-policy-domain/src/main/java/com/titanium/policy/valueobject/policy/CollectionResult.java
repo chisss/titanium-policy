@@ -11,11 +11,13 @@ import com.titanium.policy.common.enums.PremiumCollectionStatus;
  *
  * @param status            收讫状态（已收讫 / 后付挂账 / 未收讫待支付）
  * @param billId            账单ID（billing 域；开单失败时为 null，待补偿）
+ * @param billingAccountId  计费账户ID（同步开账返回，供期缴计划使用）
  * @param paymentOrderId    支付单ID（线上支付与代扣有值）
  * @param paymentCredential 支付凭据（线上支付返回给前端唤起支付）
  * @param skipReason        跳过收费的原因（未指定收费方式等异常场景）
  */
-public record CollectionResult(PremiumCollectionStatus status, String billId, String paymentOrderId,
+public record CollectionResult(PremiumCollectionStatus status, String billId, String billingAccountId,
+                               String paymentOrderId,
                                String paymentCredential, String skipReason) {
 
     /**
@@ -25,7 +27,14 @@ public record CollectionResult(PremiumCollectionStatus status, String billId, St
      * @return 已收讫结果
      */
     public static CollectionResult settled(String billId) {
-        return new CollectionResult(PremiumCollectionStatus.COLLECTED, billId, null, null, null);
+        return settled(billId, null);
+    }
+
+    /**
+     * 构造带计费账户的已收讫结果。
+     */
+    public static CollectionResult settled(String billId, String billingAccountId) {
+        return new CollectionResult(PremiumCollectionStatus.COLLECTED, billId, billingAccountId, null, null, null);
     }
 
     /**
@@ -35,7 +44,14 @@ public record CollectionResult(PremiumCollectionStatus status, String billId, St
      * @return 后付结果
      */
     public static CollectionResult deferred(String billId) {
-        return new CollectionResult(PremiumCollectionStatus.DEFERRED, billId, null, null, null);
+        return deferred(billId, null);
+    }
+
+    /**
+     * 构造带计费账户的后付结果。
+     */
+    public static CollectionResult deferred(String billId, String billingAccountId) {
+        return new CollectionResult(PremiumCollectionStatus.DEFERRED, billId, billingAccountId, null, null, null);
     }
 
     /**
@@ -47,8 +63,16 @@ public record CollectionResult(PremiumCollectionStatus status, String billId, St
      * @return 待收讫结果
      */
     public static CollectionResult pending(String billId, String paymentOrderId, String paymentCredential) {
-        return new CollectionResult(PremiumCollectionStatus.UNCOLLECTED, billId, paymentOrderId, paymentCredential,
-                null);
+        return pending(billId, null, paymentOrderId, paymentCredential);
+    }
+
+    /**
+     * 构造带计费账户的待收讫结果。
+     */
+    public static CollectionResult pending(String billId, String billingAccountId, String paymentOrderId,
+                                           String paymentCredential) {
+        return new CollectionResult(PremiumCollectionStatus.UNCOLLECTED, billId, billingAccountId, paymentOrderId,
+                paymentCredential, null);
     }
 
     /**
@@ -58,7 +82,7 @@ public record CollectionResult(PremiumCollectionStatus status, String billId, St
      * @return 跳过结果
      */
     public static CollectionResult skipped(String reason) {
-        return new CollectionResult(PremiumCollectionStatus.UNCOLLECTED, null, null, null, reason);
+        return new CollectionResult(PremiumCollectionStatus.UNCOLLECTED, null, null, null, null, reason);
     }
 
     /**

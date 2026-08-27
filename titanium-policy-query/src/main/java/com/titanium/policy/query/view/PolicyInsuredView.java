@@ -43,6 +43,26 @@ public class PolicyInsuredView extends BaseView {
     @Column(name = "insured_name", length = 128)
     private String insuredName;
 
+    /** 被保险人证件类型快照 */
+    @Column(name = "id_type", length = 32)
+    private String idType;
+
+    /** 被保险人证件号码快照 */
+    @Column(name = "id_no", length = 64)
+    private String idNo;
+
+    /** 被保险人年龄快照 */
+    @Column(name = "age")
+    private Integer age;
+
+    /** 被保险人性别快照 */
+    @Column(name = "gender", length = 16)
+    private String gender;
+
+    /** 被保险人手机号快照 */
+    @Column(name = "phone", length = 32)
+    private String phone;
+
     /** 与投保人关系（投保关系角色码，预留字段） */
     @Column(name = "relation", length = 32)
     private String relation;

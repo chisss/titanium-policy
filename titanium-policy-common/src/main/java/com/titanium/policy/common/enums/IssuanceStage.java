@@ -27,10 +27,10 @@ public enum IssuanceStage implements BaseEnum {
     INSURANCE_CREATED(5, "INSURANCE_CREATED", "投保单已创建", "投保单已建，待提交核保"),
     /** 核保中（含自动核保与人工核保） */
     UNDERWRITING(6, "UNDERWRITING", "核保中", "已提交核保，等待核保结论"),
-    /** 待收费（核保通过，等待保费收讫） */
-    PENDING_COLLECTION(7, "PENDING_COLLECTION", "待收费", "核保通过，账单已开立，等待保费收讫"),
     /** 保单已出单（尚未生效） */
-    POLICY_ISSUED(8, "POLICY_ISSUED", "保单已出单", "正式保单已创建，等待生效条件满足"),
+    POLICY_ISSUED(7, "POLICY_ISSUED", "保单已出单", "正式保单已创建，等待生效条件满足"),
+    /** 待收费（保单已创建，等待保费收讫） */
+    PENDING_COLLECTION(8, "PENDING_COLLECTION", "待收费", "保单已创建且账单已开立，等待保费收讫"),
     /** 保单已生效（流程完成） */
     POLICY_EFFECTIVE(9, "POLICY_EFFECTIVE", "保单已生效", "保单生效，出单流程完成"),
     /** 已拒绝（要素校验不通过或核保拒保，终态） */

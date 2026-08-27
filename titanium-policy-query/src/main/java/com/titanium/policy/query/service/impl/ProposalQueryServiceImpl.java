@@ -3,6 +3,7 @@ package com.titanium.policy.query.service.impl;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -51,27 +52,37 @@ public class ProposalQueryServiceImpl implements ProposalQueryService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<ProposalQueryResult> findProposalsByConditions(String proposalNo, String expectedProductCode,
-                                                               String status, String tenantId, int page, int size) {
-        Specification<ProposalView> spec = buildSpec(proposalNo, expectedProductCode, status, tenantId);
+    public List<ProposalQueryResult> findProposalsByConditions(String proposalNo, String customerId,
+                                                               String expectedProductCode, String status,
+                                                               String tenantId, int page, int size) {
+        return findProposalsPageByConditions(proposalNo, customerId, expectedProductCode, status, tenantId, page,
+                size).getContent();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ProposalQueryResult> findProposalsPageByConditions(String proposalNo, String customerId,
+                                                                   String expectedProductCode, String status,
+                                                                   String tenantId, int page, int size) {
+        Specification<ProposalView> spec = buildSpec(proposalNo, customerId, expectedProductCode, status, tenantId);
         Pageable pageable = PageRequest.of(Math.max(page, 0), size <= 0 ? 20 : size);
-        return proposalViewRepository.findAll(spec, pageable)
-                .stream()
-                .map(this::toQueryResult)
-                .toList();
+        return proposalViewRepository.findAll(spec, pageable).map(this::toQueryResult);
     }
 
     /**
      * 构建多条件动态查询规约（仅对非空条件追加谓词）
      */
-    private Specification<ProposalView> buildSpec(String proposalNo, String expectedProductCode, String status,
-                                                   String tenantId) {
+    private Specification<ProposalView> buildSpec(String proposalNo, String customerId, String expectedProductCode,
+                                                   String status, String tenantId) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
             // 多租户隔离：强制条件
             predicates.add(cb.equal(root.get("tenantId"), tenantId));
             if (isNotBlank(proposalNo)) {
                 predicates.add(cb.like(root.get("proposalNo"), "%" + proposalNo + "%"));
+            }
+            if (isNotBlank(customerId)) {
+                predicates.add(cb.equal(root.get("customerId"), customerId));
             }
             if (isNotBlank(expectedProductCode)) {
                 predicates.add(cb.equal(root.get("expectedProductCode"), expectedProductCode));
@@ -103,6 +114,11 @@ public class ProposalQueryServiceImpl implements ProposalQueryService {
         result.setInsurancePeriodStart(view.getInsurancePeriodStart());
         result.setInsurancePeriodEnd(view.getInsurancePeriodEnd());
         result.setExpectedProductCode(view.getExpectedProductCode());
+        result.setInsuranceType(view.getInsuranceType());
+        result.setBizNo(view.getBizNo());
+        result.setChannelId(view.getChannelId());
+        result.setMarketPackageId(view.getMarketPackageId());
+        result.setLineCount(view.getLineCount());
         result.setStatus(view.getStatus());
         result.setCreateTime(view.getCreateTime());
         result.setUpdateTime(view.getUpdateTime());

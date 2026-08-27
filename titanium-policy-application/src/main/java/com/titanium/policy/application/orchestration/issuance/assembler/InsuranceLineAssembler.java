@@ -87,7 +87,7 @@ public class InsuranceLineAssembler {
 
         return new InsuranceLine(lineId, planLine.lineNo(), planLine.productCategory(), parentLineId,
                 planLine.productId(), product != null ? product.productCode() : null,
-                product != null ? product.productName() : null,
+                product != null ? product.productName() : null, product != null ? product.productVersion() : null,
                 product != null ? product.insuranceType() : request.insuranceType(), planLine.sumInsured(), null,
                 assemblePeriod(request, planLine), assemblePaymentTerms(planLine),
                 assembleSubjects(request, planLine), null, null, PolicyLineStatus.UNDERWRITING);

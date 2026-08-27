@@ -17,6 +17,8 @@ public class PolicyResponse {
     private String                  policyId;
     @Schema(description = "保单号", example = "P20230801001")
     private String                  policyNo;
+    @Schema(description = "关联投保单ID", example = "INS20230801001")
+    private String                  applicationId;
     @Schema(description = "客户ID", example = "C20230801001")
     private String                  customerId;
     @Schema(description = "产品ID", example = "P20230801001")

@@ -4,10 +4,13 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import com.titanium.metadata.enums.billing.PremiumCollectionMode;
 import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.enums.product.ProductEnum.SalesChannel;
+import com.titanium.policy.entity.insurance.InsuredPartyList;
 import com.titanium.policy.entity.proposal.ProposalLine;
+import com.titanium.policy.valueobject.policy.ChannelInfo;
 
 /**
  * 意向单创建事件
@@ -45,5 +48,30 @@ public record ProposalCreatedEvent(
         /** 营销包ID（弱引用，可空） */
         String marketPackageId,
         LocalDateTime createTime,
-        String tenantId
-) {}
+        String tenantId,
+        /** 出单参与方快照（三步出单转换时直接复用） */
+        InsuredPartyList insuredPartyList,
+        /** 收费方式（三步出单转换时透传） */
+        PremiumCollectionMode collectionMode,
+        /** 渠道快照（三步出单转换时透传） */
+        ChannelInfo channelInfo,
+        /** 主险缴费模式 code */
+        String paymentMode,
+        /** 主险缴费年数 */
+        int premiumPaymentYears
+) {
+
+    /**
+     * 兼容历史事件构造与回放：旧事件没有新增的流程字段。
+     */
+    public ProposalCreatedEvent(String proposalId, String proposalNo, PolicyForm policyForm, SalesChannel channel,
+                                String customerId, BigDecimal intendedSumInsured, BigDecimal intendedPremium,
+                                LocalDateTime insurancePeriodStart, LocalDateTime insurancePeriodEnd,
+                                String expectedProductCode, List<ProposalLine> proposalLines,
+                                InsuranceProductType insuranceType, String bizNo, String marketPackageId,
+                                LocalDateTime createTime, String tenantId) {
+        this(proposalId, proposalNo, policyForm, channel, customerId, intendedSumInsured, intendedPremium,
+                insurancePeriodStart, insurancePeriodEnd, expectedProductCode, proposalLines, insuranceType, bizNo,
+                marketPackageId, createTime, tenantId, null, null, null, null, 0);
+    }
+}

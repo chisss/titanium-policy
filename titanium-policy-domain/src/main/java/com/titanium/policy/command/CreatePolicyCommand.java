@@ -39,6 +39,7 @@ import com.titanium.policy.valueobject.policy.PolicyPeriod;
  * @param insuredPartyList 参与方清单（投保人/被保险人/受益人）
  * @param policyProducts   险种段列表（L2，1..N，含条款/标的/责任快照）
  * @param sumInsured       主险保额（读侧便捷冗余）
+ * @param standardPremium  核保加费前的标准保费（可空以兼容历史调用）
  * @param premium          保单总保费（= Σ 计入段的保费，聚合内校验守恒）
  * @param policyPeriod     保单期间（保障期 + 等待期 + 犹豫期）
  * @param premiumPlan      缴费计划
@@ -48,10 +49,39 @@ import com.titanium.policy.valueobject.policy.PolicyPeriod;
  * @param tenantId         租户ID
  */
 public record CreatePolicyCommand(@TargetAggregateIdentifier String policyId, String policyNo, String insuranceId,
-                                  String proposalId, String underwritingId, String marketPackageId,
+                                  String proposalId, String underwritingId, String bizNo, String marketPackageId,
                                   PolicyForm policyForm, String productId, String issueOrg,
                                   InsuredPartyList insuredPartyList, List<PolicyProduct> policyProducts,
-                                  Money sumInsured, Money premium, PolicyPeriod policyPeriod, PremiumPlan premiumPlan,
-                                  CollectionInfo collectionInfo, ChannelInfo channelInfo,
+                                  Money sumInsured, Money standardPremium, Money premium,
+                                  PolicyPeriod policyPeriod, PremiumPlan premiumPlan, CollectionInfo collectionInfo,
+                                  ChannelInfo channelInfo,
                                   InsuranceProductType insuranceType, String tenantId) {
+
+    /**
+     * 兼容尚未区分标准保费与应付保费的调用方。
+     */
+    public CreatePolicyCommand(String policyId, String policyNo, String insuranceId, String proposalId,
+                               String underwritingId, String bizNo, String marketPackageId, PolicyForm policyForm,
+                               String productId, String issueOrg, InsuredPartyList insuredPartyList,
+                               List<PolicyProduct> policyProducts, Money sumInsured, Money premium,
+                               PolicyPeriod policyPeriod, PremiumPlan premiumPlan, CollectionInfo collectionInfo,
+                               ChannelInfo channelInfo, InsuranceProductType insuranceType, String tenantId) {
+        this(policyId, policyNo, insuranceId, proposalId, underwritingId, bizNo, marketPackageId, policyForm,
+                productId, issueOrg, insuredPartyList, policyProducts, sumInsured, null, premium, policyPeriod,
+                premiumPlan, collectionInfo, channelInfo, insuranceType, tenantId);
+    }
+
+    /**
+     * 兼容旧的承保出单调用方（无业务流水号）。
+     */
+    public CreatePolicyCommand(String policyId, String policyNo, String insuranceId, String proposalId,
+                               String underwritingId, String marketPackageId, PolicyForm policyForm,
+                               String productId, String issueOrg, InsuredPartyList insuredPartyList,
+                               List<PolicyProduct> policyProducts, Money sumInsured, Money premium,
+                               PolicyPeriod policyPeriod, PremiumPlan premiumPlan, CollectionInfo collectionInfo,
+                               ChannelInfo channelInfo, InsuranceProductType insuranceType, String tenantId) {
+        this(policyId, policyNo, insuranceId, proposalId, underwritingId, null, marketPackageId, policyForm,
+                productId, issueOrg, insuredPartyList, policyProducts, sumInsured, null, premium, policyPeriod,
+                premiumPlan, collectionInfo, channelInfo, insuranceType, tenantId);
+    }
 }

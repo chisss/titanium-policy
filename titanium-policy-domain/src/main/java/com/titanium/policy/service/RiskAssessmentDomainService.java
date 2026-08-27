@@ -1,6 +1,7 @@
 package com.titanium.policy.service;
 
 import com.titanium.policy.common.enums.RiskAssessmentStep;
+import com.titanium.policy.common.enums.RuleEngineDecision;
 import com.titanium.policy.valueobject.RiskAssessmentDecision;
 
 /**
@@ -28,7 +29,7 @@ public interface RiskAssessmentDomainService {
      * 判定某风控步骤是否需要规则引擎外部裁决数据
      * <p>
      * 应用层据此决定是否调用规则引擎 Port 取数：返回 {@code true} 的步骤需先取得规则引擎裁决，
-     * 再调 {@link #judge(RiskAssessmentStep, boolean)}；返回 {@code false} 的步骤为本地规则，
+     * 再调 {@link #judge(RiskAssessmentStep, RuleEngineDecision)}；返回 {@code false} 的步骤为本地规则，
      * 直接调 {@link #judgeLocal(RiskAssessmentStep)}。
      * </p>
      *
@@ -41,10 +42,10 @@ public interface RiskAssessmentDomainService {
      * 依据规则引擎裁决结果对风控步骤作出领域裁决
      *
      * @param step 风控步骤（须为 {@link #requiresRuleEngine} 返回 true 的步骤）
-     * @param ruleEnginePassed 规则引擎裁决是否通过
+     * @param ruleEngineDecision 规则引擎三态裁决
      * @return 风控裁决
      */
-    RiskAssessmentDecision judge(RiskAssessmentStep step, boolean ruleEnginePassed);
+    RiskAssessmentDecision judge(RiskAssessmentStep step, RuleEngineDecision ruleEngineDecision);
 
     /**
      * 对不依赖外部数据的本地风控步骤作出领域裁决

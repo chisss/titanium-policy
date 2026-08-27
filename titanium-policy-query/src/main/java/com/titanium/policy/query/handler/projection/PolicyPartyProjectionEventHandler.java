@@ -77,6 +77,12 @@ public class PolicyPartyProjectionEventHandler {
                 view.setPolicyId(policyId);
                 view.setCustomerId(insured.customerId());
                 view.setInsuredName(insured.name());
+                view.setIdType(insured.certType() != null ? insured.certType().getCode() : null);
+                view.setIdNo(insured.certNo());
+                view.setAge(insured.age());
+                view.setGender(insured.gender() != null ? insured.gender().getCode() : null);
+                view.setPhone(insured.phone());
+                view.setRelation(insured.relationToHolder());
                 view.setFamilyRelation(
                         insured.familyRelation() != null ? insured.familyRelation().getCode() : null);
                 view.setTenantId(tenantId);
@@ -98,6 +104,10 @@ public class PolicyPartyProjectionEventHandler {
                 view.setPolicyId(policyId);
                 view.setCustomerId(beneficiary.customerId());
                 view.setBeneficiaryName(beneficiary.name());
+                view.setIdType(beneficiary.certType() != null ? beneficiary.certType().getCode() : null);
+                view.setIdNo(beneficiary.certNo());
+                view.setGender(beneficiary.gender() != null ? beneficiary.gender().getCode() : null);
+                view.setPhone(beneficiary.phone());
                 view.setBeneficiaryType(
                         beneficiary.beneficiaryType() != null ? beneficiary.beneficiaryType().getCode() : null);
                 view.setOrderNo(beneficiary.order());

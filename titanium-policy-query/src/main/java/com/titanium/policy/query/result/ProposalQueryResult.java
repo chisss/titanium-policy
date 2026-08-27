@@ -3,6 +3,7 @@ package com.titanium.policy.query.result;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.enums.product.ProductEnum.SalesChannel;
 import com.titanium.policy.valueobject.proposal.ProposalStatus;
@@ -49,6 +50,21 @@ public class ProposalQueryResult {
 
     /** 期望险种编码 */
     private String                    expectedProductCode;
+
+    /** 险种三级分类 */
+    private InsuranceProductType      insuranceType;
+
+    /** 出单业务流水号 */
+    private String                    bizNo;
+
+    /** 渠道ID */
+    private String                    channelId;
+
+    /** 营销包ID */
+    private String                    marketPackageId;
+
+    /** 意向险种段数量 */
+    private Integer                   lineCount;
 
     /** 意向单状态 */
     private ProposalStatus.StatusCode status;

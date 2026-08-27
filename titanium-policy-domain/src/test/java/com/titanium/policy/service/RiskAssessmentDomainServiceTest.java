@@ -9,6 +9,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import com.titanium.policy.common.enums.RiskAssessmentStep;
+import com.titanium.policy.common.enums.RuleEngineDecision;
 import com.titanium.policy.service.impl.RiskAssessmentDomainServiceImpl;
 import com.titanium.policy.valueobject.RiskAssessmentDecision;
 
@@ -41,13 +42,20 @@ class RiskAssessmentDomainServiceTest {
     @Test
     @DisplayName("依赖规则引擎的步骤：裁决通过与否随规则引擎结果")
     void shouldJudgeByRuleEngineOutcome() {
-        RiskAssessmentDecision passed = domainService.judge(RiskAssessmentStep.BASIC_UNDERWRITING, true);
+        RiskAssessmentDecision passed = domainService.judge(RiskAssessmentStep.BASIC_UNDERWRITING,
+                RuleEngineDecision.PASS);
         assertTrue(passed.passed());
         assertEquals(RiskAssessmentStep.BASIC_UNDERWRITING, passed.step());
 
-        RiskAssessmentDecision rejected = domainService.judge(RiskAssessmentStep.BASIC_UNDERWRITING, false);
+        RiskAssessmentDecision rejected = domainService.judge(RiskAssessmentStep.BASIC_UNDERWRITING,
+                RuleEngineDecision.REJECT);
         assertFalse(rejected.passed());
         assertTrue(rejected.reason().contains("规则引擎"));
+
+        RiskAssessmentDecision referred = domainService.judge(RiskAssessmentStep.BASIC_UNDERWRITING,
+                RuleEngineDecision.REFER);
+        assertTrue(referred.passed());
+        assertTrue(referred.reason().contains("后续核保"));
     }
 
     @Test

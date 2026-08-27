@@ -8,6 +8,7 @@ import com.titanium.metadata.enums.policy.PolicyEnum;
 import com.titanium.policy.application.orchestration.issuance.orchestrator.IssuanceOrchestrator;
 import com.titanium.policy.command.ActivatePolicyCommand;
 import com.titanium.policy.command.ApplyPolicyEndorsementCommand;
+import com.titanium.policy.command.ApplyPolicyMaintenanceCommand;
 import com.titanium.policy.command.CancelPolicyCommand;
 import com.titanium.policy.command.CreatePolicyCommand;
 import com.titanium.policy.command.CreatePolicyDirectlyCommand;
@@ -16,6 +17,7 @@ import com.titanium.policy.command.IssuePolicyCommand;
 import com.titanium.policy.command.MatureDuePolicyCommand;
 import com.titanium.policy.command.MaturePolicyCommand;
 import com.titanium.policy.command.PayAnnuityBenefitCommand;
+import com.titanium.policy.command.RecordPremiumCollectionCommand;
 import com.titanium.policy.command.ResumePolicyCommand;
 import com.titanium.policy.command.StartAnnuityPayoutCommand;
 import com.titanium.policy.command.SuspendPolicyCommand;
@@ -25,19 +27,19 @@ import com.titanium.policy.command.WaivePremiumCommand;
 import com.titanium.policy.valueobject.IssuanceProcessConfig;
 import com.titanium.policy.valueobject.IssuanceRequest;
 import com.titanium.policy.valueobject.IssuanceResult;
+import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceApplicationReceipt;
 
-import jakarta.annotation.Resource;
+import lombok.RequiredArgsConstructor;
 
 /**
  * 保单应用服务
  */
 @Service
+@RequiredArgsConstructor
 public class PolicyApplicationService {
-    @Resource
-    private CommandGateway       commandGateway;
+    private final CommandGateway       commandGateway;
 
-    @Resource
-    private IssuanceOrchestrator issuanceOrchestrator;
+    private final IssuanceOrchestrator issuanceOrchestrator;
 
     /**
      * 创建保单（从投保单创建）
@@ -75,6 +77,11 @@ public class PolicyApplicationService {
         return command.policyId();
     }
 
+    /** 应用正式保全合同变更并返回聚合权威回执。 */
+    public PolicyMaintenanceApplicationReceipt applyMaintenance(ApplyPolicyMaintenanceCommand command) {
+        return commandGateway.sendAndWait(command);
+    }
+
     /**
      * 一步出单
      */
@@ -95,6 +102,11 @@ public class PolicyApplicationService {
      */
     public void activatePolicy(String policyId, String tenantId) {
         commandGateway.sendAndWait(new ActivatePolicyCommand(policyId, tenantId));
+    }
+
+    /** 回写跨域确认的保费收讫事实。 */
+    public void recordPremiumCollection(RecordPremiumCollectionCommand command) {
+        commandGateway.sendAndWait(command);
     }
 
     /**

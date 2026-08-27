@@ -123,8 +123,8 @@ public class IssuanceRequestAssembler {
                 insuredList.add(new InsuredPartyList.InsuredInfo(input.getCustomerId(),
                         input.getCustomerId() != null ? input.getCustomerId() : UUID.randomUUID().toString(),
                         input.getName(), parseCertType(input.getCertType()), input.getCertNo(),
-                        input.getAge() != null ? input.getAge() : 0, parseGender(input.getGender()),
-                        parseFamilyRelation(input.getFamilyRelation())));
+                        input.getAge() != null ? input.getAge() : 0, parseGender(input.getGender()), input.getMobile(),
+                        input.getRelationToHolder(), parseFamilyRelation(input.getFamilyRelation())));
             }
         }
 
@@ -134,6 +134,7 @@ public class IssuanceRequestAssembler {
                 beneficiaryList.add(new InsuredPartyList.BeneficiaryInfo(input.getCustomerId(),
                         input.getCustomerId() != null ? input.getCustomerId() : UUID.randomUUID().toString(),
                         input.getName(), parseCertType(input.getCertType()), input.getCertNo(),
+                        parseGender(input.getGender()), input.getMobile(),
                         parseBeneficiaryType(input.getBeneficiaryType()),
                         input.getBeneficiaryOrder() != null ? input.getBeneficiaryOrder() : 1,
                         toRatio(input.getShareRatio())));

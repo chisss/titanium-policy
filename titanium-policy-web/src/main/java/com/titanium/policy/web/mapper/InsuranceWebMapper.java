@@ -38,7 +38,15 @@ public interface InsuranceWebMapper {
      */
     @Mapping(target = "exactPremium", expression = "java(toMoney(request.getExactPremium(), request.getCurrency()))")
     @Mapping(target = "tenantId", source = "tenantId")
+    @Mapping(target = "insuranceLines", ignore = true)
     @Mapping(target = "insuredPartyList", ignore = true)
+    @Mapping(target = "collectionMode", ignore = true)
+    @Mapping(target = "channelInfo", ignore = true)
+    @Mapping(target = "bizNo", ignore = true)
+    @Mapping(target = "marketPackageId", ignore = true)
+    @Mapping(target = "sumInsured", ignore = true)
+    @Mapping(target = "paymentMode", ignore = true)
+    @Mapping(target = "premiumPaymentYears", ignore = true)
     ConvertProposalToInsuranceCommand toCommand(ConvertToInsuranceDTO request, String tenantId);
 
     /**
@@ -50,7 +58,15 @@ public interface InsuranceWebMapper {
      */
     @Mapping(target = "exactPremium", expression = "java(toMoney(dto.getExactPremium(), dto.getCurrency()))")
     @Mapping(target = "tenantId", source = "tenantId")
+    @Mapping(target = "insuranceLines", ignore = true)
     @Mapping(target = "insuredPartyList", ignore = true)
+    @Mapping(target = "collectionMode", ignore = true)
+    @Mapping(target = "channelInfo", ignore = true)
+    @Mapping(target = "bizNo", ignore = true)
+    @Mapping(target = "marketPackageId", ignore = true)
+    @Mapping(target = "sumInsured", ignore = true)
+    @Mapping(target = "paymentMode", ignore = true)
+    @Mapping(target = "premiumPaymentYears", ignore = true)
     ConvertProposalToInsuranceCommand toCommand(ConvertToInsuranceRequest dto, String tenantId);
 
     /**

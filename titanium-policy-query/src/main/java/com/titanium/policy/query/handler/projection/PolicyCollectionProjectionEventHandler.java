@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.titanium.common.jpa.BasePersistable;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.event.PolicyCreatedEvent;
+import com.titanium.policy.event.PremiumBillingAssociatedEvent;
 import com.titanium.policy.event.PremiumCollectedEvent;
 import com.titanium.policy.query.repository.PolicyCollectionViewRepository;
 import com.titanium.policy.query.repository.PolicyViewRepository;
@@ -69,6 +70,24 @@ public class PolicyCollectionProjectionEventHandler {
         policyCollectionViewRepository.save(view);
         log.info("[收费投影] 保单创建落地收费信息: policyId={}, 收费方式={}, 应收={}", event.policyId(),
                 view.getCollectionMode(), view.getPayableAmount());
+    }
+
+    /**
+     * 投影收费单据关联事件：回填真实账单ID与支付单ID。
+     */
+    @EventHandler
+    @Transactional
+    public void on(PremiumBillingAssociatedEvent event) {
+        PolicyCollectionView view = policyCollectionViewRepository.findById(event.policyId())
+                .orElseThrow(() -> new IllegalStateException("收费投影缺少保单创建基线: policyId="
+                        + event.policyId()));
+        view.setBillId(event.billId());
+        view.setPaymentOrderId(event.paymentOrderId());
+        view.setCollectionStatus(event.collectionStatus() != null ? event.collectionStatus().getCode() : null);
+        stampAuditTime(view);
+        policyCollectionViewRepository.save(view);
+        log.info("[收费投影] 收费单据已关联: policyId={}, billId={}, paymentOrderId={}", event.policyId(),
+                event.billId(), event.paymentOrderId());
     }
 
     /**

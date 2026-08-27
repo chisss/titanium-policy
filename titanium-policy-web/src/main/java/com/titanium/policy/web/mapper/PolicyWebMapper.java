@@ -3,13 +3,17 @@ package com.titanium.policy.web.mapper;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+import org.mapstruct.BeanMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.mapstruct.ReportingPolicy;
 
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.api.model.Amount;
 import com.titanium.policy.api.request.CreatePolicyRequest;
+import com.titanium.policy.api.response.PolicyMaintenanceSnapshotResponse;
 import com.titanium.policy.api.response.PolicyResponse;
+import com.titanium.policy.api.response.PolicySnapshotFieldValueResponse;
 import com.titanium.policy.api.response.PolicyStatusResponse;
 import com.titanium.policy.command.ApplyPolicyEndorsementCommand;
 import com.titanium.policy.command.CreatePolicyCommand;
@@ -18,6 +22,8 @@ import com.titanium.policy.command.DistributeDividendCommand;
 import com.titanium.policy.command.MaturePolicyCommand;
 import com.titanium.policy.command.StartAnnuityPayoutCommand;
 import com.titanium.policy.command.WaivePremiumCommand;
+import com.titanium.policy.query.result.PolicyMaintenanceSnapshotQueryResult;
+import com.titanium.policy.query.result.PolicyMaintenanceSnapshotQueryResult.PolicySnapshotFieldValueQueryResult;
 import com.titanium.policy.query.result.PolicyQueryResult;
 import com.titanium.policy.valueobject.policy.PolicyPeriod;
 import com.titanium.policy.web.dto.ApplyEndorsementDTO;
@@ -145,6 +151,7 @@ public interface PolicyWebMapper {
      * @param result 读模型查询结果
      * @return 保单详情 VO
      */
+    @BeanMapping(unmappedTargetPolicy = ReportingPolicy.ERROR)
     PolicyDetailVO toVO(PolicyQueryResult result);
 
     /**
@@ -154,12 +161,21 @@ public interface PolicyWebMapper {
      * @return 保单 DTO
      */
     @Mapping(target = "customerId", source = "policyHolderId")
-    @Mapping(target = "productId", source = "productCode")
+    @Mapping(target = "productId", source = "productId")
     @Mapping(target = "premium", expression = "java(toAmount(result.getPremium(), result.getCurrency() != null ? result.getCurrency().name() : null))")
     @Mapping(target = "createdAt", source = "createTime")
     @Mapping(target = "updatedAt", source = "updateTime")
     @Mapping(target = "policyItems", ignore = true)
+    @BeanMapping(unmappedTargetPolicy = ReportingPolicy.ERROR)
     PolicyResponse toResponse(PolicyQueryResult result);
+
+    /** Policy 权威快照读模型 → 正式 API 响应。 */
+    PolicyMaintenanceSnapshotResponse toMaintenanceSnapshotResponse(
+            PolicyMaintenanceSnapshotQueryResult result);
+
+    /** Policy 快照字段值 → 正式 API 字段值。 */
+    PolicySnapshotFieldValueResponse toSnapshotFieldValueResponse(
+            PolicySnapshotFieldValueQueryResult result);
 
     /**
      * 读模型结果 → 保单状态 DTO（Provider 用）

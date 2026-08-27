@@ -1,9 +1,14 @@
 package com.titanium.policy.entity.insurance;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+
 import java.util.List;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import com.titanium.metadata.enums.customer.CustomerEnum.CustomerGender;
 import com.titanium.metadata.enums.customer.CustomerEnum.IdCardType;
@@ -93,5 +98,28 @@ class InsuredPartyListTest {
         if (!list.verifyPartyInfo()) {
             throw new AssertionError("三等分份额总和应视为100%通过（容差）");
         }
+    }
+
+    @Test
+    @DisplayName("历史受益人事件缺少性别和手机号时仍可回放")
+    void shouldDeserializeLegacyBeneficiarySnapshotWithoutNewFields() throws Exception {
+        String legacyJson = """
+                {
+                  "customerId": "C-B-1",
+                  "beneficiaryId": "B-1",
+                  "name": "李四",
+                  "certType": null,
+                  "certNo": "3301**********5678",
+                  "beneficiaryType": null,
+                  "order": 1,
+                  "beneficiaryRatio": 1.0
+                }
+                """;
+
+        BeneficiaryInfo beneficiary = new ObjectMapper().readValue(legacyJson, BeneficiaryInfo.class);
+
+        assertEquals("C-B-1", beneficiary.customerId());
+        assertNull(beneficiary.gender());
+        assertNull(beneficiary.phone());
     }
 }

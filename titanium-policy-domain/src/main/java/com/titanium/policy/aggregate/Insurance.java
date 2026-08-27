@@ -97,6 +97,7 @@ public class Insurance extends BaseAggregate {
      */
     @CommandHandler
     public Insurance(ConvertProposalToInsuranceCommand command) {
+        validateInsuranceLines(command.insuranceLines());
         AggregateLifecycle.apply(new InsuranceCreatedEvent(command.insuranceId(), command.insuranceNo(),
                 command.proposalId(), command.policyForm(), command.applicantId(), command.insuredCount(),
                 command.exactPremium() != null ? command.exactPremium().value() : null, command.insurancePeriodStart(),
@@ -111,6 +112,7 @@ public class Insurance extends BaseAggregate {
      */
     @CommandHandler
     public Insurance(CreateInsuranceDirectlyCommand command) {
+        validateInsuranceLines(command.insuranceLines());
         AggregateLifecycle.apply(new InsuranceCreatedEvent(command.insuranceId(), command.insuranceNo(), null,
                 command.policyForm(), command.holderId(), command.insuredCount(), command.exactPremium(),
                 command.insurancePeriodStart(), command.insurancePeriodEnd(), command.insuranceLines(),
@@ -143,7 +145,7 @@ public class Insurance extends BaseAggregate {
                 this.basicInfo.exactPremium() != null ? this.basicInfo.exactPremium().value() : null,
                 this.basicInfo.exactPremium() != null ? this.basicInfo.exactPremium().currency() : "CNY",
                 this.basicInfo.insurancePeriodStart(), this.basicInfo.insurancePeriodEnd(), lineProductCodes(),
-                this.basicInfo.underwritingPriority(), this.policyForm, this.tenantId));
+                this.basicInfo.underwritingPriority(), this.policyForm, this.tenantId, this.bizNo));
     }
 
     /**
@@ -158,7 +160,7 @@ public class Insurance extends BaseAggregate {
         UnderwritingResult result = command.underwritingResult();
         AggregateLifecycle.apply(new UnderwritingResultReceivedEvent(this.insuranceId, result.underwritingId(),
                 result.resultCode(), result.underwritingOpinion(), result.underwriterId(), result.underwritingTime(),
-                result.condition(), this.tenantId, result.extraPremiumRatio()));
+                result.condition(), this.tenantId, result.extraPremiumRatio(), this.bizNo));
     }
 
     /**
@@ -364,16 +366,29 @@ public class Insurance extends BaseAggregate {
      * </p>
      */
     private void validateInsuranceLines() {
-        if (this.insuranceLines == null || this.insuranceLines.isEmpty()) {
+        validateInsuranceLines(this.insuranceLines);
+    }
+
+    /**
+     * 在首个事件写入前校验投保险种段，避免创建无法进入核保和承保流程的坏草稿。
+     */
+    private static void validateInsuranceLines(List<InsuranceLine> lines) {
+        if (lines == null || lines.isEmpty()) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "投保单至少须含一个险种段");
         }
-        long mainCount = this.insuranceLines.stream().filter(InsuranceLine::isMain).count();
+        if (lines.stream().anyMatch(line -> line == null
+                || line.productId() == null || line.productId().isBlank()
+                || line.productCode() == null || line.productCode().isBlank())) {
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "投保险种段必须包含产品ID和产品编码");
+        }
+        long mainCount = lines.stream().filter(InsuranceLine::isMain).count();
         if (mainCount != 1) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION",
                     "投保单须含且仅含一个主险段，当前有 " + mainCount + " 个");
         }
-        String mainLineId = mainLine() != null ? mainLine().lineId() : null;
-        for (InsuranceLine line : this.insuranceLines) {
+        String mainLineId = lines.stream().filter(InsuranceLine::isMain).map(InsuranceLine::lineId).findFirst()
+                .orElse(null);
+        for (InsuranceLine line : lines) {
             if (line.isRider() && (line.parentLineId() == null || !line.parentLineId().equals(mainLineId))) {
                 throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION",
                         "附加险段须依附于本单主险段: 段序号 " + line.lineNo());

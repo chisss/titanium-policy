@@ -9,4 +9,9 @@
     <include file="classpath:liquibase/ddl/policy_issuance_202608101800_weisun_ddl.sql"/>
     <include file="classpath:liquibase/ddl/policy_beneficiary_nullable_202608111200_weisun_ddl.sql"/>
     <include file="classpath:liquibase/ddl/policy_projection_fix_202608111500_weisun_ddl.sql"/>
+    <include file="classpath:liquibase/ddl/policy_party_snapshot_202608121300_weisun_ddl.sql"/>
+    <include file="classpath:liquibase/ddl/policy_insured_phone_snapshot_202608121800_weisun_ddl.sql"/>
+    <include file="classpath:liquibase/ddl/policy_number_sequence_202608131000_weisun_ddl.sql"/>
+    <include file="classpath:liquibase/ddl/annuity_payout_plan_version_202608140110_weisun_ddl.sql"/>
+    <include file="classpath:liquibase/ddl/policy_product_pricing_plan_version_202608241600_weisun_ddl.sql"/>
 </databaseChangeLog>

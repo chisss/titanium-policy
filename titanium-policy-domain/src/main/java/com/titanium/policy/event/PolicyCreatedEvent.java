@@ -43,6 +43,7 @@ import com.titanium.policy.valueobject.policy.PolicyPeriod;
  * @param underwritingId   关联核保单ID（可空）
  * @param marketPackageId  营销包ID（弱引用，可空）
  * @param policyPeriod     保单期间（保障期 + 等待期 + 犹豫期）
+ * @param standardPremium  核保加费前的标准保费（可空以兼容历史事件）
  * @param premium          保单总保费（= Σ 计入段的保费）
  * @param sumInsured       主险保额（读侧便捷冗余；各段保额见 policyProducts）
  * @param policyProducts   险种段列表（L2，含条款/标的/责任快照）
@@ -55,10 +56,41 @@ import com.titanium.policy.valueobject.policy.PolicyPeriod;
  * @param tenantId         租户ID
  */
 public record PolicyCreatedEvent(String policyId, PolicyNo policyNo, PolicyForm policyForm, String productId,
-                                 String insuranceId, String proposalId, String underwritingId, String marketPackageId,
-                                 PolicyPeriod policyPeriod, Money premium, Money sumInsured,
+                                 String insuranceId, String proposalId, String underwritingId, String bizNo,
+                                 String marketPackageId,
+                                 PolicyPeriod policyPeriod, Money standardPremium, Money premium, Money sumInsured,
                                  List<PolicyProduct> policyProducts, PremiumPlan premiumPlan,
                                  CollectionInfo collectionInfo, ChannelInfo channelInfo, PolicyStatus status,
                                  InsuredPartyList insuredPartyList, InsuranceProductType insuranceType,
                                  String tenantId) {
+
+    /**
+     * 兼容尚未携带标准保费的事件构造。
+     */
+    public PolicyCreatedEvent(String policyId, PolicyNo policyNo, PolicyForm policyForm, String productId,
+                              String insuranceId, String proposalId, String underwritingId, String bizNo,
+                              String marketPackageId, PolicyPeriod policyPeriod, Money premium, Money sumInsured,
+                              List<PolicyProduct> policyProducts, PremiumPlan premiumPlan,
+                              CollectionInfo collectionInfo, ChannelInfo channelInfo, PolicyStatus status,
+                              InsuredPartyList insuredPartyList, InsuranceProductType insuranceType,
+                              String tenantId) {
+        this(policyId, policyNo, policyForm, productId, insuranceId, proposalId, underwritingId, bizNo,
+                marketPackageId, policyPeriod, null, premium, sumInsured, policyProducts, premiumPlan,
+                collectionInfo, channelInfo, status, insuredPartyList, insuranceType, tenantId);
+    }
+
+    /**
+     * 兼容历史事件构造与回放（无业务流水号与标准保费）。
+     */
+    public PolicyCreatedEvent(String policyId, PolicyNo policyNo, PolicyForm policyForm, String productId,
+                              String insuranceId, String proposalId, String underwritingId, String marketPackageId,
+                              PolicyPeriod policyPeriod, Money premium, Money sumInsured,
+                              List<PolicyProduct> policyProducts, PremiumPlan premiumPlan,
+                              CollectionInfo collectionInfo, ChannelInfo channelInfo, PolicyStatus status,
+                              InsuredPartyList insuredPartyList, InsuranceProductType insuranceType,
+                              String tenantId) {
+        this(policyId, policyNo, policyForm, productId, insuranceId, proposalId, underwritingId, null,
+                marketPackageId, policyPeriod, null, premium, sumInsured, policyProducts, premiumPlan,
+                collectionInfo, channelInfo, status, insuredPartyList, insuranceType, tenantId);
+    }
 }

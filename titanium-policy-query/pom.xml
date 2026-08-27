@@ -58,6 +58,18 @@
             <artifactId>titanium-common</artifactId>
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
+
+        <!-- 测试依赖（版本由 parent 管理） -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>

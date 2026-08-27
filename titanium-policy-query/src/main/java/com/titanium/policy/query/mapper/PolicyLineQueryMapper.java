@@ -41,6 +41,13 @@ public interface PolicyLineQueryMapper {
      * @param view 保单读模型
      * @return 保单查询结果
      */
+    @Mapping(target = "applicationId", source = "insuranceId")
+    @Mapping(target = "effectiveDate", source = "startDate")
+    @Mapping(target = "expiryDate", source = "endDate")
+    @Mapping(target = "status", source = "policyStatus")
+    @Mapping(target = "policyForm", ignore = true)
+    @Mapping(target = "insuredId", ignore = true)
+    @Mapping(target = "productName", ignore = true)
     @Mapping(target = "policyItems", ignore = true)
     PolicyQueryResult toPolicyResult(PolicyView view);
 
@@ -97,6 +104,7 @@ public interface PolicyLineQueryMapper {
      * @param view 被保险人读模型
      * @return 被保险人查询结果
      */
+    @Mapping(target = "relationToHolder", source = "relation")
     PolicyInsuredQueryResult toInsuredResult(PolicyInsuredView view);
 
     /**

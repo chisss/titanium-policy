@@ -26,6 +26,16 @@ public record RiskAssessmentDecision(RiskAssessmentStep step, boolean passed, St
     }
 
     /**
+     * 构造「转后续核保」裁决。
+     *
+     * @param step 风控步骤
+     * @return 允许同步出单继续、由后续核保处理的裁决
+     */
+    public static RiskAssessmentDecision refer(RiskAssessmentStep step) {
+        return new RiskAssessmentDecision(step, true, step.getName() + "转后续核保");
+    }
+
+    /**
      * 构造「不通过」裁决
      *
      * @param step 风控步骤

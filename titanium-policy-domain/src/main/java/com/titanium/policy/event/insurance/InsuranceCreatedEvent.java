@@ -4,6 +4,8 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import org.axonframework.serialization.Revision;
+
 import com.titanium.metadata.enums.billing.PremiumCollectionMode;
 import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.policy.PolicyForm;
@@ -47,6 +49,7 @@ import com.titanium.policy.valueobject.policy.ChannelInfo;
  * @param paymentMode          主险缴费模式 code
  * @param premiumPaymentYears  主险缴费年数（0 表示未知）
  */
+@Revision("2")
 public record InsuranceCreatedEvent(String insuranceId, String insuranceNo, String proposalId, PolicyForm policyForm,
                                     String holderId, int insuredCount, BigDecimal exactPremium,
                                     LocalDateTime insurancePeriodStart, LocalDateTime insurancePeriodEnd,

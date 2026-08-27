@@ -8,6 +8,7 @@ import com.titanium.billing.api.request.CreateBillRequest;
 import com.titanium.billing.api.request.GenerateScheduleRequest;
 import com.titanium.billing.api.response.BillResponse;
 import com.titanium.billing.api.response.BillingAccountResponse;
+import com.titanium.common.exception.BusinessException;
 import com.titanium.metadata.response.ApiResponse;
 import com.titanium.policy.infrastructure.adapter.mapper.BillingRequestMapper;
 import com.titanium.policy.port.BillingServicePort;
@@ -44,9 +45,9 @@ public class BillingServiceAdapter implements BillingServicePort {
         if (response == null || !response.isSuccess() || response.getData() == null) {
             log.error("开立保费账单失败: policyId={}, message={}", request.policyId(),
                     response != null ? response.getMessage() : "无响应");
-            return new BillingResult(false, null);
+            return new BillingResult(false, null, null);
         }
-        return new BillingResult(true, response.getData().getBillId());
+        return new BillingResult(true, response.getData().getBillId(), response.getData().getBillingAccountId());
     }
 
     @Override
@@ -54,40 +55,37 @@ public class BillingServiceAdapter implements BillingServicePort {
         log.info("为保单生成期缴计划: policyId={}, paymentMode={}, totalPeriods={}", request.policyId(),
                 request.paymentMode(), request.totalPeriods());
 
+        String accountId = request.billingAccountId();
+        if (accountId == null || accountId.isBlank()) {
+            throw new BusinessException("查询计费账户失败: policyId=" + request.policyId() + ", accountId为空");
+        }
+
+        GenerateScheduleRequest scheduleRequest = new GenerateScheduleRequest();
+        scheduleRequest.setPaymentMode(request.paymentMode());
+        scheduleRequest.setTotalPeriods(request.totalPeriods());
+        scheduleRequest.setInstallmentAmount(request.installmentAmount());
+        scheduleRequest.setCurrency(request.currency());
+        scheduleRequest.setFirstDueDate(request.firstDueDate());
+        scheduleRequest.setOperatedBy("SYSTEM_ISSUANCE");
+        scheduleRequest.setTenantId(request.tenantId());
+        ApiResponse<BillingAccountResponse> scheduleResponse = generateSchedule(request.policyId(), accountId,
+                scheduleRequest);
+        if (scheduleResponse == null || !scheduleResponse.isSuccess() || scheduleResponse.getData() == null) {
+            String message = scheduleResponse != null ? scheduleResponse.getMessage() : "无响应";
+            throw new BusinessException("生成期缴计划失败: policyId=" + request.policyId() + ", accountId="
+                    + accountId + ", message=" + message);
+        }
+
+        log.info("期缴计划生成成功: policyId={}, accountId={}, mode={}, periods={}", request.policyId(), accountId,
+                request.paymentMode(), request.totalPeriods());
+    }
+
+    private ApiResponse<BillingAccountResponse> generateSchedule(String policyId, String accountId,
+                                                                  GenerateScheduleRequest request) {
         try {
-            // 1. 根据 policyId 查询计费账户
-            ApiResponse<BillingAccountResponse> accountResp = billingAccountApi
-                    .getBillingAccountByPolicyId(request.policyId());
-            if (accountResp == null || !accountResp.isSuccess() || accountResp.getData() == null) {
-                log.error("查询计费账户失败: policyId={}, message={}", request.policyId(),
-                        accountResp != null ? accountResp.getMessage() : "无响应");
-                return;
-            }
-
-            String accountId = accountResp.getData().getAccountId();
-
-            // 2. 调用生成期缴计划接口
-            GenerateScheduleRequest scheduleRequest = new GenerateScheduleRequest();
-            scheduleRequest.setPaymentMode(request.paymentMode());
-            scheduleRequest.setTotalPeriods(request.totalPeriods());
-            scheduleRequest.setInstallmentAmount(request.installmentAmount());
-            scheduleRequest.setCurrency(request.currency());
-            scheduleRequest.setFirstDueDate(request.firstDueDate());
-            scheduleRequest.setOperatedBy("SYSTEM_ISSUANCE");
-            scheduleRequest.setTenantId(request.tenantId());
-
-            ApiResponse<BillingAccountResponse> scheduleResp = billingAccountApi.generateSchedule(accountId,
-                    scheduleRequest);
-            if (scheduleResp == null || !scheduleResp.isSuccess()) {
-                log.error("生成期缴计划失败: policyId={}, accountId={}, message={}", request.policyId(), accountId,
-                        scheduleResp != null ? scheduleResp.getMessage() : "无响应");
-                return;
-            }
-
-            log.info("期缴计划生成成功: policyId={}, accountId={}, mode={}, periods={}", request.policyId(), accountId,
-                    request.paymentMode(), request.totalPeriods());
-        } catch (Exception e) {
-            log.error("生成期缴计划异常: policyId={}", request.policyId(), e);
+            return billingAccountApi.generateSchedule(accountId, request);
+        } catch (RuntimeException ex) {
+            throw new BusinessException("生成期缴计划异常: policyId=" + policyId + ", accountId=" + accountId, ex);
         }
     }
 }

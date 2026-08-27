@@ -77,6 +77,10 @@ public class PolicyProductView extends BaseView {
     @Column(name = "product_version", length = 32)
     private String        productVersion;
 
+    /** 定价计划版本（确认保费时冻结；历史保单可为空） */
+    @Column(name = "pricing_plan_version", length = 64)
+    private String        pricingPlanVersion;
+
     /** 险种三级分类码 */
     @Column(name = "insurance_type", length = 64)
     private String        insuranceType;

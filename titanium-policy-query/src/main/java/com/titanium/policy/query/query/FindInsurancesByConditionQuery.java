@@ -5,7 +5,7 @@ package com.titanium.policy.query.query;
  *
  * @param insuranceNo 投保单编号（模糊匹配，可空）
  * @param holderId    投保人ID（精确匹配，可空）
- * @param productCode 险种编码（可空）
+ * @param productId   主险产品ID（可空）
  * @param status      投保单状态（枚举 name，可空）
  * @param tenantId    租户ID
  * @param page        页码（从0开始）
@@ -14,7 +14,7 @@ package com.titanium.policy.query.query;
 public record FindInsurancesByConditionQuery(
         String insuranceNo,
         String holderId,
-        String productCode,
+        String productId,
         String status,
         String tenantId,
         int page,

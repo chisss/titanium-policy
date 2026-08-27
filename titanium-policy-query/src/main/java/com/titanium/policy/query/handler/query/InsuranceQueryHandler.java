@@ -58,6 +58,6 @@ public class InsuranceQueryHandler {
     @QueryHandler
     public List<InsuranceQueryResult> handle(FindInsurancesByConditionQuery query) {
         return insuranceQueryService.findInsurancesByConditions(query.insuranceNo(), query.holderId(),
-                query.status(), query.tenantId(), query.page(), query.size());
+                query.productId(), query.status(), query.tenantId(), query.page(), query.size());
     }
 }

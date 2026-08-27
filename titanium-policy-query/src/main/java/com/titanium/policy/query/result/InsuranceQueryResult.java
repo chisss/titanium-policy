@@ -3,7 +3,10 @@ package com.titanium.policy.query.result;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+import com.titanium.metadata.enums.billing.PremiumCollectionMode;
+import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.policy.PolicyForm;
+import com.titanium.metadata.enums.product.ProductEnum.PaymentFrequency;
 import com.titanium.metadata.enums.underwriting.UnderwritingEnum.ConclusionType;
 import com.titanium.policy.valueobject.insurance.InsuranceStatus;
 
@@ -31,6 +34,36 @@ public class InsuranceQueryResult {
 
     /** 保单形态 */
     private PolicyForm                 policyForm;
+
+    /** 险种三级分类 */
+    private InsuranceProductType       insuranceType;
+
+    /** 主险产品ID */
+    private String                     productId;
+
+    /** 主险基本保额 */
+    private BigDecimal                 sumInsured;
+
+    /** 主险缴费频率 */
+    private PaymentFrequency           paymentFrequency;
+
+    /** 主险缴费年数 */
+    private Integer                    premiumPaymentYears;
+
+    /** 收费方式 */
+    private PremiumCollectionMode      collectionMode;
+
+    /** 渠道ID */
+    private String                     channelId;
+
+    /** 出单业务流水号 */
+    private String                     bizNo;
+
+    /** 营销包ID */
+    private String                     marketPackageId;
+
+    /** 险种段数量 */
+    private Integer                    lineCount;
 
     /** 投保人ID */
     private String                     holderId;

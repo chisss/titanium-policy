@@ -49,6 +49,7 @@ import com.titanium.policy.valueobject.policy.LinePaymentTerms;
  * @param productCode            产品编码（快照）
  * @param productName            产品名称（快照）
  * @param productVersion         产品版本（快照，锁定出单时点的产品定义）
+ * @param pricingPlanVersion     定价计划版本（快照，锁定确认保费所用计划；历史事件可为空）
  * @param insuranceType          险种三级分类
  * @param sumInsured             本险种保额（独立）
  * @param premium                本险种保费（独立；拒保段不计入保单总保费）
@@ -62,11 +63,24 @@ import com.titanium.policy.valueobject.policy.LinePaymentTerms;
  */
 public record PolicyProduct(String policyProductId, int lineNo, ProductCategory productCategory,
                             String parentPolicyProductId, String productId, String productCode, String productName,
-                            String productVersion, InsuranceProductType insuranceType, Money sumInsured, Money premium,
-                            LineCoveragePeriod coveragePeriod, LinePaymentTerms paymentTerms,
+                            String productVersion, String pricingPlanVersion, InsuranceProductType insuranceType,
+                            Money sumInsured, Money premium, LineCoveragePeriod coveragePeriod, LinePaymentTerms paymentTerms,
                             ConclusionType underwritingConclusion, PolicyLineStatus lineStatus,
                             List<ClauseSnapshot> clauseSnapshots, List<InsuredSubject> insuredSubjects,
                             List<CoverageSnapshot> coverageSnapshots) {
+
+    /** 兼容计划版本尚未冻结的历史事件与旧调用方。 */
+    public PolicyProduct(String policyProductId, int lineNo, ProductCategory productCategory,
+                         String parentPolicyProductId, String productId, String productCode, String productName,
+                         String productVersion, InsuranceProductType insuranceType, Money sumInsured, Money premium,
+                         LineCoveragePeriod coveragePeriod, LinePaymentTerms paymentTerms,
+                         ConclusionType underwritingConclusion, PolicyLineStatus lineStatus,
+                         List<ClauseSnapshot> clauseSnapshots, List<InsuredSubject> insuredSubjects,
+                         List<CoverageSnapshot> coverageSnapshots) {
+        this(policyProductId, lineNo, productCategory, parentPolicyProductId, productId, productCode, productName,
+                productVersion, null, insuranceType, sumInsured, premium, coveragePeriod, paymentTerms,
+                underwritingConclusion, lineStatus, clauseSnapshots, insuredSubjects, coverageSnapshots);
+    }
 
     /**
      * 是否为主险段。
@@ -145,6 +159,19 @@ public record PolicyProduct(String policyProductId, int lineNo, ProductCategory 
      */
     public PolicyProduct withLineStatus(PolicyLineStatus newStatus) {
         return withConclusionAndStatus(underwritingConclusion, newStatus);
+    }
+
+    /**
+     * 以新的段级保额复制险种段。
+     *
+     * @param newSumInsured 新保额
+     * @return 保额更新后的新实例
+     */
+    public PolicyProduct withSumInsured(Money newSumInsured) {
+        return new PolicyProduct(policyProductId, lineNo, productCategory, parentPolicyProductId, productId,
+                productCode, productName, productVersion, pricingPlanVersion, insuranceType, newSumInsured, premium,
+                coveragePeriod, paymentTerms, underwritingConclusion, lineStatus, clauseSnapshots, insuredSubjects,
+                coverageSnapshots);
     }
 
     /**
@@ -237,7 +264,7 @@ public record PolicyProduct(String policyProductId, int lineNo, ProductCategory 
      */
     private PolicyProduct withConclusionAndStatus(ConclusionType conclusion, PolicyLineStatus status) {
         return new PolicyProduct(policyProductId, lineNo, productCategory, parentPolicyProductId, productId,
-                productCode, productName, productVersion, insuranceType, sumInsured, premium, coveragePeriod,
-                paymentTerms, conclusion, status, clauseSnapshots, insuredSubjects, coverageSnapshots);
+                productCode, productName, productVersion, pricingPlanVersion, insuranceType, sumInsured, premium,
+                coveragePeriod, paymentTerms, conclusion, status, clauseSnapshots, insuredSubjects, coverageSnapshots);
     }
 }

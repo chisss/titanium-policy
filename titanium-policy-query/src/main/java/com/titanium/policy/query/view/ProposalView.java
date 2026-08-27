@@ -84,6 +84,22 @@ public class ProposalView extends BaseView {
     @Column(name = "insurance_type", length = 64)
     private InsuranceProductType      insuranceType;
 
+    /** 出单业务流水号 */
+    @Column(name = "biz_no", length = 64)
+    private String                    bizNo;
+
+    /** 渠道ID（指向 channel 域） */
+    @Column(name = "channel_id", length = 36)
+    private String                    channelId;
+
+    /** 营销包ID（弱引用） */
+    @Column(name = "market_package_id", length = 36)
+    private String                    marketPackageId;
+
+    /** 意向险种段数量 */
+    @Column(name = "line_count")
+    private Integer                   lineCount;
+
     /** 意向单状态（领域状态机编码） */
     @Enumerated(EnumType.STRING)
     @Column(name = "status_code", nullable = false, length = 32)

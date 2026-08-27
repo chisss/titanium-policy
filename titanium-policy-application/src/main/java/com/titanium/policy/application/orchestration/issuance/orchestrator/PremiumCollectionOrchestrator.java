@@ -1,15 +1,14 @@
 package com.titanium.policy.application.orchestration.issuance.orchestrator;
 
-import java.time.LocalDateTime;
+import java.time.LocalDate;
+import java.util.List;
 
 import org.axonframework.commandhandling.gateway.CommandGateway;
 import org.springframework.stereotype.Service;
 
-import com.titanium.metadata.enums.billing.BillingEnum.PaymentMethod;
 import com.titanium.metadata.enums.billing.PremiumCollectionMode;
 import com.titanium.metadata.valueobject.Money;
-import com.titanium.policy.command.RecordPremiumCollectionCommand;
-import com.titanium.policy.common.constant.PolicyConstants;
+import com.titanium.policy.command.AssociatePremiumBillingCommand;
 import com.titanium.policy.port.BillingServicePort;
 import com.titanium.policy.port.PaymentServicePort;
 import com.titanium.policy.valueobject.billing.BillingResult;
@@ -17,6 +16,7 @@ import com.titanium.policy.valueobject.billing.PremiumBillRequest;
 import com.titanium.policy.valueobject.payment.PaymentOrderResult;
 import com.titanium.policy.valueobject.payment.PremiumPaymentRequest;
 import com.titanium.policy.valueobject.policy.CollectionResult;
+import com.titanium.policy.valueobject.pricing.PremiumCalculationReference;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -61,56 +61,91 @@ public class PremiumCollectionOrchestrator {
      */
     public CollectionResult collect(String policyId, String customerId, Money payableAmount,
                                     PremiumCollectionMode collectionMode, String tenantId) {
+        return collect(policyId, customerId, payableAmount, collectionMode, null, tenantId);
+    }
+
+    /**
+     * 为保单发起收费，并把首期应缴日写入账单。
+     */
+    public CollectionResult collect(String policyId, String customerId, Money payableAmount,
+                                    PremiumCollectionMode collectionMode, LocalDate dueDate, String tenantId) {
+        return collect(policyId, customerId, payableAmount, collectionMode, dueDate, tenantId, List.of());
+    }
+
+    /**
+     * 为保单发起收费，并将 Product 确认计算证据传给 Billing 校验入账。
+     */
+    public CollectionResult collect(String policyId, String customerId, Money payableAmount,
+                                    PremiumCollectionMode collectionMode, LocalDate dueDate, String tenantId,
+                                    List<PremiumCalculationReference> calculationReferences) {
         if (collectionMode == null) {
             log.warn("[收费编排] 保单未指定收费方式，跳过收费（保单停未生效待人工补正）: policyId={}", policyId);
             return CollectionResult.skipped("未指定收费方式");
         }
 
         // ① 开账单：五种方式均需账单（免支付开零元单、先享后付开后付单），账单是应收的唯一凭据
-        String billId = createBill(policyId, customerId, payableAmount, tenantId);
+        BillingResult billing = createBill(
+                policyId, customerId, payableAmount, dueDate, tenantId, calculationReferences);
+        if (billing == null) {
+            // 没有账单就不能创建支付单，否则支付域会生成无法对账的孤儿支付单。
+            return CollectionResult.skipped("开立保费账单失败");
+        }
+        String billId = billing.billId();
+        String billingAccountId = billing.billingAccountId();
+        // 账单是应收事实，创建成功后立即写回保单；后续支付调用即使异常也不会丢失对账依据。
+        associateBilling(policyId, billId, null, tenantId);
 
-        // ② 免支付：零元账单直接视为收讫，回写保单后即可生效
+        // ② 免支付：初始收费信息已经是收讫状态，只需关联零元账单，禁止伪造支付流水。
         if (collectionMode.isSettledOnIssue()) {
             log.info("[收费编排] 免支付（零元保）直接标记收讫: policyId={}, billId={}", policyId, billId);
-            // 零元单一次性结清，缴费方式为趸缴（BillingEnum.PaymentMethod 语义实为缴费频率）
-            recordCollection(policyId, payableAmount, PaymentMethod.LUMP_SUM, tenantId);
-            return CollectionResult.settled(billId);
+            return CollectionResult.settled(billId, billingAccountId);
         }
 
         // ③ 先享后付：账单挂账，保单直接生效（不以收讫为生效前提），逾期走失效流程
         if (collectionMode.allowsActivationWithoutPayment()) {
             log.info("[收费编排] 先享后付：账单挂账，保单可直接生效: policyId={}, billId={}", policyId, billId);
-            return CollectionResult.deferred(billId);
+            return CollectionResult.deferred(billId, billingAccountId);
         }
 
         // ④ 线上支付/代扣：建支付单并取支付凭据
         if (collectionMode.requiresPaymentOrder()) {
-            PaymentOrderResult payment = paymentServicePort.createPaymentOrder(new PremiumPaymentRequest(policyId,
-                    billId, customerId, payableAmount, collectionMode, "保险费收取", tenantId));
+            PaymentOrderResult payment;
+            try {
+                payment = paymentServicePort.createPaymentOrder(new PremiumPaymentRequest(policyId, billId,
+                        customerId, payableAmount, collectionMode, "保险费收取", tenantId));
+            } catch (RuntimeException exception) {
+                log.error("[收费编排] 支付单创建异常（账单已保留，待补偿重试）: policyId={}, billId={}", policyId,
+                        billId, exception);
+                return CollectionResult.pending(billId, billingAccountId, null, null);
+            }
             if (!payment.success()) {
                 log.error("[收费编排] 支付单创建失败（保单停未生效，账单待催缴）: policyId={}, 原因={}", policyId,
                         payment.failureReason());
-                return CollectionResult.pending(billId, null, null);
+                return CollectionResult.pending(billId, billingAccountId, null, null);
             }
             log.info("[收费编排] 支付单已创建，待支付回调: policyId={}, paymentOrderId={}", policyId,
                     payment.paymentOrderId());
-            return CollectionResult.pending(billId, payment.paymentOrderId(), payment.paymentCredential());
+            associateBilling(policyId, billId, payment.paymentOrderId(), tenantId);
+            return CollectionResult.pending(billId, billingAccountId, payment.paymentOrderId(),
+                    payment.paymentCredential());
         }
 
         // ⑤ 线下收费：仅开账单，等财务确认收讫后经回调回写
         log.info("[收费编排] 线下收费：账单已开立，待财务确认收讫: policyId={}, billId={}", policyId, billId);
-        return CollectionResult.pending(billId, null, null);
+        return CollectionResult.pending(billId, billingAccountId, null, null);
     }
 
     /**
      * 开立保费账单（远程失败不阻断，返回 null 由调用方记录待补偿）。
      */
-    private String createBill(String policyId, String customerId, Money payableAmount, String tenantId) {
+    private BillingResult createBill(String policyId, String customerId, Money payableAmount, LocalDate dueDate,
+                                     String tenantId, List<PremiumCalculationReference> calculationReferences) {
         try {
             BillingResult result = billingServicePort
-                    .createPremiumBill(new PremiumBillRequest(policyId, customerId, payableAmount, null, tenantId));
+                    .createPremiumBill(new PremiumBillRequest(policyId, customerId, payableAmount, null, dueDate,
+                            tenantId, calculationReferences));
             if (result != null && result.success()) {
-                return result.billId();
+                return result;
             }
             log.error("[收费编排] 开立保费账单失败（待补偿）: policyId={}", policyId);
             return null;
@@ -121,10 +156,9 @@ public class PremiumCollectionOrchestrator {
     }
 
     /**
-     * 回写实收到保单（收讫后保单方满足生效的保费条件）。
+     * 将收费域单据写回保单事件流。
      */
-    private void recordCollection(String policyId, Money amount, PaymentMethod method, String tenantId) {
-        commandGateway.sendAndWait(new RecordPremiumCollectionCommand(policyId, "FREE_" + policyId, null, amount,
-                method, LocalDateTime.now(), PolicyConstants.POLICY_SYSTEM, tenantId));
+    private void associateBilling(String policyId, String billId, String paymentOrderId, String tenantId) {
+        commandGateway.sendAndWait(new AssociatePremiumBillingCommand(policyId, billId, paymentOrderId, tenantId));
     }
 }

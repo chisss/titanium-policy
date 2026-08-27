@@ -6,6 +6,7 @@ import com.titanium.metadata.enums.policy.IssuanceStrategy;
 import com.titanium.metadata.enums.product.ProductEnum.IssuanceMode;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.common.enums.IssuanceStage;
+import com.titanium.policy.valueobject.policy.CollectionResult;
 
 /**
  * 出单结果值对象
@@ -132,6 +133,28 @@ public record IssuanceResult(boolean success, String bizNo, IssuanceMode issuanc
         return new IssuanceResult(success, bizNo, issuanceMode, issuanceStrategy, IssuanceStage.PENDING_COLLECTION,
                 proposalId, proposalNo, insuranceId, insuranceNo, policies, underwritingId, standardPremium,
                 extraPremium, payablePremium, billId, paymentOrderId, paymentCredential, rejectCode, rejectReason);
+    }
+
+    /**
+     * 按真实收费结果补充单据信息和阶段。
+     * <p>
+     * 未收讫且账单已成功开立时进入待收费；免支付、先享后付或开单失败时保持保单已出单阶段，
+     * 避免向调用方错误展示“去支付”。
+     * </p>
+     *
+     * @param collection 收费编排结果
+     * @return 补充收费信息后的新实例
+     */
+    public IssuanceResult withCollection(CollectionResult collection) {
+        if (collection == null) {
+            return this;
+        }
+        boolean pending = collection.billId() != null && !collection.allowsActivation();
+        IssuanceStage stage = pending ? IssuanceStage.PENDING_COLLECTION : currentStage;
+        return new IssuanceResult(success, bizNo, issuanceMode, issuanceStrategy, stage, proposalId, proposalNo,
+                insuranceId, insuranceNo, policies, underwritingId, standardPremium, extraPremium, payablePremium,
+                collection.billId(), collection.paymentOrderId(), collection.paymentCredential(), rejectCode,
+                rejectReason);
     }
 
     /**

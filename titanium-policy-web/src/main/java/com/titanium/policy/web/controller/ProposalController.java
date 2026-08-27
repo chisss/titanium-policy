@@ -3,6 +3,7 @@ package com.titanium.policy.web.controller;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -72,7 +73,7 @@ public class ProposalController {
     @GetMapping("/{proposalId}")
     public ResponseEntity<ProposalVO> getProposal(@PathVariable("proposalId") String proposalId,
                                                   @RequestHeader("X-Tenant-Id") String tenantId) {
-        Optional<ProposalVO> vo = proposalAppQueryService.findByProposalNo(proposalId, tenantId)
+        Optional<ProposalVO> vo = proposalAppQueryService.findById(proposalId, tenantId)
                 .map(proposalWebMapper::toVO);
         return vo.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
     }
@@ -80,12 +81,11 @@ public class ProposalController {
     /**
      * 多条件分页查询投保意向单列表
      * <p>
-     * 面向管理后台组合检索：意向单编号（模糊）/险种编码（精确）/状态任意组合。{@code holderName}
-     * 参数暂不支持（意向单读模型仅存 customerId，无投保人姓名快照，避免跨域联查破坏 CQRS 隔离）。
+     * 面向管理后台组合检索：意向单编号（模糊）/客户ID（精确）/险种编码（精确）/状态任意组合。
      * </p>
      *
      * @param proposalNo  意向单编号（可空）
-     * @param holderName  投保人姓名（当前读模型不支持，保留占位）
+     * @param customerId  客户ID（可空）
      * @param productCode 险种编码（可空）
      * @param status      意向单状态（可空）
      * @param page        页码（从0开始）
@@ -96,17 +96,35 @@ public class ProposalController {
     @GetMapping
     public ResponseEntity<List<ProposalVO>> listProposals(
             @RequestParam(value = "proposalNo", required = false) String proposalNo,
-            @RequestParam(value = "holderName", required = false) String holderName,
+            @RequestParam(value = "customerId", required = false) String customerId,
             @RequestParam(value = "productCode", required = false) String productCode,
             @RequestParam(value = "status", required = false) String status,
             @RequestParam(value = "page", defaultValue = "0") int page,
             @RequestParam(value = "size", defaultValue = "20") int size,
             @RequestHeader("X-Tenant-Id") String tenantId) {
         List<ProposalVO> proposals = proposalAppQueryService
-                .findByConditions(proposalNo, productCode, status, tenantId, page, size)
+                .findByConditions(proposalNo, customerId, productCode, status, tenantId, page, size)
                 .stream()
                 .map(proposalWebMapper::toVO)
                 .toList();
+        return ResponseEntity.ok(proposals);
+    }
+
+    /**
+     * 多条件分页查询投保意向单，返回完整分页元数据。
+     */
+    @GetMapping("/page")
+    public ResponseEntity<Page<ProposalVO>> pageProposals(
+            @RequestParam(value = "proposalNo", required = false) String proposalNo,
+            @RequestParam(value = "customerId", required = false) String customerId,
+            @RequestParam(value = "productCode", required = false) String productCode,
+            @RequestParam(value = "status", required = false) String status,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "20") int size,
+            @RequestHeader("X-Tenant-Id") String tenantId) {
+        Page<ProposalVO> proposals = proposalAppQueryService
+                .findPageByConditions(proposalNo, customerId, productCode, status, tenantId, page, size)
+                .map(proposalWebMapper::toVO);
         return ResponseEntity.ok(proposals);
     }
 

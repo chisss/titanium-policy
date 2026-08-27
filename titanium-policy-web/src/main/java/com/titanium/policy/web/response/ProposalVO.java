@@ -3,6 +3,7 @@ package com.titanium.policy.web.response;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.enums.product.ProductEnum.SalesChannel;
 import com.titanium.policy.valueobject.proposal.ProposalStatus;
@@ -51,6 +52,27 @@ public class ProposalVO {
     @Schema(description = "期望险种编码")
     private String                    expectedProductCode;
 
+    @Schema(description = "险种三级分类")
+    private InsuranceProductType      insuranceType;
+
+    @Schema(description = "出单业务流水号")
+    private String                    bizNo;
+
+    @Schema(description = "渠道ID")
+    private String                    channelId;
+
+    @Schema(description = "营销包ID")
+    private String                    marketPackageId;
+
+    @Schema(description = "意向险种段数量")
+    private Integer                   lineCount;
+
     @Schema(description = "意向单状态")
     private ProposalStatus.StatusCode status;
+
+    @Schema(description = "创建时间")
+    private LocalDateTime             createTime;
+
+    @Schema(description = "更新时间")
+    private LocalDateTime             updateTime;
 }

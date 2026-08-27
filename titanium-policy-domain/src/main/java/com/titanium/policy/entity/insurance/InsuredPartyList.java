@@ -191,9 +191,42 @@ public record InsuredPartyList(
                                */
                               CustomerGender gender,
                               /*
+                               * 手机号（客户主数据与出单时点快照）
+                               */
+                              String phone,
+                              /*
+                               * 与投保人关系（出单参与方快照；如 SELF/SPOUSE 等）
+                               */
+                              String relationToHolder,
+                              /*
                                * 家庭成员关系（家庭险场景标识与投保人的关系；个险/团单可为 null）
                                */
                               FamilyRelation familyRelation) {
+
+        /**
+         * 兼容旧事件与旧调用方：未提供投保关系时保留为空。
+         *
+         * @param customerId 客户主数据ID
+         * @param insuredId  聚合内被保险人ID
+         * @param name       姓名快照
+         * @param certType   证件类型
+         * @param certNo     证件号
+         * @param age        年龄
+         * @param gender     性别
+         * @param familyRelation 家庭成员关系
+         */
+        public InsuredInfo(String customerId, String insuredId, String name, IdCardType certType, String certNo,
+                           int age, CustomerGender gender, FamilyRelation familyRelation) {
+            this(customerId, insuredId, name, certType, certNo, age, gender, null, null, familyRelation);
+        }
+
+        /**
+         * 兼容已携带投保人关系但尚未携带手机号的调用方。
+         */
+        public InsuredInfo(String customerId, String insuredId, String name, IdCardType certType, String certNo,
+                           int age, CustomerGender gender, String relationToHolder, FamilyRelation familyRelation) {
+            this(customerId, insuredId, name, certType, certNo, age, gender, null, relationToHolder, familyRelation);
+        }
     }
 
     /**
@@ -221,6 +254,14 @@ public record InsuredPartyList(
                                    */
                                   String certNo,
                                   /*
+                                   * 性别（客户主数据与出单时点快照）
+                                   */
+                                  CustomerGender gender,
+                                  /*
+                                   * 手机号（客户主数据与出单时点快照）
+                                   */
+                                  String phone,
+                                  /*
                                    * 受益人类型（身故受益人/生存受益人）
                                    */
                                   BeneficiaryType beneficiaryType,
@@ -232,5 +273,15 @@ public record InsuredPartyList(
                                    * 受益比例（同一顺位内份额，以 1.0 表示 100%）
                                    */
                                   double beneficiaryRatio) {
+
+        /**
+         * 兼容旧事件与旧调用方：历史受益人快照未携带性别和手机号。
+         */
+        public BeneficiaryInfo(String customerId, String beneficiaryId, String name, IdCardType certType,
+                               String certNo, BeneficiaryType beneficiaryType, int order,
+                               double beneficiaryRatio) {
+            this(customerId, beneficiaryId, name, certType, certNo, null, null, beneficiaryType, order,
+                    beneficiaryRatio);
+        }
     }
 }

@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 
+import com.titanium.common.exception.BusinessException;
 import com.titanium.metadata.enums.underwriting.UnderwritingEnum;
 import com.titanium.metadata.enums.underwriting.UnderwritingEnum.ConclusionType;
 import com.titanium.policy.port.UnderwritingDecisionGateway;
@@ -29,8 +30,8 @@ import lombok.extern.slf4j.Slf4j;
  * </p>
  * <p>
  * <b>UW-2 富核保切换</b>：替代原「createUnderwriting + underwrite（金额>10万兜底）」路径，改走
- * submitInput（组装被保人年龄/性别/职业/BMI 等风险要素）+ decide（触发核保域富评分决策）。
- * 被保人要素不足时留空，由核保域按保守标准体兜底评分。
+ * submitInput（组装当前 API 支持的职业/BMI 风险要素）+ decide（触发核保域富评分决策）。
+ * 被保人要素不足时留空；年龄/性别因当前核保 API 无对应字段，暂不在同步适配器中透传。
  * </p>
  * <p>
  * <b>UW-3 加费回传</b>：从决策后 DTO 读取结构化加费率 {@code extraPremiumRatio} 填入
@@ -53,26 +54,29 @@ public class SyncUnderwritingDecisionAdapter implements UnderwritingDecisionGate
                 request.holderId(), request.tenantId());
 
         // 1. 创建核保单（透传险种编码供核保域按产品配置决策——UW-4）
-        ResponseEntity<UnderwritingResponse> createdResponse = underwritingApi.createUnderwriting(buildCreateRequest(request),
-                request.tenantId());
-        UnderwritingResponse created = createdResponse.getBody();
-        String underwritingId = created.getUnderwritingId();
+        ResponseEntity<UnderwritingResponse> createdResponse = underwritingApi.createUnderwriting(
+                buildCreateRequest(request), request.tenantId());
+        UnderwritingResponse created = requireSuccessfulBody(createdResponse, "创建核保", request);
+        String underwritingId = requireUnderwritingId(created, "创建核保", request);
 
         // 2. 提交结构化核保输入（被保人风险要素 → 富核保评分依据），替代旧金额兜底
-        underwritingApi.submitInput(underwritingId, buildInputRequest(request), request.tenantId());
+        ResponseEntity<UnderwritingResponse> submittedResponse = underwritingApi.submitInput(underwritingId,
+                buildInputRequest(request), request.tenantId());
+        requireSuccessfulBody(submittedResponse, "提交核保输入", request);
 
         // 3. 触发核保决策（核保域基于已提交输入产出富结论/风险等级/加费）
         ResponseEntity<UnderwritingResponse> decidedResponse = underwritingApi.decide(underwritingId,
                 buildDecideRequest(request), request.tenantId());
-        UnderwritingResponse decided = decidedResponse.getBody();
+        UnderwritingResponse decided = requireSuccessfulBody(decidedResponse, "触发核保决策", request);
+        String decidedUnderwritingId = requireUnderwritingId(decided, "核保决策", request);
 
         // 4. 核保域结果翻译为保单域核保结果（防腐层），携带结构化加费率
-        ConclusionType resultCode = mapToResultCode(decided.getStatus());
+        ConclusionType resultCode = resolveConclusion(decided, request);
         BigDecimal extraPremiumRatio = decided.getExtraPremiumRatio();
         log.info("[核保网关] 富核保完成, insuranceId={}, underwritingId={}, 结论={}, 加费率={}", request.insuranceId(),
-                underwritingId, resultCode, extraPremiumRatio);
+                decidedUnderwritingId, resultCode, extraPremiumRatio);
 
-        return new UnderwritingResult(underwritingId, resultCode, decided.getReviewComments(),
+        return new UnderwritingResult(decidedUnderwritingId, resultCode, decided.getReviewComments(),
                 decided.getUnderwriterId(), LocalDateTime.now(), decided.getSurchargeReason(), extraPremiumRatio);
     }
 
@@ -83,7 +87,7 @@ public class SyncUnderwritingDecisionAdapter implements UnderwritingDecisionGate
         CreateUnderwritingRequest createRequest = new CreateUnderwritingRequest();
         createRequest.setPolicyId(request.insuranceId());
         createRequest.setCustomerId(request.holderId());
-        createRequest.setAmount(request.premium());
+        createRequest.setAmount(request.sumInsured());
         createRequest.setCurrency(request.currency());
         createRequest.setUnderwritingType(UnderwritingEnum.UnderwritingType.NEW_BUSINESS);
         createRequest.setRequestDate(LocalDateTime.now());
@@ -120,15 +124,50 @@ public class SyncUnderwritingDecisionAdapter implements UnderwritingDecisionGate
             inputRequest.setPhysicalExamResult(exam);
         }
 
-        // 财务评估：以保费/保额触发高保额财务核保（保额取应缴保费的粗略放大，具体由核保域评估）
-        if (request.premium() != null) {
-            SubmitUnderwritingInputApiRequest.FinancialAssessInput financial =
-                    new SubmitUnderwritingInputApiRequest.FinancialAssessInput();
-            financial.setRequestedSumInsured(request.premium());
-            inputRequest.setFinancialAssessment(financial);
-        }
-
         return inputRequest;
+    }
+
+    /**
+     * 校验核保域同步调用响应，避免空响应在 Saga 内退化为无上下文空指针异常。
+     */
+    private UnderwritingResponse requireSuccessfulBody(ResponseEntity<UnderwritingResponse> response, String stage,
+                                                        UnderwritingDecisionRequest request) {
+        if (response == null) {
+            throw new BusinessException(stage + "失败: insuranceId=" + request.insuranceId() + ", 无响应");
+        }
+        if (!response.getStatusCode().is2xxSuccessful()) {
+            throw new BusinessException(stage + "失败: insuranceId=" + request.insuranceId() + ", HTTP状态="
+                    + response.getStatusCode().value());
+        }
+        if (response.getBody() == null) {
+            throw new BusinessException(stage + "响应体为空: insuranceId=" + request.insuranceId());
+        }
+        return response.getBody();
+    }
+
+    /**
+     * 提取核保单ID并拒绝无效响应。
+     */
+    private String requireUnderwritingId(UnderwritingResponse response, String stage,
+                                         UnderwritingDecisionRequest request) {
+        if (response.getUnderwritingId() == null || response.getUnderwritingId().isBlank()) {
+            throw new BusinessException(stage + "核保单ID为空: insuranceId=" + request.insuranceId());
+        }
+        return response.getUnderwritingId();
+    }
+
+    /**
+     * 新契约直接采用业务结论；兼容旧版仅返回流程状态的核保响应。
+     */
+    private ConclusionType resolveConclusion(UnderwritingResponse response, UnderwritingDecisionRequest request) {
+        if (response.getConclusionType() != null) {
+            return response.getConclusionType();
+        }
+        if (response.getStatus() != null) {
+            return mapToResultCode(response.getStatus());
+        }
+        throw new BusinessException("核保结论为空: insuranceId=" + request.insuranceId() + ", underwritingId="
+                + response.getUnderwritingId());
     }
 
     /**
@@ -160,9 +199,6 @@ public class SyncUnderwritingDecisionAdapter implements UnderwritingDecisionGate
      * </p>
      */
     private ConclusionType mapToResultCode(UnderwritingEnum.UnderwritingStatus status) {
-        if (status == null) {
-            return ConclusionType.POSTPONE;
-        }
         return switch (status) {
             case APPROVED, STANDARD -> ConclusionType.ACCEPT;
             case RATED, EXCLUDED -> ConclusionType.MODIFY;

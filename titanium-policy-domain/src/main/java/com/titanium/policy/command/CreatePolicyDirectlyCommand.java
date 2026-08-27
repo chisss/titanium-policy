@@ -48,10 +48,24 @@ import com.titanium.policy.valueobject.policy.PolicyPeriod;
  * @param tenantId         租户ID
  */
 public record CreatePolicyDirectlyCommand(@TargetAggregateIdentifier String policyId, String policyNo,
-                                          String marketPackageId, PolicyForm policyForm, String productId,
+                                          String bizNo, String marketPackageId, PolicyForm policyForm, String productId,
                                           InsuredPartyList insuredPartyList, List<PolicyProduct> policyProducts,
                                           Money sumInsured, Money totalPremium, PolicyPeriod policyPeriod,
                                           PremiumPlan premiumPlan, CollectionInfo collectionInfo,
                                           ChannelInfo channelInfo, InsuranceProductType insuranceType,
                                           String tenantId) {
+
+    /**
+     * 兼容旧的一步出单调用方。
+     */
+    public CreatePolicyDirectlyCommand(String policyId, String policyNo, String marketPackageId, PolicyForm policyForm,
+                                       String productId, InsuredPartyList insuredPartyList,
+                                       List<PolicyProduct> policyProducts, Money sumInsured, Money totalPremium,
+                                       PolicyPeriod policyPeriod, PremiumPlan premiumPlan,
+                                       CollectionInfo collectionInfo, ChannelInfo channelInfo,
+                                       InsuranceProductType insuranceType, String tenantId) {
+        this(policyId, policyNo, null, marketPackageId, policyForm, productId, insuredPartyList, policyProducts,
+                sumInsured, totalPremium, policyPeriod, premiumPlan, collectionInfo, channelInfo, insuranceType,
+                tenantId);
+    }
 }

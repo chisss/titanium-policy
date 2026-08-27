@@ -1,10 +1,13 @@
 package com.titanium.policy.application.query;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.axonframework.messaging.responsetypes.ResponseTypes;
 import org.axonframework.queryhandling.QueryGateway;
+import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 
 import com.titanium.policy.query.query.FindBeneficiariesByPolicyIdQuery;
@@ -17,10 +20,13 @@ import com.titanium.policy.query.query.FindPolicyStatisticsQuery;
 import com.titanium.policy.query.result.PolicyBeneficiaryQueryResult;
 import com.titanium.policy.query.result.PolicyEndorsementQueryResult;
 import com.titanium.policy.query.result.PolicyInsuredQueryResult;
+import com.titanium.policy.query.result.PolicyMaintenanceCaseReferenceQueryResult;
+import com.titanium.policy.query.result.PolicyMaintenanceSnapshotQueryResult;
 import com.titanium.policy.query.result.PolicyQueryResult;
 import com.titanium.policy.query.result.PolicyStatisticsResult;
+import com.titanium.policy.query.service.PolicyQueryService;
 
-import jakarta.annotation.Resource;
+import lombok.RequiredArgsConstructor;
 // 读门面入参即读侧查询 record（FindXxxQuery），由 web 直接构造，见 docs/DDD-API层与Web层职责边界及协作规范.md
 
 /**
@@ -32,10 +38,12 @@ import jakarta.annotation.Resource;
  * </p>
  */
 @Service
+@RequiredArgsConstructor
 public class PolicyAppQueryService {
 
-    @Resource
-    private QueryGateway queryGateway;
+    private final QueryGateway       queryGateway;
+
+    private final PolicyQueryService policyQueryService;
 
     /**
      * 根据ID查询保单（读模型）
@@ -51,6 +59,13 @@ public class PolicyAppQueryService {
                 .query(query, ResponseTypes.instanceOf(PolicyQueryResult.class))
                 .join();
         return Optional.ofNullable(result);
+    }
+
+    /** 查询保全建案专用的 Policy 权威快照。 */
+    public Optional<PolicyMaintenanceSnapshotQueryResult> findMaintenanceSnapshot(
+            String policyId,
+            String tenantId) {
+        return Optional.ofNullable(policyQueryService.findMaintenanceSnapshot(policyId, tenantId));
     }
 
     /**
@@ -95,6 +110,17 @@ public class PolicyAppQueryService {
     }
 
     /**
+     * 多条件分页查询保单，并保留总条数等分页元数据。
+     */
+    public Page<PolicyQueryResult> findPageByConditions(String policyNo, String policyHolderName, String insuredName,
+                                                        String productCode, String status, String tenantId, int page,
+                                                        int size) {
+        // Axon 4.10 无法以 InstanceResponseType 匹配实现 Iterable 的 Page，分页查询直调读模型服务。
+        return policyQueryService.findPoliciesPageByMultipleConditions(policyNo, policyHolderName, insuredName,
+                productCode, status, null, null, null, null, tenantId, page, size);
+    }
+
+    /**
      * 查询保单受益人清单（读模型）
      *
      * @param policyId 保单ID
@@ -128,6 +154,32 @@ public class PolicyAppQueryService {
     public List<PolicyEndorsementQueryResult> findEndorsements(String policyId, String tenantId) {
         return queryGateway.query(new FindEndorsementsByPolicyIdQuery(policyId, tenantId),
                 ResponseTypes.multipleInstancesOf(PolicyEndorsementQueryResult.class)).join();
+    }
+
+    /**
+     * 查询已在本保单落地的保全案件引用。
+     * <p>
+     * 数据来自租户隔离的批改投影，仅返回具有来源保全案件 ID 的批改记录，并按案件 ID 去重。
+     * </p>
+     */
+    public List<PolicyMaintenanceCaseReferenceQueryResult> findMaintenanceCaseReferences(
+            String policyId,
+            String tenantId) {
+        Map<String, PolicyMaintenanceCaseReferenceQueryResult> references = new LinkedHashMap<>();
+        for (PolicyEndorsementQueryResult endorsement : findEndorsements(policyId, tenantId)) {
+            String maintenanceId = endorsement.getSourceMaintenanceId();
+            if (maintenanceId == null || maintenanceId.isBlank()) {
+                continue;
+            }
+            references.putIfAbsent(maintenanceId, new PolicyMaintenanceCaseReferenceQueryResult(
+                    maintenanceId,
+                    endorsement.getEndorsementNo(),
+                    endorsement.getUpdateType(),
+                    endorsement.getPolicyVersion(),
+                    endorsement.getEffectiveDate(),
+                    endorsement.getEndorsedAt()));
+        }
+        return List.copyOf(references.values());
     }
 
     /**

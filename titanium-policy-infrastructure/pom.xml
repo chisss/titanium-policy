@@ -78,6 +78,13 @@
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
 
+        <!-- 客户主数据 API（出单参与方解析适配器） -->
+        <dependency>
+            <groupId>com.titanium</groupId>
+            <artifactId>titanium-customer-api</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+
         <!-- 条款系统API -->
         <dependency>
             <groupId>com.titanium</groupId>

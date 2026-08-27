@@ -87,11 +87,15 @@ public class PolicyIssuanceOrchestrator {
 
         // ② 生成技术性标识（编排职责）
         String policyId = UUID.randomUUID().toString();
-        String policyNo = policyNoGenerator.generatePolicyNo();
+        String policyNo = policyNoGenerator.generatePolicyNo(insurance.getTenantId());
 
         // ③ 装配承保段：把投保段精化为保单段，冻结条款与责任快照（取数职责）
         List<PolicyProduct> policyProducts = policyProductAssembler
                 .assembleFromInsuranceLines(insurance.getInsuranceLines(), insurance.getTenantId());
+        Money standardPremium = policyProductAssembler.sumStandardPremium(insurance.getInsuranceLines());
+        if (standardPremium == null) {
+            standardPremium = decision.premium();
+        }
         Money totalPremium = policyProductAssembler.sumPremium(policyProducts);
         if (totalPremium == null) {
             totalPremium = decision.premium();
@@ -101,8 +105,8 @@ public class PolicyIssuanceOrchestrator {
         CreatePolicyCommand command = new CreatePolicyCommand(policyId, policyNo, insurance.getInsuranceId(),
                 insurance.getProposalId(),
                 insurance.getUnderwritingResult() != null ? insurance.getUnderwritingResult().underwritingId() : null,
-                insurance.getMarketPackageId(), decision.policyForm(), mainProductId(insurance), null,
-                insurance.getInsuredPartyList(), policyProducts, mainSumInsured(insurance), totalPremium,
+                insurance.getBizNo(), insurance.getMarketPackageId(), decision.policyForm(), mainProductId(insurance), null,
+                insurance.getInsuredPartyList(), policyProducts, mainSumInsured(insurance), standardPremium, totalPremium,
                 PolicyPeriod.of(decision.insurancePeriodStart(), decision.insurancePeriodEnd(), 0, 0), null,
                 CollectionInfo.initial(insurance.getCollectionMode(), totalPremium, LocalDateTime.now()),
                 insurance.getChannelInfo(), insurance.getInsuranceType(), insurance.getTenantId());

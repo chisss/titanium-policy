@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.titanium.common.jpa.BasePersistable;
+import com.titanium.policy.entity.proposal.ProposalLine;
 import com.titanium.policy.event.proposal.ProposalConvertedEvent;
 import com.titanium.policy.event.proposal.ProposalCreatedEvent;
 import com.titanium.policy.event.proposal.ProposalSubmittedEvent;
@@ -56,8 +57,22 @@ public class ProposalProjectionEventHandler {
         ProposalView view = proposalViewRepository.findByProposalIdAndTenantId(event.proposalId(), event.tenantId())
                 .orElseGet(ProposalView::new);
 
-        // 事件字段 → 读模型的同名结构映射收敛到 MapStruct，消除逐字段 set（insuranceType 保持原行为不投影）
+        // 事件字段 → 读模型的同名结构映射收敛到 MapStruct，派生字段由处理器补齐
         proposalViewMapper.applyCreated(view, event);
+        if (view.getInsuranceType() == null && event.proposalLines() != null) {
+            event.proposalLines().stream()
+                    .filter(ProposalLine::isMain)
+                    .map(ProposalLine::insuranceType)
+                    .filter(type -> type != null)
+                    .findFirst()
+                    .ifPresent(view::setInsuranceType);
+        }
+        if (event.proposalLines() != null && !event.proposalLines().isEmpty()) {
+            view.setLineCount(event.proposalLines().size());
+        } else if (view.getLineCount() == null && event.expectedProductCode() != null
+                && !event.expectedProductCode().isBlank()) {
+            view.setLineCount(1);
+        }
         // 初始状态 DRAFT 属创建期语义，由处理器显式赋值，不下沉映射器
         view.setStatus(ProposalStatus.StatusCode.DRAFT);
         stampAuditTime(view);

@@ -21,10 +21,6 @@ import com.titanium.policy.query.view.ProposalView;
  * （createTime 仅首次、updateTime 每次 now）——注意事件同名 {@code createTime} 字段亦须 ignore 以免覆盖
  * 投影时间；意向单初始状态（DRAFT，创建期语义）。
  * </p>
- * <p>
- * <b>严格等价</b>：事件虽携带 {@code insuranceType}，但原投影处理器并未写入读模型（仅投影 basicInfo 级数据），
- * 为保持行为等价，此处对 {@code insuranceType} 亦 {@code ignore}，不静默新增字段落库。
- * </p>
  */
 @Mapper(componentModel = "spring", nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE,
         unmappedTargetPolicy = ReportingPolicy.IGNORE)
@@ -35,11 +31,12 @@ public interface ProposalViewMapper {
      * <p>
      * 事件与读模型同名字段（proposalId/proposalNo/policyForm/channel/customerId/intendedSumInsured/
      * intendedPremium/insurancePeriodStart/insurancePeriodEnd/expectedProductCode/tenantId）自动映射；
-     * 状态由处理器置 DRAFT，审计时间戳由处理器 stamp，insuranceType 保持原行为不写入，均 {@code ignore}。
+     * 状态由处理器置 DRAFT，审计时间戳与派生字段由处理器填充。
      * </p>
      */
+    @Mapping(target = "channelId", source = "channelInfo.channelId")
+    @Mapping(target = "lineCount", ignore = true)
     @Mapping(target = "status", ignore = true)
-    @Mapping(target = "insuranceType", ignore = true)
     @Mapping(target = "createTime", ignore = true)
     @Mapping(target = "updateTime", ignore = true)
     void applyCreated(@MappingTarget ProposalView view, ProposalCreatedEvent event);

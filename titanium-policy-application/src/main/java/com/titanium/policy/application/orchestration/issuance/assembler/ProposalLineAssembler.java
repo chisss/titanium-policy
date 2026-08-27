@@ -56,8 +56,9 @@ public class ProposalLineAssembler {
             lines.add(new ProposalLine(UUID.randomUUID().toString(), planLine.lineNo(), planLine.productCategory(),
                     planLine.parentLineNo(), planLine.productId(),
                     product != null ? product.productCode() : null,
+                    product != null ? product.productVersion() : null,
                     product != null ? product.insuranceType() : request.insuranceType(), planLine.sumInsured(),
-                    request.quotedPremium()));
+                    planLine.isMain() ? request.quotedPremium() : null));
         }
         log.info("意向险种段装配完成: bizNo={}, 段数={}", request.bizNo(), lines.size());
         return List.copyOf(lines);

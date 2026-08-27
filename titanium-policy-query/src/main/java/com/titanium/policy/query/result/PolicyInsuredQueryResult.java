@@ -20,6 +20,24 @@ public class PolicyInsuredQueryResult {
     /** 被保险人姓名（出单快照） */
     private String insuredName;
 
+    /** 被保险人证件类型快照 */
+    private String idType;
+
+    /** 被保险人证件号码快照 */
+    private String idNo;
+
+    /** 被保险人年龄快照 */
+    private Integer age;
+
+    /** 被保险人性别快照 */
+    private String gender;
+
+    /** 被保险人手机号快照 */
+    private String phone;
+
+    /** 与投保人关系快照 */
+    private String relationToHolder;
+
     /** 家庭成员关系码（家庭险专属） */
     private String familyRelation;
 

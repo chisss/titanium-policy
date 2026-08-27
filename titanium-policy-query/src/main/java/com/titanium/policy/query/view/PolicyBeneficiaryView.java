@@ -52,6 +52,22 @@ public class PolicyBeneficiaryView extends BaseView {
     @Column(name = "beneficiary_name", length = 128)
     private String beneficiaryName;
 
+    /** 受益人证件类型快照 */
+    @Column(name = "id_type", length = 32)
+    private String idType;
+
+    /** 受益人证件号码快照 */
+    @Column(name = "id_no", length = 64)
+    private String idNo;
+
+    /** 受益人性别快照 */
+    @Column(name = "gender", length = 16)
+    private String gender;
+
+    /** 受益人手机号快照 */
+    @Column(name = "phone", length = 32)
+    private String phone;
+
     /** 受益类型码（DEATH 身故受益人 / SURVIVAL 生存受益人） */
     @Column(name = "beneficiary_type", length = 32)
     private String beneficiaryType;

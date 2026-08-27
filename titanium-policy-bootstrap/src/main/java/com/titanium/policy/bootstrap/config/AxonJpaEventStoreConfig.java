@@ -6,14 +6,20 @@ import javax.sql.DataSource;
 import org.axonframework.common.jdbc.PersistenceExceptionResolver;
 import org.axonframework.common.jpa.EntityManagerProvider;
 import org.axonframework.common.transaction.TransactionManager;
+import org.axonframework.config.Configurer;
+import org.axonframework.config.ConfigurerModule;
 import org.axonframework.eventhandling.tokenstore.TokenStore;
 import org.axonframework.eventhandling.tokenstore.jpa.JpaTokenStore;
 import org.axonframework.eventsourcing.eventstore.EventStorageEngine;
 import org.axonframework.eventsourcing.eventstore.jpa.JpaEventStorageEngine;
 import org.axonframework.eventsourcing.eventstore.jpa.SQLErrorCodesResolver;
+import org.axonframework.modelling.saga.repository.SagaStore;
+import org.axonframework.modelling.saga.repository.jpa.JpaSagaStore;
 import org.axonframework.serialization.Serializer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+
+import com.titanium.policy.bootstrap.upcaster.InsuranceCreatedEventUpcaster;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -59,11 +65,12 @@ public class AxonJpaEventStoreConfig {
             Serializer defaultSerializer,
             PersistenceExceptionResolver persistenceExceptionResolver,
             EntityManagerProvider entityManagerProvider,
-            TransactionManager transactionManager) {
+            TransactionManager transactionManager,
+            InsuranceCreatedEventUpcaster insuranceCreatedEventUpcaster) {
 
         return JpaEventStorageEngine.builder()
                 .snapshotSerializer(defaultSerializer)
-                .upcasterChain(org.axonframework.serialization.upcasting.event.NoOpEventUpcaster.INSTANCE)
+                .upcasterChain(insuranceCreatedEventUpcaster)
                 .persistenceExceptionResolver(persistenceExceptionResolver)
                 .eventSerializer(defaultSerializer)
                 .snapshotFilter(e -> true)
@@ -83,5 +90,31 @@ public class AxonJpaEventStoreConfig {
                 .entityManagerProvider(entityManagerProvider)
                 .serializer(serializer)
                 .build();
+    }
+
+    /**
+     * 持久化 Saga 状态，避免容器重启丢失正在进行的出单编排。
+     */
+    @Bean
+    public SagaStore<Object> sagaStore(EntityManagerProvider entityManagerProvider, Serializer serializer) {
+        return JpaSagaStore.builder()
+                .entityManagerProvider(entityManagerProvider)
+                .serializer(serializer)
+                .build();
+    }
+
+    /**
+     * Spring Boot 4 下 Axon 的 JPA 自动配置可能因条件不匹配而回退到内存 Saga Store，
+     * 这里显式把 JPA Store 注册到事件处理配置，确保运行态选择与数据库表一致。
+     */
+    @Bean
+    public ConfigurerModule policyJpaSagaStoreConfigurerModule() {
+        return new ConfigurerModule() {
+            @Override
+            public void configureModule(Configurer configurer) {
+                configurer.eventProcessing().registerSagaStore(configuration ->
+                        configuration.getComponent(SagaStore.class));
+            }
+        };
     }
 }

@@ -21,6 +21,18 @@ public class PolicyBeneficiaryQueryResult {
     /** 受益人姓名（出单快照） */
     private String beneficiaryName;
 
+    /** 受益人证件类型快照 */
+    private String idType;
+
+    /** 受益人证件号码快照 */
+    private String idNo;
+
+    /** 受益人性别快照 */
+    private String gender;
+
+    /** 受益人手机号快照 */
+    private String phone;
+
     /** 受益类型码（DEATH/SURVIVAL） */
     private String beneficiaryType;
 

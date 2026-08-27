@@ -21,5 +21,18 @@ public record UnderwritingResultReceivedEvent(
         LocalDateTime underwritingTime,
         String underwritingCondition,
         String tenantId,
-        BigDecimal extraPremiumRatio
-) {}
+        BigDecimal extraPremiumRatio,
+        String bizNo
+) {
+
+    /**
+     * 兼容历史事件构造与回放。
+     */
+    public UnderwritingResultReceivedEvent(String insuranceId, String underwritingId, ConclusionType resultCode,
+                                            String opinion, String underwriterId, LocalDateTime underwritingTime,
+                                            String underwritingCondition, String tenantId,
+                                            BigDecimal extraPremiumRatio) {
+        this(insuranceId, underwritingId, resultCode, opinion, underwriterId, underwritingTime,
+                underwritingCondition, tenantId, extraPremiumRatio, null);
+    }
+}

@@ -84,6 +84,13 @@
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
 
+        <!-- 客户主数据 API（供 Policy 的 Feign 适配器运行） -->
+        <dependency>
+            <groupId>com.titanium</groupId>
+            <artifactId>titanium-customer-api</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+
         <!-- ============ Jackson 2.x 兼容依赖（Axon 4.10 需要） ============ -->
         <!-- Spring Boot 4 升级到 Jackson 3.x，但 Axon 4.10 还依赖 Jackson 2.x -->
         <dependency>
@@ -114,6 +121,11 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

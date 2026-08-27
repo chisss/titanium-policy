@@ -1,6 +1,7 @@
 package com.titanium.policy.query.handler.projection;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import org.axonframework.config.ProcessingGroup;
 import org.axonframework.eventhandling.EventHandler;
@@ -8,11 +9,18 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.titanium.common.jpa.BasePersistable;
+import com.titanium.policy.entity.policy.PolicyProduct;
 import com.titanium.policy.event.PolicyEndorsedEvent;
+import com.titanium.policy.event.PolicyMaintenanceAppliedEvent;
+import com.titanium.policy.event.PolicyMaintenanceStateAppliedEvent;
 import com.titanium.policy.query.mapper.PolicyViewMapper;
 import com.titanium.policy.query.repository.PolicyEndorsementViewRepository;
+import com.titanium.policy.query.repository.PolicyProductViewRepository;
 import com.titanium.policy.query.repository.PolicyViewRepository;
 import com.titanium.policy.query.view.PolicyEndorsementView;
+import com.titanium.policy.query.view.PolicyProductView;
+import com.titanium.policy.query.view.PolicyView;
+import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceExecutionState;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +41,7 @@ public class EndorsementProjectionEventHandler {
 
     private final PolicyEndorsementViewRepository endorsementViewRepository;
     private final PolicyViewRepository            policyViewRepository;
+    private final PolicyProductViewRepository     policyProductViewRepository;
     private final PolicyViewMapper                policyViewMapper;
 
     /**
@@ -60,6 +69,100 @@ public class EndorsementProjectionEventHandler {
             policy.setUpdateTime(LocalDateTime.now());
             policyViewRepository.save(policy);
         });
+    }
+
+    /** 投影正式保全应用事件：批单、业务版本和实际字段在同一事务刷新。 */
+    @EventHandler
+    @Transactional
+    public void on(PolicyMaintenanceAppliedEvent event) {
+        log.info("[读模型投影] Policy 保全应用: policyId={}, endorsementNo={}, requestId={}",
+                event.policyId(), event.endorsementNo(), event.requestId());
+        PolicyEndorsementView view = endorsementViewRepository.findById(event.endorsementNo())
+                .orElseGet(PolicyEndorsementView::new);
+        view.setEndorsementNo(event.endorsementNo());
+        view.setPolicyId(event.policyId());
+        view.setUpdateType(event.updateType().getCode());
+        view.setCategory(event.category().getCode());
+        view.setPolicyVersion(Math.toIntExact(event.actualPolicyVersion()));
+        view.setEffectiveDate(event.effectiveAt());
+        view.setChangeSummary(event.changeSummary());
+        view.setRequiresPremiumRecalc(event.updateType().needsPremiumRecalc());
+        view.setSourceMaintenanceId(event.sourceMaintenanceId());
+        view.setOperatorId(event.operatorId());
+        view.setEndorsedAt(event.appliedAt());
+        view.setTenantId(event.tenantId());
+        stampAuditTime(view);
+        endorsementViewRepository.save(view);
+
+        policyViewRepository.findByPolicyIdAndTenantId(event.policyId(), event.tenantId()).ifPresent(policy -> {
+            policy.setCurrentVersion(Math.toIntExact(event.actualPolicyVersion()));
+            applyExecutionState(event.policyId(), event.tenantId(), policy, event.executionStateAfter());
+            policy.setUpdateTime(LocalDateTime.now());
+            policyViewRepository.save(policy);
+        });
+    }
+
+    /** 投影状态类保全的统一批单、版本和字段实际值。 */
+    @EventHandler
+    @Transactional
+    public void on(PolicyMaintenanceStateAppliedEvent event) {
+        log.info("[读模型投影] Policy 状态保全应用: policyId={}, endorsementNo={}, action={}",
+                event.policyId(), event.endorsementNo(), event.stateAction());
+        PolicyEndorsementView view = endorsementViewRepository.findById(event.endorsementNo())
+                .orElseGet(PolicyEndorsementView::new);
+        view.setEndorsementNo(event.endorsementNo());
+        view.setPolicyId(event.policyId());
+        view.setUpdateType(event.applicationType());
+        view.setCategory(event.category().getCode());
+        view.setPolicyVersion(Math.toIntExact(event.actualPolicyVersion()));
+        view.setEffectiveDate(event.effectiveAt());
+        view.setChangeSummary(event.changeSummary());
+        view.setRequiresPremiumRecalc(false);
+        view.setSourceMaintenanceId(event.sourceMaintenanceId());
+        view.setOperatorId(event.operatorId());
+        view.setEndorsedAt(event.appliedAt());
+        view.setTenantId(event.tenantId());
+        stampAuditTime(view);
+        endorsementViewRepository.save(view);
+
+        policyViewRepository.findByPolicyIdAndTenantId(event.policyId(), event.tenantId()).ifPresent(policy -> {
+            policy.setCurrentVersion(Math.toIntExact(event.actualPolicyVersion()));
+            applyExecutionState(event.policyId(), event.tenantId(), policy, event.executionStateAfter());
+            policy.setUpdateTime(LocalDateTime.now());
+            policyViewRepository.save(policy);
+        });
+    }
+
+    private void applyExecutionState(
+            String policyId,
+            String tenantId,
+            PolicyView policy,
+            PolicyMaintenanceExecutionState executionState) {
+        if (executionState == null) {
+            return;
+        }
+        if (executionState.insuredPartyList() != null
+                && executionState.insuredPartyList().holderInfo() != null) {
+            policy.setPolicyHolderPhone(executionState.insuredPartyList().holderInfo().phone());
+        }
+        if (executionState.policyProducts() == null) {
+            return;
+        }
+        List<PolicyProductView> productViews = policyProductViewRepository
+                .findByPolicyIdAndTenantIdOrderByLineNoAsc(policyId, tenantId);
+        for (PolicyProduct product : executionState.policyProducts()) {
+            productViews.stream()
+                    .filter(view -> product.policyProductId().equals(view.getPolicyProductId()))
+                    .findFirst()
+                    .ifPresent(view -> {
+                        view.setSumInsured(product.sumInsured() == null ? null : product.sumInsured().value());
+                        view.setUpdateTime(LocalDateTime.now());
+                        policyProductViewRepository.save(view);
+                    });
+            if (product.isMain()) {
+                policy.setSumInsured(product.sumInsured() == null ? null : product.sumInsured().value());
+            }
+        }
     }
 
     /**

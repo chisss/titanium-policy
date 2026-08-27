@@ -3,6 +3,9 @@ package com.titanium.policy.query.service;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import org.springframework.data.domain.Page;
+
+import com.titanium.policy.query.result.PolicyMaintenanceSnapshotQueryResult;
 import com.titanium.policy.query.result.PolicyQueryResult;
 import com.titanium.policy.query.result.PolicyStatisticsResult;
 
@@ -22,6 +25,9 @@ public interface PolicyQueryService {
      * @return 保单查询结果
      */
     PolicyQueryResult findPolicyById(String policyId, String tenantId);
+
+    /** 查询保全建案所需的 Policy 权威快照；保单不存在时返回 null。 */
+    PolicyMaintenanceSnapshotQueryResult findMaintenanceSnapshot(String policyId, String tenantId);
 
     /**
      * 根据客户ID查询保单
@@ -57,6 +63,19 @@ public interface PolicyQueryService {
                                                              LocalDateTime effectiveDateEnd,
                                                              LocalDateTime expiryDateStart, LocalDateTime expiryDateEnd,
                                                              String tenantId, int page, int size);
+
+    /**
+     * 根据多条件分页查询保单，并保留总条数等分页元数据。
+     *
+     * @return 保单分页查询结果
+     */
+    Page<PolicyQueryResult> findPoliciesPageByMultipleConditions(String policyNo, String policyHolderName,
+                                                                 String insuredName, String productCode, String status,
+                                                                 LocalDateTime effectiveDateStart,
+                                                                 LocalDateTime effectiveDateEnd,
+                                                                 LocalDateTime expiryDateStart,
+                                                                 LocalDateTime expiryDateEnd, String tenantId, int page,
+                                                                 int size);
 
     /**
      * 根据状态查询保单
