@@ -84,6 +84,10 @@ const services = [
     port: "8083",
     contextPath: "/titanium-clause",
     showcase: true,
+    screenshots: [
+      ["titanium-clause-list-20260828.png", "条款列表：生效中条款与版本状态", "条款列表 · 条款编码、险种分类、版本及生效状态"],
+      ["titanium-clause-detail-20260828.png", "条款详情：医疗保障责任明细", "条款详情 · 基本信息、条款内容及保障责任明细"],
+    ],
     owns: ["条款生命周期与版本", "保险责任和除外责任", "告知书与合同文本模板", "条款级结构化规则"],
     excludes: ["产品组合与销售计划", "最终保费计算", "出单后的合同实例"],
   },
@@ -101,6 +105,10 @@ const services = [
     port: "8081",
     contextPath: "/",
     showcase: true,
+    screenshots: [
+      ["titanium-customer-list-20260828.png", "客户列表：客户主数据", "客户列表 · 身份证件、联系方式、性别及注册时间"],
+      ["titanium-customer-detail-20260828.png", "客户详情：客户与关联保单", "客户详情 · 主数据、联系方式及关联保单"],
+    ],
     owns: ["客户主数据与身份标识", "联系方式和地址", "家庭、组织及受益关系", "租户内客户去重与查询"],
     excludes: ["投保角色的合同快照", "核保风险结论", "保单与理赔状态"],
   },
@@ -166,6 +174,10 @@ const services = [
     port: "8083",
     contextPath: "/maintenance",
     showcase: true,
+    screenshots: [
+      ["titanium-maintenance-list-20260828.png", "保全工单列表：案件状态与生效状态", "保全工单 · 保单号、保全项、来源及案件状态"],
+      ["titanium-maintenance-workbench-20260828.png", "保全工作台：字段变更与流程任务", "保全工作台 · 字段变更、流程任务、快照及生效回执"],
+    ],
     owns: ["保全案件和项目状态机", "字段变更、审核与核保证据", "保全报价和资金双门禁", "立即、未来及追溯生效编排"],
     excludes: ["保单权威合同状态", "产品定价公式", "账务与支付最终状态"],
   },
@@ -215,6 +227,10 @@ const services = [
     port: "8080",
     contextPath: "/",
     showcase: true,
+    screenshots: [
+      ["titanium-policy-list-20260828.png", "保单查询列表：保单生命周期数据", "保单查询 · 投保人、产品、保费及保单状态"],
+      ["titanium-policy-detail-20260828.png", "保单详情：合同与保障信息", "保单详情 · 合同参与人、保障责任及版本信息"],
+    ],
     owns: ["投保资料和合同快照", "承保、签发及生效状态机", "保单版本和批单引用", "合同参与人、保障和期限事实"],
     excludes: ["产品定义与定价", "客户主数据", "核保决策过程", "收付款执行"],
   },
@@ -232,6 +248,10 @@ const services = [
     port: "8082",
     contextPath: "/",
     showcase: true,
+    screenshots: [
+      ["titanium-product-list-20260828.png", "产品列表：产品版本与上下架状态", "产品列表 · 产品编码、版本、险种及上下架状态"],
+      ["titanium-product-pricing-plans-20260828.png", "定价包列表：费率版本与计算配置", "定价包 · 产品版本、费率模式及发布状态"],
+    ],
     owns: ["产品与计划生命周期", "责任、条款和销售配置组合", "版本化试算与确认计算", "费用、税费和佣金计算证据"],
     excludes: ["保单合同实例", "账单与应收", "支付执行"],
   },
@@ -374,16 +394,19 @@ function screenshotsSection(service) {
   if (!service.showcase) return "";
 
   const screenshotBase = "./docs/screenshots";
-  return `### 管理后台展示
-
-以下截图来自 [Titanium 管理后台](https://github.com/chisss/titanium-admin-web)，展示真实运行中的数据看板和产品管理页面。图片采用仓库内版本化资源，GitHub 页面可直接加载。
-
-<p align="center">
-  <img src="${screenshotBase}/titanium-admin-dashboard-20260828.png" alt="Titanium 管理后台数据看板" width="49%" />
-  <img src="${screenshotBase}/titanium-admin-product-list-20260828.png" alt="Titanium 管理后台产品列表" width="49%" />
+  const screenshots = service.screenshots ?? [];
+  const images = screenshots
+    .map(([file, alt, caption]) => `<p align="center">
+  <img src="${screenshotBase}/${file}" alt="${alt}" width="100%" />
 </p>
 
-<p align="center"><sub>数据看板总览 · 产品列表与产品生命周期操作</sub></p>`.trim();
+<p align="center"><sub>${caption}</sub></p>`)
+    .join("\n\n");
+  return `### 管理后台展示
+
+以下截图来自 [Titanium 管理后台](https://github.com/chisss/titanium-admin-web)，仅展示当前服务对应的业务页面。截图包含可核验的示例数据，并按页面上下排列，GitHub 页面可直接加载。
+
+${images}`.trim();
 }
 
 function readme(service) {
