@@ -83,6 +83,7 @@ const services = [
     downstream: "Product、Policy、Claim",
     port: "8083",
     contextPath: "/titanium-clause",
+    showcase: true,
     owns: ["条款生命周期与版本", "保险责任和除外责任", "告知书与合同文本模板", "条款级结构化规则"],
     excludes: ["产品组合与销售计划", "最终保费计算", "出单后的合同实例"],
   },
@@ -99,6 +100,7 @@ const services = [
     downstream: "Policy、Underwriting、Claim",
     port: "8081",
     contextPath: "/",
+    showcase: true,
     owns: ["客户主数据与身份标识", "联系方式和地址", "家庭、组织及受益关系", "租户内客户去重与查询"],
     excludes: ["投保角色的合同快照", "核保风险结论", "保单与理赔状态"],
   },
@@ -163,6 +165,7 @@ const services = [
     downstream: "Underwriting、Billing、Payment",
     port: "8083",
     contextPath: "/maintenance",
+    showcase: true,
     owns: ["保全案件和项目状态机", "字段变更、审核与核保证据", "保全报价和资金双门禁", "立即、未来及追溯生效编排"],
     excludes: ["保单权威合同状态", "产品定价公式", "账务与支付最终状态"],
   },
@@ -211,6 +214,7 @@ const services = [
     downstream: "Billing、Payment、Maintenance、Claim",
     port: "8080",
     contextPath: "/",
+    showcase: true,
     owns: ["投保资料和合同快照", "承保、签发及生效状态机", "保单版本和批单引用", "合同参与人、保障和期限事实"],
     excludes: ["产品定义与定价", "客户主数据", "核保决策过程", "收付款执行"],
   },
@@ -227,6 +231,7 @@ const services = [
     downstream: "Policy、Billing、Maintenance",
     port: "8082",
     contextPath: "/",
+    showcase: true,
     owns: ["产品与计划生命周期", "责任、条款和销售配置组合", "版本化试算与确认计算", "费用、税费和佣金计算证据"],
     excludes: ["保单合同实例", "账单与应收", "支付执行"],
   },
@@ -365,9 +370,26 @@ function bulletList(items) {
   return items.map((item) => `- ${item}`).join("\n");
 }
 
+function screenshotsSection(service) {
+  if (!service.showcase) return "";
+
+  const screenshotBase = "https://raw.githubusercontent.com/chisss/titanium-admin-web/main/docs/screenshots";
+  return `### 管理后台展示
+
+以下截图来自 [Titanium 管理后台](https://github.com/chisss/titanium-admin-web)，展示真实运行中的数据看板和产品管理页面。图片采用仓库内版本化资源，GitHub 页面可直接加载。
+
+<p align="center">
+  <img src="${screenshotBase}/titanium-admin-dashboard-20260828.png" alt="Titanium 管理后台数据看板" width="49%" />
+  <img src="${screenshotBase}/titanium-admin-product-list-20260828.png" alt="Titanium 管理后台产品列表" width="49%" />
+</p>
+
+<p align="center"><sub>数据看板总览 · 产品列表与产品生命周期操作</sub></p>`.trim();
+}
+
 function readme(service) {
   const designPath = path.join(projectRoot, service.repo, "DESIGN.md");
   const designLink = fs.existsSync(designPath) ? "- [详细设计](./DESIGN.md)\n" : "";
+  const screenshotSection = screenshotsSection(service);
   const baseUrl = service.contextPath === "/" ? `http://localhost:${service.port}` : `http://localhost:${service.port}${service.contextPath}`;
 
   return `<div align="center">
@@ -500,7 +522,7 @@ flowchart LR
 
 ### 核心能力
 
-${bulletList(service.owns)}
+${bulletList(service.owns)}${screenshotSection ? `\n\n${screenshotSection}` : ""}
 
 ### 协作关系
 
