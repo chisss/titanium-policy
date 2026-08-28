@@ -36,6 +36,11 @@ class PolicyFieldCatalogApiProviderTest {
                         && field.capability().proposable()
                         && field.capability().executionSupported()));
         assertTrue(response.getData().fields().stream()
+                .anyMatch(field -> field.fieldCode().equals("policy.beneficiary.name")
+                        && field.collection()
+                        && "beneficiaryId".equals(field.objectIdentityField())
+                        && field.capability().executionSupported()));
+        assertTrue(response.getData().fields().stream()
                 .anyMatch(field -> field.fieldCode().equals("policy.holder.email")
                         && field.capability().proposable()
                         && !field.capability().executionSupported()));

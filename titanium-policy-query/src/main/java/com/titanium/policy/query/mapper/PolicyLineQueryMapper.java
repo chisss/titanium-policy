@@ -113,5 +113,6 @@ public interface PolicyLineQueryMapper {
      * @param view 受益人读模型
      * @return 受益人查询结果
      */
+    @Mapping(target = "beneficiaryId", source = "id")
     PolicyBeneficiaryQueryResult toBeneficiaryResult(PolicyBeneficiaryView view);
 }

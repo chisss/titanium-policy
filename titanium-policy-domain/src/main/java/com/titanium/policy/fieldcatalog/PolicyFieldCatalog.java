@@ -19,7 +19,7 @@ import com.titanium.metadata.enums.policy.fieldcatalog.PolicyFieldValueType;
 /** Policy 对外发布的不可变字段目录。 */
 public record PolicyFieldCatalog(String catalogVersion, String contentHash, List<PolicyFieldDescriptor> fields) {
 
-    public static final String STANDARD_VERSION = "2026.08.27.1";
+    public static final String STANDARD_VERSION = "2026.08.28.1";
 
     public PolicyFieldCatalog {
         if (catalogVersion == null || catalogVersion.isBlank()) {
@@ -89,15 +89,15 @@ public record PolicyFieldCatalog(String catalogVersion, String contentHash, List
                         PolicyFieldMaskingPolicy.ID_NUMBER),
                 collection("policy.beneficiary.name", PolicyFieldObjectType.BENEFICIARY, PolicyFieldValueType.TEXT,
                         "policy.field.beneficiary.name", "beneficiaryId",
-                        proposal("BENEFICIARY_CHANGE", false, true), PolicyFieldSensitivityLevel.SENSITIVE,
+                        executable("BENEFICIARY_CHANGE", false, true), PolicyFieldSensitivityLevel.SENSITIVE,
                         PolicyFieldMaskingPolicy.NAME),
                 collection("policy.beneficiary.relationship", PolicyFieldObjectType.BENEFICIARY,
                         PolicyFieldValueType.ENUM, "policy.field.beneficiary.relationship", "beneficiaryId",
-                        proposal("BENEFICIARY_CHANGE", false, true), PolicyFieldSensitivityLevel.INTERNAL,
+                        executable("BENEFICIARY_CHANGE", false, true), PolicyFieldSensitivityLevel.INTERNAL,
                         PolicyFieldMaskingPolicy.NONE),
                 collection("policy.beneficiary.share", PolicyFieldObjectType.BENEFICIARY,
                         PolicyFieldValueType.DECIMAL, "policy.field.beneficiary.share", "beneficiaryId",
-                        proposal("BENEFICIARY_CHANGE", false, true), PolicyFieldSensitivityLevel.INTERNAL,
+                        executable("BENEFICIARY_CHANGE", false, true), PolicyFieldSensitivityLevel.INTERNAL,
                         PolicyFieldMaskingPolicy.NONE),
                 collection("policy.coverage.sumInsured", PolicyFieldObjectType.COVERAGE,
                         PolicyFieldValueType.DECIMAL, "policy.field.coverage.sumInsured", "policyProductId",

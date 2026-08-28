@@ -36,7 +36,7 @@ class RootQueryServicePaginationTest {
         when(repository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(view), PageRequest.of(1, 10), 35));
 
-        Page<PolicyQueryResult> page = new PolicyQueryServiceImpl(repository, null, null, null)
+        Page<PolicyQueryResult> page = new PolicyQueryServiceImpl(repository, null, null, null, null)
                 .findPoliciesPageByMultipleConditions(null, null, null, null, null, null, null, null, null,
                         TENANT_ID, 1, 10);
 

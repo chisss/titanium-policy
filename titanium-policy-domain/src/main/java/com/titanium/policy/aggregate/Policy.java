@@ -1,5 +1,6 @@
 package com.titanium.policy.aggregate;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -86,6 +87,7 @@ import com.titanium.policy.event.PremiumWaivedEvent;
 import com.titanium.policy.event.SubPolicyLinkedEvent;
 import com.titanium.policy.exception.PolicyBusinessRuleException;
 import com.titanium.policy.service.PolicyCompositionDomainService;
+import com.titanium.policy.service.maintenance.BeneficiaryPolicyMaintenanceFieldExecutor;
 import com.titanium.policy.service.maintenance.PolicyMaintenanceFieldExecutorRegistry;
 import com.titanium.policy.service.maintenance.PolicyMaintenanceHashing;
 import com.titanium.policy.valueobject.AnnuityPayoutPlan;
@@ -98,6 +100,7 @@ import com.titanium.policy.valueobject.RuleDecision;
 import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceApplicationReceipt;
 import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceExecutionState;
 import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceFieldChange;
+import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceObjectId;
 import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceSnapshotFieldValue;
 import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceSnapshotReference;
 import com.titanium.policy.valueobject.policy.ChannelInfo;
@@ -1514,7 +1517,26 @@ public class Policy extends BaseAggregate {
         fields.put("policy.product.planVersion", snapshotField("TEXT", mainProduct.pricingPlanVersion()));
         fields.put("policy.product.version", snapshotField("TEXT", mainProduct.productVersion()));
         fields.put("policy.status", snapshotField("ENUM", snapshotStatus.name()));
+        List<InsuredPartyList.BeneficiaryInfo> beneficiaries = parties == null || parties.beneficiaryList() == null
+                ? List.of() : parties.beneficiaryList();
+        for (int index = 0; index < beneficiaries.size(); index++) {
+            InsuredPartyList.BeneficiaryInfo beneficiary = beneficiaries.get(index);
+            String objectId = PolicyMaintenanceObjectId.beneficiary(this.policyId, beneficiary, index).value();
+            fields.put(collectionSnapshotKey(objectId, BeneficiaryPolicyMaintenanceFieldExecutor.NAME_FIELD),
+                    snapshotField("TEXT", beneficiary.name()));
+            fields.put(collectionSnapshotKey(
+                            objectId, BeneficiaryPolicyMaintenanceFieldExecutor.RELATIONSHIP_FIELD),
+                    snapshotField("ENUM", beneficiary.beneficiaryType() == null
+                            ? null : beneficiary.beneficiaryType().getCode()));
+            fields.put(collectionSnapshotKey(objectId, BeneficiaryPolicyMaintenanceFieldExecutor.SHARE_FIELD),
+                    snapshotField("DECIMAL", BigDecimal.valueOf(beneficiary.beneficiaryRatio())
+                            .movePointRight(2).stripTrailingZeros().toPlainString()));
+        }
         return Map.copyOf(fields);
+    }
+
+    private String collectionSnapshotKey(String objectId, String fieldCode) {
+        return objectId + ":" + fieldCode;
     }
 
     private PolicyProduct requireMainProductForMaintenance(List<PolicyProduct> products) {

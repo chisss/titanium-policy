@@ -1,9 +1,11 @@
 package com.titanium.policy.entity.insurance;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
@@ -88,6 +90,26 @@ public record InsuredPartyList(
             }
         }
         return true;
+    }
+
+    /** 保全生效前校验受益人身份、类型、顺位、标识唯一性和份额守恒。 */
+    @JsonIgnore
+    public boolean isBeneficiaryMaintenanceStateValid() {
+        if (beneficiaryList == null || beneficiaryList.isEmpty()) {
+            return true;
+        }
+        Set<String> beneficiaryIds = new HashSet<>();
+        for (BeneficiaryInfo beneficiary : beneficiaryList) {
+            if (beneficiary == null
+                    || beneficiary.beneficiaryId() == null || beneficiary.beneficiaryId().isBlank()
+                    || beneficiary.name() == null || beneficiary.name().isBlank()
+                    || beneficiary.beneficiaryType() == null
+                    || beneficiary.order() <= 0
+                    || !beneficiaryIds.add(beneficiary.beneficiaryId())) {
+                return false;
+            }
+        }
+        return isBeneficiaryRatioValid();
     }
 
     /**

@@ -15,6 +15,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import com.titanium.metadata.enums.maintenance.PolicyMaintenanceAction;
+import com.titanium.metadata.enums.policy.BeneficiaryType;
 import com.titanium.metadata.enums.policy.PolicyEnum.TerminationReason;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.enums.product.ProductEnum.ProductCategory;
@@ -30,6 +31,7 @@ import com.titanium.policy.event.PolicyMaintenanceRetroactiveEvidenceRecordedEve
 import com.titanium.policy.event.PolicyMaintenanceStateAppliedEvent;
 import com.titanium.policy.event.PolicySuspendedEvent;
 import com.titanium.policy.exception.PolicyBusinessRuleException;
+import com.titanium.policy.service.maintenance.BeneficiaryPolicyMaintenanceFieldExecutor;
 import com.titanium.policy.service.maintenance.CoverageSumInsuredPolicyMaintenanceFieldExecutor;
 import com.titanium.policy.service.maintenance.HolderMobilePolicyMaintenanceFieldExecutor;
 import com.titanium.policy.service.maintenance.PolicyMaintenanceFieldExecutorRegistry;
@@ -57,7 +59,8 @@ class PolicyMaintenanceApplicationTest {
     void setUp() {
         registry = new PolicyMaintenanceFieldExecutorRegistry(
                 List.of(new HolderMobilePolicyMaintenanceFieldExecutor(),
-                        new CoverageSumInsuredPolicyMaintenanceFieldExecutor()));
+                        new CoverageSumInsuredPolicyMaintenanceFieldExecutor(),
+                        new BeneficiaryPolicyMaintenanceFieldExecutor()));
         fixture = new AggregateTestFixture<>(Policy.class);
         fixture.registerInjectableResource(registry);
         fixture.setReportIllegalStateChange(false);
@@ -116,6 +119,31 @@ class PolicyMaintenanceApplicationTest {
                     assertEquals(new BigDecimal("120000.00"),
                             policy.getPolicyProducts().getFirst().sumInsured().value());
                 });
+    }
+
+    @Test
+    void shouldAddBeneficiaryAndReturnPartyEndorsement() {
+        ApplyPolicyMaintenanceCommand command = beneficiaryCommand();
+
+        fixture.given(createdEvent(), activatedEvent())
+                .when(command)
+                .expectSuccessfulHandlerExecution()
+                .expectEventsMatching(org.axonframework.test.matchers.Matchers.payloadsMatching(
+                        org.axonframework.test.matchers.Matchers.exactSequenceOf(
+                                org.axonframework.test.matchers.Matchers.predicate(payload -> {
+                                    PolicyMaintenanceAppliedEvent event = (PolicyMaintenanceAppliedEvent) payload;
+                                    assertEquals(
+                                            com.titanium.policy.common.enums.PolicyDataUpdateType.BENEFICIARY_CHANGE,
+                                            event.updateType());
+                                    InsuredPartyList.BeneficiaryInfo beneficiary = event.executionStateAfter()
+                                            .insuredPartyList().beneficiaryList().getFirst();
+                                    assertEquals("beneficiary-20260828", beneficiary.beneficiaryId());
+                                    assertEquals("李四", beneficiary.name());
+                                    assertEquals(BeneficiaryType.DEATH, beneficiary.beneficiaryType());
+                                    assertEquals(1d, beneficiary.beneficiaryRatio());
+                                    assertEquals(3, event.appliedFields().size());
+                                    return true;
+                                }))));
     }
 
     @Test
@@ -325,6 +353,25 @@ class PolicyMaintenanceApplicationTest {
         List<PolicyMaintenanceFieldChange> changes = List.of(new PolicyMaintenanceFieldChange(
                 "COVERAGE_AMOUNT_CHANGE", "line-1", "policy.coverage.sumInsured", "DECIMAL", sumInsured));
         String summary = "maintenance=maintenance-1;fields=policy.coverage.sumInsured";
+        String hash = PolicyMaintenanceHashing.requestHash(
+                TENANT_ID, POLICY_ID, requestId, "maintenance-1", 0,
+                "a".repeat(64), "IMMEDIATE", EFFECTIVE_AT, summary, changes);
+        return new ApplyPolicyMaintenanceCommand(
+                POLICY_ID, requestId, "maintenance-1", 0, hash, "a".repeat(64),
+                "IMMEDIATE", EFFECTIVE_AT, summary, changes, "operator-1", TENANT_ID);
+    }
+
+    private ApplyPolicyMaintenanceCommand beneficiaryCommand() {
+        String requestId = REQUEST_ID + "-beneficiary";
+        String objectId = "beneficiary-20260828";
+        List<PolicyMaintenanceFieldChange> changes = List.of(
+                new PolicyMaintenanceFieldChange(
+                        "BENEFICIARY_CHANGE", objectId, "policy.beneficiary.name", "TEXT", "李四"),
+                new PolicyMaintenanceFieldChange(
+                        "BENEFICIARY_CHANGE", objectId, "policy.beneficiary.relationship", "ENUM", "DEATH"),
+                new PolicyMaintenanceFieldChange(
+                        "BENEFICIARY_CHANGE", objectId, "policy.beneficiary.share", "DECIMAL", "100"));
+        String summary = "maintenance=maintenance-1;fields=policy.beneficiary";
         String hash = PolicyMaintenanceHashing.requestHash(
                 TENANT_ID, POLICY_ID, requestId, "maintenance-1", 0,
                 "a".repeat(64), "IMMEDIATE", EFFECTIVE_AT, summary, changes);

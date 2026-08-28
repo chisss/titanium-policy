@@ -25,6 +25,7 @@ import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.policy.PolicyEnum;
 import com.titanium.metadata.enums.product.ProductEnum.PaymentFrequency;
 import com.titanium.policy.query.repository.InsuranceViewRepository;
+import com.titanium.policy.query.repository.PolicyBeneficiaryViewRepository;
 import com.titanium.policy.query.repository.PolicyInsuredViewRepository;
 import com.titanium.policy.query.repository.PolicyProductViewRepository;
 import com.titanium.policy.query.repository.PolicyViewRepository;
@@ -34,6 +35,7 @@ import com.titanium.policy.query.result.PolicyQueryResult;
 import com.titanium.policy.query.result.PolicyStatisticsResult;
 import com.titanium.policy.query.service.PolicyQueryService;
 import com.titanium.policy.query.view.InsuranceView;
+import com.titanium.policy.query.view.PolicyBeneficiaryView;
 import com.titanium.policy.query.view.PolicyProductView;
 import com.titanium.policy.query.view.PolicyView;
 import com.titanium.policy.service.maintenance.PolicyMaintenanceHashing;
@@ -61,6 +63,7 @@ public class PolicyQueryServiceImpl implements PolicyQueryService {
     private final PolicyProductViewRepository policyProductViewRepository;
     private final PolicyInsuredViewRepository policyInsuredViewRepository;
     private final InsuranceViewRepository insuranceViewRepository;
+    private final PolicyBeneficiaryViewRepository policyBeneficiaryViewRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -95,7 +98,10 @@ public class PolicyQueryServiceImpl implements PolicyQueryService {
         OffsetDateTime businessEffectiveAt = policy.getStartDate().atOffset(BUSINESS_OFFSET);
         OffsetDateTime nextBillingDateAt = nextBillingDate(policy, mainProduct, capturedAt.toLocalDateTime());
         OffsetDateTime nextPolicyAnniversaryAt = nextPolicyAnniversary(policy, capturedAt.toLocalDateTime());
-        Map<String, PolicySnapshotFieldValueQueryResult> fieldValues = buildSnapshotFields(policy, mainProduct);
+        List<PolicyBeneficiaryView> beneficiaries = policyBeneficiaryViewRepository
+                .findByPolicyIdAndTenantId(policyId, tenantId);
+        Map<String, PolicySnapshotFieldValueQueryResult> fieldValues =
+                buildSnapshotFields(policy, mainProduct, beneficiaries);
         String storageKey = "axon-event://policy/" + tenantId + "/" + policyId + "?version=" + policyVersion;
         String contentHash = snapshotHash(policy, mainProduct, policyVersion, fieldValues);
         return new PolicyMaintenanceSnapshotQueryResult(
@@ -165,7 +171,8 @@ public class PolicyQueryServiceImpl implements PolicyQueryService {
 
     private Map<String, PolicySnapshotFieldValueQueryResult> buildSnapshotFields(
             PolicyView policy,
-            PolicyProductView product) {
+            PolicyProductView product,
+            List<PolicyBeneficiaryView> beneficiaries) {
         TreeMap<String, PolicySnapshotFieldValueQueryResult> fields = new TreeMap<>();
         fields.put("policy.collection.mode", enumField(policy.getCollectionMode()));
         fields.put("policy.coverage.sumInsured",
@@ -182,6 +189,15 @@ public class PolicyQueryServiceImpl implements PolicyQueryService {
         fields.put("policy.product.planVersion", textField(product.getPricingPlanVersion()));
         fields.put("policy.product.version", textField(product.getProductVersion()));
         fields.put("policy.status", enumField(policy.getPolicyStatus().getCode()));
+        beneficiaries.forEach(beneficiary -> {
+            String objectId = beneficiary.getId();
+            fields.put(collectionKey(objectId, "policy.beneficiary.name"),
+                    textField(beneficiary.getBeneficiaryName(), objectId));
+            fields.put(collectionKey(objectId, "policy.beneficiary.relationship"),
+                    enumField(beneficiary.getBeneficiaryType(), objectId));
+            fields.put(collectionKey(objectId, "policy.beneficiary.share"),
+                    decimalField(beneficiary.getShareRatio(), objectId));
+        });
         return Map.copyOf(fields);
     }
 
@@ -189,8 +205,20 @@ public class PolicyQueryServiceImpl implements PolicyQueryService {
         return new PolicySnapshotFieldValueQueryResult("TEXT", value);
     }
 
+    private PolicySnapshotFieldValueQueryResult textField(String value, String objectId) {
+        return new PolicySnapshotFieldValueQueryResult("TEXT", value, objectId);
+    }
+
     private PolicySnapshotFieldValueQueryResult enumField(String value) {
         return new PolicySnapshotFieldValueQueryResult("ENUM", value);
+    }
+
+    private PolicySnapshotFieldValueQueryResult enumField(String value, String objectId) {
+        return new PolicySnapshotFieldValueQueryResult("ENUM", value, objectId);
+    }
+
+    private String collectionKey(String objectId, String fieldCode) {
+        return objectId + ":" + fieldCode;
     }
 
     private PolicySnapshotFieldValueQueryResult decimalField(BigDecimal value) {

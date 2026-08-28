@@ -69,6 +69,7 @@ public class PolicyPartyQueryServiceImpl implements PolicyPartyQueryService {
     /** View → 受益人查询结果 */
     private PolicyBeneficiaryQueryResult toBeneficiaryResult(PolicyBeneficiaryView view) {
         PolicyBeneficiaryQueryResult result = new PolicyBeneficiaryQueryResult();
+        result.setBeneficiaryId(view.getId());
         result.setPolicyId(view.getPolicyId());
         result.setCustomerId(view.getCustomerId());
         result.setBeneficiaryName(view.getBeneficiaryName());

@@ -16,6 +16,7 @@ import com.titanium.policy.query.repository.PolicyBeneficiaryViewRepository;
 import com.titanium.policy.query.repository.PolicyInsuredViewRepository;
 import com.titanium.policy.query.view.PolicyBeneficiaryView;
 import com.titanium.policy.query.view.PolicyInsuredView;
+import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceObjectId;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -100,7 +101,7 @@ public class PolicyPartyProjectionEventHandler {
             for (int i = 0; i < beneficiaryList.size(); i++) {
                 InsuredPartyList.BeneficiaryInfo beneficiary = beneficiaryList.get(i);
                 PolicyBeneficiaryView view = new PolicyBeneficiaryView();
-                view.setId(deterministicId(policyId, "B", i));
+                view.setId(PolicyMaintenanceObjectId.beneficiary(policyId, beneficiary, i).value());
                 view.setPolicyId(policyId);
                 view.setCustomerId(beneficiary.customerId());
                 view.setBeneficiaryName(beneficiary.name());

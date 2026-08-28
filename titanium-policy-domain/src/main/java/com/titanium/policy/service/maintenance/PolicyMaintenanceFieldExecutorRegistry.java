@@ -22,7 +22,12 @@ public class PolicyMaintenanceFieldExecutorRegistry {
 
     public PolicyMaintenanceFieldExecutorRegistry(List<PolicyMaintenanceFieldExecutor> executors) {
         Map<String, PolicyMaintenanceFieldExecutor> indexed = new HashMap<>();
-        executors.forEach(executor -> indexed.put(executor.fieldCode(), executor));
+        executors.forEach(executor -> executor.fieldCodes().forEach(fieldCode -> {
+            PolicyMaintenanceFieldExecutor previous = indexed.putIfAbsent(fieldCode, executor);
+            if (previous != null) {
+                throw new IllegalArgumentException("Policy 保全字段执行器重复注册: " + fieldCode);
+            }
+        }));
         this.executors = Map.copyOf(indexed);
     }
 
@@ -49,6 +54,12 @@ public class PolicyMaintenanceFieldExecutorRegistry {
             PolicyMaintenanceFieldExecution execution = executor.execute(policyId, state, change);
             state = execution.state();
             appliedFields.add(execution.appliedField());
+        }
+        if (changes.stream().anyMatch(change -> "BENEFICIARY_CHANGE".equals(change.itemCode()))
+                && (state.insuredPartyList() == null
+                        || !state.insuredPartyList().isBeneficiaryMaintenanceStateValid())) {
+            throw new PolicyBusinessRuleException(
+                    "POLICY_MAINTENANCE_FIELD_VALUE_INVALID", "受益人信息不完整或同顺位份额合计不为 100%");
         }
         return new ExecutionResult(state, List.copyOf(appliedFields));
     }

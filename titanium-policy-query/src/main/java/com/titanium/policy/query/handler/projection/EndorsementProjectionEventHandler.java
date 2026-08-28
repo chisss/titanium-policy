@@ -1,5 +1,6 @@
 package com.titanium.policy.query.handler.projection;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -9,18 +10,22 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.titanium.common.jpa.BasePersistable;
+import com.titanium.policy.entity.insurance.InsuredPartyList;
 import com.titanium.policy.entity.policy.PolicyProduct;
 import com.titanium.policy.event.PolicyEndorsedEvent;
 import com.titanium.policy.event.PolicyMaintenanceAppliedEvent;
 import com.titanium.policy.event.PolicyMaintenanceStateAppliedEvent;
 import com.titanium.policy.query.mapper.PolicyViewMapper;
+import com.titanium.policy.query.repository.PolicyBeneficiaryViewRepository;
 import com.titanium.policy.query.repository.PolicyEndorsementViewRepository;
 import com.titanium.policy.query.repository.PolicyProductViewRepository;
 import com.titanium.policy.query.repository.PolicyViewRepository;
+import com.titanium.policy.query.view.PolicyBeneficiaryView;
 import com.titanium.policy.query.view.PolicyEndorsementView;
 import com.titanium.policy.query.view.PolicyProductView;
 import com.titanium.policy.query.view.PolicyView;
 import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceExecutionState;
+import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceObjectId;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -43,6 +48,7 @@ public class EndorsementProjectionEventHandler {
     private final PolicyViewRepository            policyViewRepository;
     private final PolicyProductViewRepository     policyProductViewRepository;
     private final PolicyViewMapper                policyViewMapper;
+    private final PolicyBeneficiaryViewRepository beneficiaryViewRepository;
 
     /**
      * 投影批改事件：写批单流水 + 刷新保单读模型版本
@@ -145,6 +151,9 @@ public class EndorsementProjectionEventHandler {
                 && executionState.insuredPartyList().holderInfo() != null) {
             policy.setPolicyHolderPhone(executionState.insuredPartyList().holderInfo().phone());
         }
+        if (executionState.insuredPartyList() != null) {
+            replaceBeneficiaries(policyId, tenantId, executionState.insuredPartyList().beneficiaryList());
+        }
         if (executionState.policyProducts() == null) {
             return;
         }
@@ -162,6 +171,36 @@ public class EndorsementProjectionEventHandler {
             if (product.isMain()) {
                 policy.setSumInsured(product.sumInsured() == null ? null : product.sumInsured().value());
             }
+        }
+    }
+
+    private void replaceBeneficiaries(
+            String policyId,
+            String tenantId,
+            List<InsuredPartyList.BeneficiaryInfo> beneficiaries) {
+        beneficiaryViewRepository.deleteByPolicyIdAndTenantId(policyId, tenantId);
+        beneficiaryViewRepository.flush();
+        List<InsuredPartyList.BeneficiaryInfo> resolved = beneficiaries == null ? List.of() : beneficiaries;
+        LocalDateTime now = LocalDateTime.now();
+        for (int index = 0; index < resolved.size(); index++) {
+            InsuredPartyList.BeneficiaryInfo beneficiary = resolved.get(index);
+            PolicyBeneficiaryView view = new PolicyBeneficiaryView();
+            view.setId(PolicyMaintenanceObjectId.beneficiary(policyId, beneficiary, index).value());
+            view.setPolicyId(policyId);
+            view.setCustomerId(beneficiary.customerId());
+            view.setBeneficiaryName(beneficiary.name());
+            view.setIdType(beneficiary.certType() == null ? null : beneficiary.certType().getCode());
+            view.setIdNo(beneficiary.certNo());
+            view.setGender(beneficiary.gender() == null ? null : beneficiary.gender().getCode());
+            view.setPhone(beneficiary.phone());
+            view.setBeneficiaryType(
+                    beneficiary.beneficiaryType() == null ? null : beneficiary.beneficiaryType().getCode());
+            view.setOrderNo(beneficiary.order());
+            view.setShareRatio(BigDecimal.valueOf(beneficiary.beneficiaryRatio()).movePointRight(2));
+            view.setTenantId(tenantId);
+            view.setCreateTime(now);
+            view.setUpdateTime(now);
+            beneficiaryViewRepository.save(view);
         }
     }
 

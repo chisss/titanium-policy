@@ -14,17 +14,21 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 import com.titanium.metadata.enums.maintenance.PolicyMaintenanceAction;
+import com.titanium.metadata.enums.policy.BeneficiaryType;
 import com.titanium.metadata.enums.product.ProductEnum.ProductCategory;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.common.enums.EndorsementCategory;
 import com.titanium.policy.common.enums.PolicyDataUpdateType;
+import com.titanium.policy.entity.insurance.InsuredPartyList;
 import com.titanium.policy.entity.policy.PolicyProduct;
 import com.titanium.policy.event.PolicyMaintenanceAppliedEvent;
 import com.titanium.policy.event.PolicyMaintenanceStateAppliedEvent;
 import com.titanium.policy.query.mapper.PolicyViewMapper;
+import com.titanium.policy.query.repository.PolicyBeneficiaryViewRepository;
 import com.titanium.policy.query.repository.PolicyEndorsementViewRepository;
 import com.titanium.policy.query.repository.PolicyProductViewRepository;
 import com.titanium.policy.query.repository.PolicyViewRepository;
+import com.titanium.policy.query.view.PolicyBeneficiaryView;
 import com.titanium.policy.query.view.PolicyEndorsementView;
 import com.titanium.policy.query.view.PolicyProductView;
 import com.titanium.policy.query.view.PolicyView;
@@ -38,6 +42,7 @@ class EndorsementProjectionEventHandlerTest {
         PolicyEndorsementViewRepository endorsementRepository = mock(PolicyEndorsementViewRepository.class);
         PolicyViewRepository policyRepository = mock(PolicyViewRepository.class);
         PolicyProductViewRepository productRepository = mock(PolicyProductViewRepository.class);
+        PolicyBeneficiaryViewRepository beneficiaryRepository = mock(PolicyBeneficiaryViewRepository.class);
         PolicyView policy = new PolicyView();
         when(endorsementRepository.findById("END_001")).thenReturn(Optional.empty());
         when(policyRepository.findByPolicyIdAndTenantId("POLICY_001", "TENANT_001"))
@@ -45,7 +50,8 @@ class EndorsementProjectionEventHandlerTest {
         PolicyMaintenanceStateAppliedEvent event = stateEvent();
 
         new EndorsementProjectionEventHandler(
-                endorsementRepository, policyRepository, productRepository, mock(PolicyViewMapper.class)).on(event);
+                endorsementRepository, policyRepository, productRepository, mock(PolicyViewMapper.class),
+                beneficiaryRepository).on(event);
 
         ArgumentCaptor<PolicyEndorsementView> endorsement =
                 ArgumentCaptor.forClass(PolicyEndorsementView.class);
@@ -63,6 +69,7 @@ class EndorsementProjectionEventHandlerTest {
         PolicyEndorsementViewRepository endorsementRepository = mock(PolicyEndorsementViewRepository.class);
         PolicyViewRepository policyRepository = mock(PolicyViewRepository.class);
         PolicyProductViewRepository productRepository = mock(PolicyProductViewRepository.class);
+        PolicyBeneficiaryViewRepository beneficiaryRepository = mock(PolicyBeneficiaryViewRepository.class);
         PolicyView policy = new PolicyView();
         PolicyProductView productView = new PolicyProductView();
         productView.setPolicyProductId("LINE_001");
@@ -73,7 +80,8 @@ class EndorsementProjectionEventHandlerTest {
                 .thenReturn(List.of(productView));
 
         new EndorsementProjectionEventHandler(
-                endorsementRepository, policyRepository, productRepository, mock(PolicyViewMapper.class))
+                endorsementRepository, policyRepository, productRepository, mock(PolicyViewMapper.class),
+                beneficiaryRepository)
                 .on(coverageEvent());
 
         assertEquals(new BigDecimal("120000.00"), policy.getSumInsured());
@@ -81,6 +89,35 @@ class EndorsementProjectionEventHandlerTest {
         assertEquals(8, policy.getCurrentVersion());
         verify(productRepository).save(productView);
         verify(policyRepository).save(policy);
+    }
+
+    @Test
+    void replacesBeneficiaryProjectionFromMaintenanceExecutionState() {
+        PolicyEndorsementViewRepository endorsementRepository = mock(PolicyEndorsementViewRepository.class);
+        PolicyViewRepository policyRepository = mock(PolicyViewRepository.class);
+        PolicyProductViewRepository productRepository = mock(PolicyProductViewRepository.class);
+        PolicyBeneficiaryViewRepository beneficiaryRepository = mock(PolicyBeneficiaryViewRepository.class);
+        PolicyView policy = new PolicyView();
+        when(endorsementRepository.findById("END_BENEFICIARY_001")).thenReturn(Optional.empty());
+        when(policyRepository.findByPolicyIdAndTenantId("POLICY_001", "TENANT_001"))
+                .thenReturn(Optional.of(policy));
+
+        new EndorsementProjectionEventHandler(
+                endorsementRepository, policyRepository, productRepository, mock(PolicyViewMapper.class),
+                beneficiaryRepository)
+                .on(beneficiaryEvent());
+
+        verify(beneficiaryRepository).deleteByPolicyIdAndTenantId("POLICY_001", "TENANT_001");
+        verify(beneficiaryRepository).flush();
+        ArgumentCaptor<PolicyBeneficiaryView> beneficiary =
+                ArgumentCaptor.forClass(PolicyBeneficiaryView.class);
+        verify(beneficiaryRepository).save(beneficiary.capture());
+        assertEquals("b".repeat(32), beneficiary.getValue().getId());
+        assertEquals("李四", beneficiary.getValue().getBeneficiaryName());
+        assertEquals("DEATH", beneficiary.getValue().getBeneficiaryType());
+        assertEquals(1, beneficiary.getValue().getOrderNo());
+        assertEquals(new BigDecimal("100"), beneficiary.getValue().getShareRatio());
+        assertEquals("TENANT_001", beneficiary.getValue().getTenantId());
     }
 
     private PolicyMaintenanceStateAppliedEvent stateEvent() {
@@ -108,6 +145,22 @@ class EndorsementProjectionEventHandlerTest {
                 "b".repeat(64), "c".repeat(64), "axon-event://policy/POLICY_001/8",
                 "d".repeat(64), "e".repeat(64), List.of(),
                 new PolicyMaintenanceExecutionState(null, List.of(product)),
+                appliedAt, "operator-1", "TENANT_001");
+    }
+
+    private PolicyMaintenanceAppliedEvent beneficiaryEvent() {
+        LocalDateTime appliedAt = LocalDateTime.parse("2026-08-28T10:00:00");
+        InsuredPartyList.BeneficiaryInfo beneficiary = new InsuredPartyList.BeneficiaryInfo(
+                null, "b".repeat(32), "李四", null, null, null, null, BeneficiaryType.DEATH, 1, 1.0d);
+        InsuredPartyList parties = new InsuredPartyList(
+                "PARTIES_001", null, List.of(), List.of(beneficiary));
+        return new PolicyMaintenanceAppliedEvent(
+                "POLICY_001", "REQUEST_BENEFICIARY_001", "a".repeat(64), "MAINTENANCE_BENEFICIARY_001",
+                "END_BENEFICIARY_001", PolicyDataUpdateType.BENEFICIARY_CHANGE,
+                EndorsementCategory.PARTY, 7, 8, appliedAt, "受益人变更",
+                "b".repeat(64), "c".repeat(64), "axon-event://policy/POLICY_001/8",
+                "d".repeat(64), "e".repeat(64), List.of(),
+                new PolicyMaintenanceExecutionState(parties, null),
                 appliedAt, "operator-1", "TENANT_001");
     }
 }

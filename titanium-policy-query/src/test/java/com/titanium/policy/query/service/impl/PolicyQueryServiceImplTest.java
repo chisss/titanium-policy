@@ -18,11 +18,13 @@ import com.titanium.common.exception.BusinessException;
 import com.titanium.metadata.enums.policy.PolicyEnum.PolicyStatus;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.policy.query.repository.InsuranceViewRepository;
+import com.titanium.policy.query.repository.PolicyBeneficiaryViewRepository;
 import com.titanium.policy.query.repository.PolicyInsuredViewRepository;
 import com.titanium.policy.query.repository.PolicyProductViewRepository;
 import com.titanium.policy.query.repository.PolicyViewRepository;
 import com.titanium.policy.query.result.PolicyQueryResult;
 import com.titanium.policy.query.view.InsuranceView;
+import com.titanium.policy.query.view.PolicyBeneficiaryView;
 import com.titanium.policy.query.view.PolicyInsuredView;
 import com.titanium.policy.query.view.PolicyProductView;
 import com.titanium.policy.query.view.PolicyView;
@@ -101,7 +103,7 @@ class PolicyQueryServiceImplTest {
                 .thenReturn(Optional.of(insurance));
 
         PolicyQueryResult result = new PolicyQueryServiceImpl(policyRepository, productRepository, insuredRepository,
-                insuranceRepository).findPolicyById(POLICY_ID, TENANT_ID);
+                insuranceRepository, null).findPolicyById(POLICY_ID, TENANT_ID);
 
         assertEquals("测试定期寿险", result.getProductName());
         assertEquals("customer-1", result.getInsuredId());
@@ -114,11 +116,16 @@ class PolicyQueryServiceImplTest {
         PolicyProductViewRepository productRepository = Mockito.mock(PolicyProductViewRepository.class);
         PolicyView policy = maintenancePolicyView();
         PolicyProductView product = maintenanceMainProduct();
+        PolicyBeneficiaryView beneficiary = maintenanceBeneficiaryView();
+        PolicyBeneficiaryViewRepository beneficiaryRepository =
+                Mockito.mock(PolicyBeneficiaryViewRepository.class);
         when(policyRepository.findByPolicyIdAndTenantId(POLICY_ID, TENANT_ID)).thenReturn(Optional.of(policy));
         when(productRepository.findByPolicyIdAndTenantIdOrderByLineNoAsc(POLICY_ID, TENANT_ID))
                 .thenReturn(List.of(product));
+        when(beneficiaryRepository.findByPolicyIdAndTenantId(POLICY_ID, TENANT_ID))
+                .thenReturn(List.of(beneficiary));
         PolicyQueryServiceImpl service = new PolicyQueryServiceImpl(
-                policyRepository, productRepository, null, null);
+                policyRepository, productRepository, null, null, beneficiaryRepository);
 
         var first = service.findMaintenanceSnapshot(POLICY_ID, TENANT_ID);
         var second = service.findMaintenanceSnapshot(POLICY_ID, TENANT_ID);
@@ -131,6 +138,10 @@ class PolicyQueryServiceImplTest {
         assertNotNull(first.fieldValues().get("policy.holder.mobile"));
         assertEquals("policy-product-1",
                 first.fieldValues().get("policy.coverage.sumInsured").objectId());
+        assertEquals("beneficiary-1",
+                first.fieldValues().get("beneficiary-1:policy.beneficiary.name").objectId());
+        assertEquals("100",
+                first.fieldValues().get("beneficiary-1:policy.beneficiary.share").canonicalValue());
         assertNotNull(first.nextBillingDateAt());
         assertNotNull(first.nextPolicyAnniversaryAt());
     }
@@ -139,6 +150,8 @@ class PolicyQueryServiceImplTest {
     void rejectsMaintenanceSnapshotWithoutPricingPlanVersion() {
         PolicyViewRepository policyRepository = Mockito.mock(PolicyViewRepository.class);
         PolicyProductViewRepository productRepository = Mockito.mock(PolicyProductViewRepository.class);
+        PolicyBeneficiaryViewRepository beneficiaryRepository =
+                Mockito.mock(PolicyBeneficiaryViewRepository.class);
         PolicyProductView product = maintenanceMainProduct();
         product.setPricingPlanVersion(null);
         when(policyRepository.findByPolicyIdAndTenantId(POLICY_ID, TENANT_ID))
@@ -147,7 +160,7 @@ class PolicyQueryServiceImplTest {
                 .thenReturn(List.of(product));
 
         assertThrows(BusinessException.class, () -> new PolicyQueryServiceImpl(
-                policyRepository, productRepository, null, null)
+                policyRepository, productRepository, null, null, beneficiaryRepository)
                 .findMaintenanceSnapshot(POLICY_ID, TENANT_ID));
     }
 
@@ -182,8 +195,20 @@ class PolicyQueryServiceImplTest {
         return view;
     }
 
+    private PolicyBeneficiaryView maintenanceBeneficiaryView() {
+        PolicyBeneficiaryView view = new PolicyBeneficiaryView();
+        view.setId("beneficiary-1");
+        view.setPolicyId(POLICY_ID);
+        view.setBeneficiaryName("李四");
+        view.setBeneficiaryType("DEATH");
+        view.setOrderNo(1);
+        view.setShareRatio(new BigDecimal("100.00"));
+        view.setTenantId(TENANT_ID);
+        return view;
+    }
+
     private PolicyQueryResult invokeToQueryResult(PolicyView view) throws Exception {
-        PolicyQueryServiceImpl service = new PolicyQueryServiceImpl(null, null, null, null);
+        PolicyQueryServiceImpl service = new PolicyQueryServiceImpl(null, null, null, null, null);
         Method method = PolicyQueryServiceImpl.class.getDeclaredMethod("toQueryResult", PolicyView.class);
         method.setAccessible(true);
         return (PolicyQueryResult) method.invoke(service, view);

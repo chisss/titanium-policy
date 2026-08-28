@@ -27,6 +27,11 @@ class PolicyFieldCatalogTest {
         assertTrue(catalog.requireField("policy.holder.mobile").capability().proposable());
         assertTrue(catalog.requireField("policy.holder.mobile").capability().executionSupported());
         assertTrue(catalog.requireField("policy.coverage.sumInsured").capability().executionSupported());
+        assertTrue(catalog.requireField("policy.beneficiary.name").capability().executionSupported());
+        assertTrue(catalog.requireField("policy.beneficiary.relationship").capability().executionSupported());
+        assertTrue(catalog.requireField("policy.beneficiary.share").capability().executionSupported());
+        assertEquals("beneficiaryId",
+                catalog.requireField("policy.beneficiary.name").objectIdentityField());
         assertEquals("policyProductId",
                 catalog.requireField("policy.coverage.sumInsured").objectIdentityField());
         assertFalse(catalog.requireField("policy.holder.email").capability().executionSupported());

@@ -15,6 +15,9 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class PolicyBeneficiaryQueryResult {
 
+    /** 保全及页面编辑使用的稳定受益人对象ID */
+    private String beneficiaryId;
+
     /** 受益人客户ID */
     private String customerId;
 
