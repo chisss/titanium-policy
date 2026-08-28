@@ -404,7 +404,7 @@ function screenshotsSection(service) {
     .join("\n\n");
   return `### 管理后台展示
 
-以下截图来自 [Titanium 管理后台](https://github.com/chisss/titanium-admin-web)，仅展示当前服务对应的业务页面。截图包含可核验的示例数据，并按页面上下排列，GitHub 页面可直接加载。
+以下截图来自 [Titanium 管理后台](https://github.com/chisss/titanium-admin-web)，仅展示 ${service.name} 对应的业务页面。截图包含可核验的示例数据，并按页面上下排列，GitHub 页面可直接加载。
 
 ${images}`.trim();
 }
