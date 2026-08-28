@@ -148,8 +148,8 @@ flowchart LR
 以下截图来自 [Titanium 管理后台](https://github.com/chisss/titanium-admin-web)，展示真实运行中的数据看板和产品管理页面。图片采用仓库内版本化资源，GitHub 页面可直接加载。
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/chisss/titanium-admin-web/main/docs/screenshots/titanium-admin-dashboard-20260828.png" alt="Titanium 管理后台数据看板" width="49%" />
-  <img src="https://raw.githubusercontent.com/chisss/titanium-admin-web/main/docs/screenshots/titanium-admin-product-list-20260828.png" alt="Titanium 管理后台产品列表" width="49%" />
+  <img src="./docs/screenshots/titanium-admin-dashboard-20260828.png" alt="Titanium 管理后台数据看板" width="49%" />
+  <img src="./docs/screenshots/titanium-admin-product-list-20260828.png" alt="Titanium 管理后台产品列表" width="49%" />
 </p>
 
 <p align="center"><sub>数据看板总览 · 产品列表与产品生命周期操作</sub></p>

@@ -373,7 +373,7 @@ function bulletList(items) {
 function screenshotsSection(service) {
   if (!service.showcase) return "";
 
-  const screenshotBase = "https://raw.githubusercontent.com/chisss/titanium-admin-web/main/docs/screenshots";
+  const screenshotBase = "./docs/screenshots";
   return `### 管理后台展示
 
 以下截图来自 [Titanium 管理后台](https://github.com/chisss/titanium-admin-web)，展示真实运行中的数据看板和产品管理页面。图片采用仓库内版本化资源，GitHub 页面可直接加载。
