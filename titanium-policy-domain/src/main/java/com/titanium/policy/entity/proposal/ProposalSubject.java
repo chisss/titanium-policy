@@ -1,5 +1,7 @@
 package com.titanium.policy.entity.proposal;
 
+import java.util.Map;
+
 import com.titanium.metadata.enums.insurance.SubjectType;
 import com.titanium.metadata.enums.underwriting.UnderwritingEnum;
 
@@ -25,8 +27,15 @@ public record ProposalSubject(
         /**
          * 预估风险等级
          */
-        UnderwritingEnum.RiskLevel estimatedRiskLevel
+        UnderwritingEnum.RiskLevel estimatedRiskLevel,
+        /** 标的属性摘要（车辆/财产等物类标的用于后续投保段精化） */
+        Map<String, Object> attributes
 ) {
+    /** 兼容仅有简要信息的历史调用方。 */
+    public ProposalSubject(String subjectId, SubjectType subjectType, String simpleInfo,
+                           UnderwritingEnum.RiskLevel estimatedRiskLevel) {
+        this(subjectId, subjectType, simpleInfo, estimatedRiskLevel, Map.of());
+    }
     /**
      * 更新标的简要信息
      *
@@ -34,7 +43,7 @@ public record ProposalSubject(
      * @return 更新后的标的实体
      */
     public ProposalSubject updateSubjectInfo(String simpleInfo) {
-        return new ProposalSubject(subjectId, subjectType, simpleInfo, estimatedRiskLevel);
+        return new ProposalSubject(subjectId, subjectType, simpleInfo, estimatedRiskLevel, attributes);
     }
 
     /**
@@ -44,6 +53,6 @@ public record ProposalSubject(
      * @return 更新后的标的实体
      */
     public ProposalSubject updateEstimatedRiskLevel(UnderwritingEnum.RiskLevel estimatedRiskLevel) {
-        return new ProposalSubject(subjectId, subjectType, simpleInfo, estimatedRiskLevel);
+        return new ProposalSubject(subjectId, subjectType, simpleInfo, estimatedRiskLevel, attributes);
     }
 }

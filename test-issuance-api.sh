@@ -8,6 +8,10 @@ set -euo pipefail
 BASE_URL="${BASE_URL:-http://localhost:8080}"
 TENANT_ID="${TENANT_ID:-TEST-TENANT-001}"
 PRODUCT_ID="${PRODUCT_ID:-PRD-TEST-LIFE-001}"
+SUBJECTS_JSON="${SUBJECTS_JSON:-null}"
+PAYMENT_FREQUENCY="${PAYMENT_FREQUENCY:-ANNUAL}"
+COVERAGE_PERIOD_VALUE="${COVERAGE_PERIOD_VALUE:-20}"
+PREMIUM_PAYMENT_YEARS="${PREMIUM_PAYMENT_YEARS:-20}"
 CHANNEL_ID="${CHANNEL_ID:-CH001}"
 INSURED_AGE="${INSURED_AGE:-30}"
 SUM_INSURED="${SUM_INSURED:-500000}"
@@ -21,6 +25,16 @@ CONNECT_TIMEOUT="${CONNECT_TIMEOUT:-5}"
 REQUEST_TIMEOUT="${REQUEST_TIMEOUT:-30}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+PERIOD_START="2026-09-01T00:00:00"
+calculate_period_end() {
+  local years="$1"
+  if date -j -v+0y -f '%Y-%m-%dT%H:%M:%S' "${PERIOD_START}" '+%Y-%m-%dT%H:%M:%S' >/dev/null 2>&1; then
+    date -j -v+"${years}"y -f '%Y-%m-%dT%H:%M:%S' "${PERIOD_START}" '+%Y-%m-%dT%H:%M:%S'
+  else
+    date -d "${PERIOD_START} + ${years} years" '+%Y-%m-%dT%H:%M:%S'
+  fi
+}
 
 normalize_uint_in_range() {
   local name="$1"
@@ -50,6 +64,8 @@ POLL_ATTEMPTS="$(normalize_uint_in_range POLL_ATTEMPTS "${POLL_ATTEMPTS}" 1 60)"
 POLL_INTERVAL="$(normalize_uint_in_range POLL_INTERVAL "${POLL_INTERVAL}" 1 60)"
 CONNECT_TIMEOUT="$(normalize_uint_in_range CONNECT_TIMEOUT "${CONNECT_TIMEOUT}" 1 30)"
 REQUEST_TIMEOUT="$(normalize_uint_in_range REQUEST_TIMEOUT "${REQUEST_TIMEOUT}" 1 120)"
+COVERAGE_PERIOD_VALUE="$(normalize_uint_in_range COVERAGE_PERIOD_VALUE "${COVERAGE_PERIOD_VALUE}" 1 100)"
+PERIOD_END="$(calculate_period_end "${COVERAGE_PERIOD_VALUE}")"
 if [ "${CONNECT_TIMEOUT}" -gt "${REQUEST_TIMEOUT}" ]; then
   echo "CONNECT_TIMEOUT 不能大于 REQUEST_TIMEOUT" >&2
   exit 1
@@ -259,8 +275,14 @@ REQUEST_PAYLOAD="$(jq -n \
   --arg idNo "${ID_NO}" \
   --arg mobile "${MOBILE}" \
   --arg channelId "${CHANNEL_ID}" \
+  --argjson subjects "${SUBJECTS_JSON}" \
+  --arg paymentFrequency "${PAYMENT_FREQUENCY}" \
+  --argjson coveragePeriodValue "${COVERAGE_PERIOD_VALUE}" \
+  --argjson premiumPaymentYears "${PREMIUM_PAYMENT_YEARS}" \
   --argjson sumInsured "${SUM_INSURED}" \
   --argjson age "${AGE}" \
+  --arg periodStart "${PERIOD_START}" \
+  --arg periodEnd "${PERIOD_END}" \
   '{
     bizNo: $bizNo,
     issuanceStrategy: "MERGE_ONE_POLICY",
@@ -282,18 +304,19 @@ REQUEST_PAYLOAD="$(jq -n \
       mobile: $mobile,
       relationToHolder: "SELF"
     }],
-    periodStart: "2026-09-01T00:00:00",
-    periodEnd: "2046-09-01T00:00:00",
+    periodStart: $periodStart,
+    periodEnd: $periodEnd,
     collectionMode: "ONLINE",
     planLines: [{
       lineNo: 1,
       productId: $productId,
       productCategory: "MAIN",
       sumInsured: $sumInsured,
-      coveragePeriodValue: 20,
+      coveragePeriodValue: $coveragePeriodValue,
       coveragePeriodUnit: "YEAR",
-      paymentFrequency: "ANNUAL",
-      premiumPaymentYears: 20
+      paymentFrequency: $paymentFrequency,
+      premiumPaymentYears: $premiumPaymentYears,
+      subjects: $subjects
     }],
     currency: "CNY"
   }')"

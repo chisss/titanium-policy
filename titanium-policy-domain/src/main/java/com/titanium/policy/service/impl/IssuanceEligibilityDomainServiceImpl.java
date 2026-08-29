@@ -17,6 +17,7 @@ import static com.titanium.metadata.errorcode.PolicyErrorCode.ELIGIBILITY_REGION
 import static com.titanium.metadata.errorcode.PolicyErrorCode.ELIGIBILITY_SUM_INSURED_BELOW_MIN;
 import static com.titanium.metadata.errorcode.PolicyErrorCode.ELIGIBILITY_SUM_INSURED_EXCEEDS_MAX;
 import static com.titanium.metadata.errorcode.PolicyErrorCode.ELIGIBILITY_SUM_INSURED_REQUIRED;
+import static com.titanium.metadata.errorcode.PolicyErrorCode.ELIGIBILITY_SUBJECT_ATTRIBUTE_MISSING;
 
 import java.util.List;
 import java.util.Map;
@@ -118,6 +119,10 @@ public class IssuanceEligibilityDomainServiceImpl implements IssuanceEligibility
         if (!region.passed()) {
             return region;
         }
+        RuleDecision subject = validateSubjectAttributes(line, rules);
+        if (!subject.passed()) {
+            return subject;
+        }
         RuleDecision insuredCount = validateInsuredCount(request, line, rules);
         if (!insuredCount.passed()) {
             return insuredCount;
@@ -131,6 +136,26 @@ public class IssuanceEligibilityDomainServiceImpl implements IssuanceEligibility
             return payment;
         }
         return validateBeneficiaryRequirement(request, line, rules);
+    }
+
+    /**
+     * 按产品模板的 JSON Schema 校验物类标的必填属性。属性包只在受理边界校验一次，
+     * 后续险种段与保单快照沿用同一份已验证数据。
+     */
+    private RuleDecision validateSubjectAttributes(IssuancePlanLine line, ProductIssueRules rules) {
+        if (line.subjects() == null || line.subjects().isEmpty()
+                || rules.requiredSubjectAttributes() == null || rules.requiredSubjectAttributes().isEmpty()) {
+            return RuleDecision.accepted();
+        }
+        for (IssuancePlanLine.SubjectIntent subject : line.subjects()) {
+            for (String attribute : rules.requiredSubjectAttributes()) {
+                String value = subject.attributeText(attribute);
+                if (value == null || value.isBlank()) {
+                    return RuleDecision.rejectedAtLine(ELIGIBILITY_SUBJECT_ATTRIBUTE_MISSING, line.lineNo(), attribute);
+                }
+            }
+        }
+        return RuleDecision.accepted();
     }
 
     /**

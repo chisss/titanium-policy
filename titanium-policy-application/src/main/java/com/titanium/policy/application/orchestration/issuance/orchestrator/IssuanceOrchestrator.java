@@ -1,6 +1,8 @@
 package com.titanium.policy.application.orchestration.issuance.orchestrator;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import org.axonframework.commandhandling.gateway.CommandGateway;
@@ -25,6 +27,7 @@ import com.titanium.policy.common.enums.RiskAssessmentStep;
 import com.titanium.policy.entity.insurance.InsuranceLine;
 import com.titanium.policy.entity.policy.PolicyProduct;
 import com.titanium.policy.entity.proposal.ProposalLine;
+import com.titanium.policy.entity.proposal.ProposalSubject;
 import com.titanium.policy.generator.PolicyNoGenerator;
 import com.titanium.policy.port.ProductServicePort;
 import com.titanium.policy.valueobject.IssuancePlanLine;
@@ -255,6 +258,7 @@ public class IssuanceOrchestrator {
                 .insurancePeriodEnd(request.periodEnd())
                 .expectedProductCode(mainProposalLine != null ? mainProposalLine.productCode() : null)
                 .proposalLines(proposalLines)
+                .proposalSubjects(buildProposalSubjects(request))
                 .insuranceType(ProposalLine.resolveInsuranceType(request.insuranceType(), proposalLines))
                 .bizNo(request.bizNo())
                 .marketPackageId(request.marketPackageId())
@@ -279,6 +283,22 @@ public class IssuanceOrchestrator {
                 proposalNo);
 
         return IssuanceResult.proposalCreated(request.bizNo(), proposalId, proposalNo);
+    }
+
+    /** 将方案行中的标的意图压缩为意向阶段摘要，并在三步转换时恢复物类标的。 */
+    private List<ProposalSubject> buildProposalSubjects(IssuanceRequest request) {
+        List<ProposalSubject> subjects = new ArrayList<>();
+        for (IssuancePlanLine line : request.planLines()) {
+            if (line.subjects() == null) {
+                continue;
+            }
+            for (IssuancePlanLine.SubjectIntent intent : line.subjects()) {
+                subjects.add(new ProposalSubject(UUID.randomUUID().toString(), intent.subjectType(),
+                        intent.subjectName(), null,
+                        intent.attributes() != null ? intent.attributes() : Map.of()));
+            }
+        }
+        return List.copyOf(subjects);
     }
 
     /**

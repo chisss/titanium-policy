@@ -3,6 +3,7 @@ package com.titanium.policy.aggregate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import org.axonframework.commandhandling.CommandHandler;
 import org.axonframework.eventsourcing.EventSourcingHandler;
@@ -89,7 +90,7 @@ public class Proposal extends BaseAggregate {
                 command.intendedSumInsured() != null ? command.intendedSumInsured().value() : null,
                 command.intendedPremium() != null ? command.intendedPremium().value() : null,
                 command.insurancePeriodStart(), command.insurancePeriodEnd(), command.expectedProductCode(),
-                command.proposalLines(), ProposalLine.resolveInsuranceType(command.insuranceType(),
+                command.proposalLines(), command.proposalSubjects(), ProposalLine.resolveInsuranceType(command.insuranceType(),
                         command.proposalLines()), command.bizNo(), command.marketPackageId(),
                 LocalDateTime.now(), command.tenantId(), command.insuredPartyList(), command.collectionMode(),
                 command.channelInfo(), command.paymentMode(), command.premiumPaymentYears()));
@@ -185,12 +186,16 @@ public class Proposal extends BaseAggregate {
      */
     private ArrayList<ProposalSubject> initialSubjects(ProposalCreatedEvent event) {
         ArrayList<ProposalSubject> initial = new ArrayList<>();
+        if (event.proposalSubjects() != null && !event.proposalSubjects().isEmpty()) {
+            initial.addAll(event.proposalSubjects());
+            return initial;
+        }
         if (event.insuredPartyList() == null || event.insuredPartyList().insuredList() == null) {
             return initial;
         }
         for (var insured : event.insuredPartyList().insuredList()) {
             initial.add(new ProposalSubject(insured.insuredId(),
-                    com.titanium.metadata.enums.insurance.SubjectType.PERSON, insured.name(), null));
+                    com.titanium.metadata.enums.insurance.SubjectType.PERSON, insured.name(), null, Map.of()));
         }
         return initial;
     }
@@ -344,9 +349,8 @@ public class Proposal extends BaseAggregate {
         if (subjects.isEmpty()) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "At least one subject is required");
         }
-        if (PolicyForm.GROUP == this.policyForm && subjects.size() < 2) {
-            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "Group policy requires at least 2 subjects");
-        }
+        // 意向阶段只持有参与方摘要，物类团单的标的数量由后续投保险种段校验。
+        // 这里仅要求至少一个意向标的，避免把单一投保人误判为单一财产标的。
     }
 
     private void ensureDraftStatus() {

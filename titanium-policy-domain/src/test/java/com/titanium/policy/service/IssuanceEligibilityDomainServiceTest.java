@@ -46,6 +46,23 @@ class IssuanceEligibilityDomainServiceTest {
                 null, new BigDecimal("5000000"), false, false);
     }
 
+    /** 车险产品规则：车辆标的必须提供车牌、VIN 与初登日期。 */
+    private static ProductIssueRules vehicleRules() {
+        return new ProductIssueRules(null, null, new BigDecimal("10000"), new BigDecimal("1000000"), 5, null,
+                List.of(), List.of(), List.of(), 0, 0, null, false,
+                List.of(PaymentFrequency.ANNUAL, PaymentFrequency.LUMP_SUM), List.of(1), null, List.of(1),
+                null, null, false, false, SubjectType.VEHICLE,
+                List.of("licensePlate", "vin", "firstRegistrationDate"));
+    }
+
+    private static ProductIssueRules propertyRules() {
+        return new ProductIssueRules(null, null, new BigDecimal("100000"), new BigDecimal("100000000"), 100, null,
+                List.of(), List.of(), List.of(), 0, 0, null, false,
+                List.of(PaymentFrequency.ANNUAL, PaymentFrequency.LUMP_SUM), List.of(1), null, List.of(1),
+                null, new BigDecimal("5000000"), false, false, SubjectType.PROPERTY,
+                List.of("propertyAddress", "propertyUsage", "fireProtectionLevel", "propertyValue"));
+    }
+
     /** 构造一个合格的医疗险出单请求（35 岁男，保额 400 万，年缴 1 年期） */
     private static IssuanceRequest validRequest() {
         return requestWith(insuredParties(35), planLine(Map.of()));
@@ -68,6 +85,22 @@ class IssuanceEligibilityDomainServiceTest {
         return new IssuancePlanLine(1, PRODUCT_ID, ProductCategory.MAIN, null,
                 sumInsured != null ? Money.of(sumInsured, "CNY") : null, 1, null, frequency, years, List.of(subject),
                 null);
+    }
+
+    private static IssuancePlanLine vehicleLine(Map<String, Object> attributes) {
+        IssuancePlanLine.SubjectIntent subject = new IssuancePlanLine.SubjectIntent(SubjectType.VEHICLE, null,
+                "沪A12345", null, null, attributes);
+        return new IssuancePlanLine(1, "PROD_AUTO_001", ProductCategory.MAIN, null,
+                Money.of(new BigDecimal("200000"), "CNY"), 1, null, PaymentFrequency.ANNUAL, 1,
+                List.of(subject), null);
+    }
+
+    private static IssuancePlanLine propertyLine(Map<String, Object> attributes) {
+        IssuancePlanLine.SubjectIntent subject = new IssuancePlanLine.SubjectIntent(SubjectType.PROPERTY, null,
+                "测试厂房", null, null, attributes);
+        return new IssuancePlanLine(1, "PROD_PROPERTY_001", ProductCategory.MAIN, null,
+                Money.of(new BigDecimal("5000000"), "CNY"), 1, null, PaymentFrequency.ANNUAL, 1,
+                List.of(subject), null);
     }
 
     /** 构造含指定年龄被保险人的参与方清单（受益人份额 100%） */
@@ -240,5 +273,45 @@ class IssuanceEligibilityDomainServiceTest {
         RuleDecision decision = service.validate(requestWith(insuredParties(70), planLine(Map.of())), Map.of());
 
         assertTrue(decision.passed(), "产品规则未取到时不应因段级规则拒绝");
+    }
+
+    @Test
+    @DisplayName("车险车辆标的缺少 VIN 被拒绝")
+    void shouldRejectVehicleWhenRequiredAttributeMissing() {
+        IssuancePlanLine line = vehicleLine(Map.of("licensePlate", "沪A12345", "firstRegistrationDate", "2024-01-01"));
+
+        RuleDecision decision = service.validate(requestWith(insuredParties(35), line),
+                Map.of("PROD_AUTO_001", vehicleRules()));
+
+        assertFalse(decision.passed());
+        assertEquals(PolicyErrorCode.ELIGIBILITY_SUBJECT_ATTRIBUTE_MISSING, decision.errorCode());
+        assertEquals(1, decision.lineNo());
+        assertEquals("vin", decision.args().get(0));
+    }
+
+    @Test
+    @DisplayName("财产/车辆标的属性齐全时通过校验")
+    void shouldAcceptObjectSubjectWhenSchemaAttributesComplete() {
+        IssuancePlanLine line = vehicleLine(Map.of("licensePlate", "沪A12345", "vin", "LSVAA000001234567",
+                "firstRegistrationDate", "2024-01-01"));
+
+        RuleDecision decision = service.validate(requestWith(insuredParties(35), line),
+                Map.of("PROD_AUTO_001", vehicleRules()));
+
+        assertTrue(decision.passed(), "车辆必填属性齐全时应通过: " + decision.defaultMessage());
+    }
+
+    @Test
+    @DisplayName("企业财产标的缺少地址被拒绝")
+    void shouldRejectPropertyWhenRequiredAttributeMissing() {
+        IssuancePlanLine line = propertyLine(Map.of("propertyUsage", "FACTORY", "fireProtectionLevel", "A",
+                "propertyValue", 5000000));
+
+        RuleDecision decision = service.validate(requestWith(insuredParties(35), line),
+                Map.of("PROD_PROPERTY_001", propertyRules()));
+
+        assertFalse(decision.passed());
+        assertEquals(PolicyErrorCode.ELIGIBILITY_SUBJECT_ATTRIBUTE_MISSING, decision.errorCode());
+        assertEquals("propertyAddress", decision.args().get(0));
     }
 }

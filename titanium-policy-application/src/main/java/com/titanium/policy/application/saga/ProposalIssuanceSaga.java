@@ -34,6 +34,7 @@ import com.titanium.policy.entity.insurance.InsuranceLine;
 import com.titanium.policy.entity.insurance.InsuredPartyList;
 import com.titanium.policy.entity.policy.InsuredSubject;
 import com.titanium.policy.entity.proposal.ProposalLine;
+import com.titanium.policy.entity.proposal.ProposalSubject;
 import com.titanium.policy.event.proposal.ProposalConvertedEvent;
 import com.titanium.policy.event.proposal.ProposalCreatedEvent;
 import com.titanium.policy.event.proposal.ProposalSubmittedEvent;
@@ -89,6 +90,8 @@ public class ProposalIssuanceSaga {
     private String expectedProductCode;
     /** 意向险种段列表（多险种意向组合，转投保单时精化为投保段） */
     private List<ProposalLine> proposalLines;
+    /** 意向标的摘要，物类标的在转投保单时恢复为完整标的。 */
+    private List<ProposalSubject> proposalSubjects;
     /** 出单业务流水号（幂等与进度追溯，透传投保单） */
     private String bizNo;
     /** 营销包ID（弱引用，透传投保单） */
@@ -126,6 +129,7 @@ public class ProposalIssuanceSaga {
         this.insurancePeriodEnd = event.insurancePeriodEnd();
         this.expectedProductCode = event.expectedProductCode();
         this.proposalLines = event.proposalLines();
+        this.proposalSubjects = event.proposalSubjects();
         this.bizNo = event.bizNo();
         this.marketPackageId = event.marketPackageId();
         this.insuranceType = ProposalLine.resolveInsuranceType(event.insuranceType(), event.proposalLines());
@@ -161,7 +165,7 @@ public class ProposalIssuanceSaga {
             Money sumInsured = intendedSumInsured != null ? Money.of(intendedSumInsured, "CNY") : null;
             return List.of(new InsuranceLine(lineId, 1, ProductCategory.MAIN, null, null,
                     expectedProductCode, null, null, insuranceType,
-                    sumInsured, null, coveragePeriod, mainPaymentTerms, personalSubjects(insuranceType, sumInsured),
+                    sumInsured, null, coveragePeriod, mainPaymentTerms, subjectsForLine(insuranceType, sumInsured),
                     null, null, PolicyLineStatus.UNDERWRITING));
         }
         Map<Integer, String> lineIdByNo = new HashMap<>();
@@ -174,7 +178,7 @@ public class ProposalIssuanceSaga {
                     line.parentLineNo() != null ? lineIdByNo.get(line.parentLineNo()) : null, line.productId(),
                     line.productCode(), null, line.productVersion(), line.insuranceType(), line.intendedSumInsured(),
                     null, coveragePeriod, line.productCategory() == ProductCategory.MAIN ? mainPaymentTerms : null,
-                    personalSubjects(line.insuranceType(), line.intendedSumInsured()), null, null,
+                    subjectsForLine(line.insuranceType(), line.intendedSumInsured()), null, null,
                     PolicyLineStatus.UNDERWRITING));
         }
         return List.copyOf(lines);
@@ -219,6 +223,26 @@ public class ProposalIssuanceSaga {
             }
             subjects.add(InsuredSubject.ofPerson(UUID.randomUUID().toString(), insured.customerId(), insured.name(),
                     sumInsured, attributes));
+        }
+        return List.copyOf(subjects);
+    }
+
+    /** 人身险沿用参与方兜底，物类险恢复意向阶段携带的标的属性。 */
+    private List<InsuredSubject> subjectsForLine(InsuranceProductType lineInsuranceType, Money sumInsured) {
+        InsuranceProductType resolvedType = lineInsuranceType != null ? lineInsuranceType : insuranceType;
+        if (resolvedType != null && resolvedType.getCategory() == InsuranceCategory.PERSONAL) {
+            return personalSubjects(resolvedType, sumInsured);
+        }
+        if (proposalSubjects == null || proposalSubjects.isEmpty()) {
+            return List.of();
+        }
+        List<InsuredSubject> subjects = new ArrayList<>();
+        for (ProposalSubject subject : proposalSubjects) {
+            if (subject.subjectType() == null || subject.subjectType().isPersonal()) {
+                continue;
+            }
+            subjects.add(InsuredSubject.ofObject(UUID.randomUUID().toString(), subject.subjectType(),
+                    subject.simpleInfo(), sumInsured, subject.attributes()));
         }
         return List.copyOf(subjects);
     }

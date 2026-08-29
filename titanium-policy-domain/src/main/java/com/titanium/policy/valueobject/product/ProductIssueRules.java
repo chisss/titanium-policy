@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 import com.titanium.metadata.enums.policy.PolicyForm;
+import com.titanium.metadata.enums.insurance.SubjectType;
 import com.titanium.metadata.enums.product.ProductEnum.PaymentFrequency;
 import com.titanium.metadata.enums.product.ProductEnum.PeriodUnit;
 import com.titanium.metadata.enums.product.ProductEnum.UnderwritingMode;
@@ -53,7 +54,30 @@ public record ProductIssueRules(Integer minAge, Integer maxAge, BigDecimal minSu
                                 List<PaymentFrequency> allowedFrequencies, List<Integer> allowedPaymentTerms,
                                 PeriodUnit coveragePeriodUnit, List<Integer> fixedTermOptions,
                                 UnderwritingMode underwritingMode, BigDecimal manualReviewAmountThreshold,
-                                boolean underwritingSkippable, boolean prepaymentRequired) {
+                                boolean underwritingSkippable, boolean prepaymentRequired,
+                                SubjectType subjectType, List<String> requiredSubjectAttributes) {
+
+    /**
+     * 兼容旧版调用方的构造器。未提供标的 Schema 时保持原有“无段级属性约束”语义。
+     */
+    public ProductIssueRules(Integer minAge, Integer maxAge, BigDecimal minSumInsured, BigDecimal maxSumInsured,
+                             Integer maxInsuredCount, Integer minGroupSize, List<String> forbiddenOccupations,
+                             List<String> allowedRegions, List<String> forbiddenRegions, Integer waitingPeriodDays,
+                             Integer hesitationPeriodDays, PolicyForm policyForm, boolean beneficiaryRequired,
+                             List<PaymentFrequency> allowedFrequencies, List<Integer> allowedPaymentTerms,
+                             PeriodUnit coveragePeriodUnit, List<Integer> fixedTermOptions,
+                             UnderwritingMode underwritingMode, BigDecimal manualReviewAmountThreshold,
+                             boolean underwritingSkippable, boolean prepaymentRequired) {
+        this(minAge, maxAge, minSumInsured, maxSumInsured, maxInsuredCount, minGroupSize, forbiddenOccupations,
+                allowedRegions, forbiddenRegions, waitingPeriodDays, hesitationPeriodDays, policyForm,
+                beneficiaryRequired, allowedFrequencies, allowedPaymentTerms, coveragePeriodUnit, fixedTermOptions,
+                underwritingMode, manualReviewAmountThreshold, underwritingSkippable, prepaymentRequired, null,
+                List.of());
+    }
+
+    public boolean requiresSubjectAttribute(String attribute) {
+        return attribute != null && requiredSubjectAttributes != null && requiredSubjectAttributes.contains(attribute);
+    }
 
     /**
      * 指定缴费频率是否在产品允许集内。

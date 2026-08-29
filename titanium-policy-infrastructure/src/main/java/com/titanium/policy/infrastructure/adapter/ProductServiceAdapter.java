@@ -4,7 +4,12 @@ import java.util.List;
 
 import org.springframework.stereotype.Component;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import com.titanium.metadata.enums.policy.PolicyForm;
+import com.titanium.metadata.enums.insurance.InsuranceProductType;
+import com.titanium.metadata.enums.insurance.SubjectType;
 import com.titanium.metadata.enums.product.ProductEnum.IssuanceMode;
 import com.titanium.metadata.enums.product.ProductEnum.PolicyFormType;
 import com.titanium.metadata.response.ApiResponse;
@@ -42,6 +47,8 @@ import lombok.extern.slf4j.Slf4j;
 @Component
 @RequiredArgsConstructor
 public class ProductServiceAdapter implements ProductServicePort {
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     private final ProductApi productApi;
     private final ProductTemplateApi productTemplateApi;
@@ -85,6 +92,10 @@ public class ProductServiceAdapter implements ProductServicePort {
         PolicyFormConfigResponse formConfig = product.getPolicyFormConfig();
         UnderwritingConfigResponse underwriting = product.getUnderwritingConfig();
         IssuanceProcessConfigResponse issuance = product.getIssuanceProcessConfig();
+        ProductTemplateResponse template = fetchTemplate(productId, tenantId);
+        ProductTemplateResponse.PolicyStructureConfigDTO structure = template != null
+                ? template.getPolicyStructure() : null;
+        SubjectType subjectType = structure != null ? structure.getSubjectType() : inferSubjectType(product.getInsuranceType());
 
         return new ProductIssueRules(
                 condition != null ? condition.minAge() : null,
@@ -107,7 +118,44 @@ public class ProductServiceAdapter implements ProductServicePort {
                 underwriting != null ? underwriting.underwritingMode() : null,
                 underwriting != null ? underwriting.manualReviewAmountThreshold() : null,
                 issuance != null && issuance.underwritingSkippable(),
-                issuance != null && issuance.prepaymentRequired());
+                issuance != null && issuance.prepaymentRequired(), subjectType,
+                requiredAttributes(structure != null ? structure.getSubjectFieldsSchema() : null));
+    }
+
+    /** 从模板 JSON Schema 读取 required 数组；非法 Schema 按未配置约束处理并记录日志。 */
+    private List<String> requiredAttributes(String schema) {
+        if (schema == null || schema.isBlank() || "{}".equals(schema.trim())) {
+            return List.of();
+        }
+        try {
+            JsonNode required = objectMapper.readTree(schema).path("required");
+            if (!required.isArray()) {
+                return List.of();
+            }
+            List<String> attributes = new java.util.ArrayList<>();
+            required.forEach(node -> {
+                if (node.isTextual() && !node.asText().isBlank()) {
+                    attributes.add(node.asText());
+                }
+            });
+            return List.copyOf(attributes);
+        } catch (Exception exception) {
+            log.warn("产品标的 Schema 无法解析，按未配置必填属性处理: schema={}", schema, exception);
+            return List.of();
+        }
+    }
+
+    private SubjectType inferSubjectType(InsuranceProductType type) {
+        if (type == null) {
+            return null;
+        }
+        return switch (type) {
+            case AUTO -> SubjectType.VEHICLE;
+            case ENTERPRISE_PROPERTY -> SubjectType.PROPERTY;
+            case HOUSEHOLD_PROPERTY -> SubjectType.HOUSEHOLD;
+            case MARINE_CARGO -> SubjectType.CARGO;
+            default -> SubjectType.PERSON;
+        };
     }
 
     @Override

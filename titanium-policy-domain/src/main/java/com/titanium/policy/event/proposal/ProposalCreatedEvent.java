@@ -10,6 +10,7 @@ import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.enums.product.ProductEnum.SalesChannel;
 import com.titanium.policy.entity.insurance.InsuredPartyList;
 import com.titanium.policy.entity.proposal.ProposalLine;
+import com.titanium.policy.entity.proposal.ProposalSubject;
 import com.titanium.policy.valueobject.policy.ChannelInfo;
 
 /**
@@ -42,6 +43,8 @@ public record ProposalCreatedEvent(
         String expectedProductCode,
         /** 意向险种段列表（客户在 App 勾选的险种组合；单险种意向为长度 1，可空以兼容存量事件） */
         List<ProposalLine> proposalLines,
+        /** 意向标的摘要（物类标的属性透传至后续投保段） */
+        List<ProposalSubject> proposalSubjects,
         InsuranceProductType insuranceType,
         /** 出单业务流水号（幂等与进度追溯，可空） */
         String bizNo,
@@ -61,6 +64,21 @@ public record ProposalCreatedEvent(
         int premiumPaymentYears
 ) {
 
+    /** 兼容新增标的摘要字段前的完整流程事件构造。 */
+    public ProposalCreatedEvent(String proposalId, String proposalNo, PolicyForm policyForm, SalesChannel channel,
+                                String customerId, BigDecimal intendedSumInsured, BigDecimal intendedPremium,
+                                LocalDateTime insurancePeriodStart, LocalDateTime insurancePeriodEnd,
+                                String expectedProductCode, List<ProposalLine> proposalLines,
+                                InsuranceProductType insuranceType, String bizNo, String marketPackageId,
+                                LocalDateTime createTime, String tenantId, InsuredPartyList insuredPartyList,
+                                PremiumCollectionMode collectionMode, ChannelInfo channelInfo, String paymentMode,
+                                int premiumPaymentYears) {
+        this(proposalId, proposalNo, policyForm, channel, customerId, intendedSumInsured, intendedPremium,
+                insurancePeriodStart, insurancePeriodEnd, expectedProductCode, proposalLines, null, insuranceType,
+                bizNo, marketPackageId, createTime, tenantId, insuredPartyList, collectionMode, channelInfo,
+                paymentMode, premiumPaymentYears);
+    }
+
     /**
      * 兼容历史事件构造与回放：旧事件没有新增的流程字段。
      */
@@ -71,7 +89,7 @@ public record ProposalCreatedEvent(
                                 InsuranceProductType insuranceType, String bizNo, String marketPackageId,
                                 LocalDateTime createTime, String tenantId) {
         this(proposalId, proposalNo, policyForm, channel, customerId, intendedSumInsured, intendedPremium,
-                insurancePeriodStart, insurancePeriodEnd, expectedProductCode, proposalLines, insuranceType, bizNo,
-                marketPackageId, createTime, tenantId, null, null, null, null, 0);
+                insurancePeriodStart, insurancePeriodEnd, expectedProductCode, proposalLines, null, insuranceType,
+                bizNo, marketPackageId, createTime, tenantId, null, null, null, null, 0);
     }
 }

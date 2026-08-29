@@ -12,6 +12,7 @@ import com.titanium.metadata.enums.product.ProductEnum.SalesChannel;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.entity.insurance.InsuredPartyList;
 import com.titanium.policy.entity.proposal.ProposalLine;
+import com.titanium.policy.entity.proposal.ProposalSubject;
 import com.titanium.policy.valueobject.policy.ChannelInfo;
 
 import lombok.Builder;
@@ -41,6 +42,7 @@ public record CreateProposalCommand(@TargetAggregateIdentifier String proposalId
                                     Money intendedSumInsured, Money intendedPremium,
                                     LocalDateTime insurancePeriodStart, LocalDateTime insurancePeriodEnd,
                                     String expectedProductCode, List<ProposalLine> proposalLines,
+                                    List<ProposalSubject> proposalSubjects,
                                     InsuranceProductType insuranceType, String bizNo, String marketPackageId,
                                     String tenantId, InsuredPartyList insuredPartyList,
                                     PremiumCollectionMode collectionMode, ChannelInfo channelInfo,
@@ -56,7 +58,7 @@ public record CreateProposalCommand(@TargetAggregateIdentifier String proposalId
                                  InsuranceProductType insuranceType, String bizNo, String marketPackageId,
                                  String tenantId) {
         this(proposalId, proposalNo, policyForm, channel, customerId, intendedSumInsured, intendedPremium,
-                insurancePeriodStart, insurancePeriodEnd, expectedProductCode, proposalLines, insuranceType, bizNo,
-                marketPackageId, tenantId, null, null, null, null, 0);
+                insurancePeriodStart, insurancePeriodEnd, expectedProductCode, proposalLines, null,
+                insuranceType, bizNo, marketPackageId, tenantId, null, null, null, null, 0);
     }
 }

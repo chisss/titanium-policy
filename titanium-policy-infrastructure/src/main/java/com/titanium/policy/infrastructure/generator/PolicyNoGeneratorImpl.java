@@ -2,12 +2,12 @@ package com.titanium.policy.infrastructure.generator;
 
 import java.time.Clock;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.Objects;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import com.titanium.common.util.BusinessNumberFormatter;
 import com.titanium.policy.generator.PolicyNoGenerator;
 
 /**
@@ -19,9 +19,6 @@ import com.titanium.policy.generator.PolicyNoGenerator;
  */
 @Service
 public class PolicyNoGeneratorImpl implements PolicyNoGenerator {
-
-    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.BASIC_ISO_DATE;
-    private static final int                MAX_SEQUENCE   = 9_999_999;
 
     private final PolicyNoSequenceStore sequenceStore;
     private final Clock                clock;
@@ -63,9 +60,10 @@ public class PolicyNoGeneratorImpl implements PolicyNoGenerator {
         }
         LocalDate businessDate = LocalDate.now(clock);
         long sequence = sequenceStore.next(tenantId, documentType, businessDate);
-        if (sequence < 1 || sequence > MAX_SEQUENCE) {
-            throw new IllegalStateException("业务编号流水超出 7 位范围: " + sequence);
+        try {
+            return BusinessNumberFormatter.format(prefix, businessDate, sequence);
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalStateException("业务编号流水超出 7 位范围: " + sequence, exception);
         }
-        return prefix + businessDate.format(DATE_FORMATTER) + String.format("%07d", sequence);
     }
 }
