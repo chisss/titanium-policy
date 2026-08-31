@@ -9,6 +9,7 @@ import java.util.Map;
 import org.springframework.stereotype.Service;
 
 import com.titanium.common.exception.BusinessException;
+import com.titanium.metadata.enums.CurrencyEnum;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.entity.insurance.InsuranceLine;
 import com.titanium.policy.entity.policy.InsuredSubject;
@@ -29,7 +30,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class InsuranceLinePremiumResolver {
 
-    private static final String DEFAULT_CURRENCY = "CNY";
+    private static final String DEFAULT_CURRENCY = CurrencyEnum.CNY.getCode();
     private static final String LINE_PREMIUM_CALCULATION_FAILED =
             "ISSUANCE_LINE_PREMIUM_CALCULATION_FAILED";
 

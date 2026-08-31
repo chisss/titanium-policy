@@ -1,5 +1,6 @@
 package com.titanium.policy.infrastructure.adapter;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.stereotype.Component;
@@ -7,9 +8,9 @@ import org.springframework.stereotype.Component;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.insurance.SubjectType;
+import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.enums.product.ProductEnum.IssuanceMode;
 import com.titanium.metadata.enums.product.ProductEnum.PolicyFormType;
 import com.titanium.metadata.response.ApiResponse;
@@ -24,6 +25,7 @@ import com.titanium.product.api.response.InsureConditionResponse;
 import com.titanium.product.api.response.IssuanceProcessConfigResponse;
 import com.titanium.product.api.response.PaymentConfigResponse;
 import com.titanium.product.api.response.PolicyFormConfigResponse;
+import com.titanium.product.api.response.ProductClauseResponse;
 import com.titanium.product.api.response.ProductResponse;
 import com.titanium.product.api.response.ProductTemplateResponse;
 import com.titanium.product.api.response.UnderwritingConfigResponse;
@@ -132,7 +134,7 @@ public class ProductServiceAdapter implements ProductServicePort {
             if (!required.isArray()) {
                 return List.of();
             }
-            List<String> attributes = new java.util.ArrayList<>();
+            List<String> attributes = new ArrayList<>();
             required.forEach(node -> {
                 if (node.isTextual() && !node.asText().isBlank()) {
                     attributes.add(node.asText());
@@ -160,7 +162,7 @@ public class ProductServiceAdapter implements ProductServicePort {
 
     @Override
     public List<ProductClauseRef> getClauseRefs(String productId, String tenantId) {
-        ApiResponse<List<com.titanium.product.api.response.ProductClauseResponse>> response = productApi
+        ApiResponse<List<ProductClauseResponse>> response = productApi
                 .getProductClauses(productId, tenantId);
         if (response == null || !response.isSuccess() || response.getData() == null) {
             log.warn("产品未绑定条款或查询失败: productId={}, tenantId={}", productId, tenantId);

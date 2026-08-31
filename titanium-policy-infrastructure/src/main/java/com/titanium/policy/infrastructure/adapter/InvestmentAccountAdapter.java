@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 import com.titanium.investment.api.InvestmentAccountApi;
 import com.titanium.investment.api.InvestmentAccountApi.CreateAccountRequest;
 import com.titanium.investment.query.result.InvestmentAccountQueryResult;
+import com.titanium.metadata.enums.CurrencyEnum;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.response.ApiResponse;
 import com.titanium.metadata.valueobject.Money;
@@ -37,7 +38,7 @@ public class InvestmentAccountAdapter implements InvestmentAccountPort {
 
     @Override
     public String openAccount(String policyId, PolicyForm form, Money initialPremium, String tenantId) {
-        String currency = initialPremium != null ? initialPremium.currency() : "CNY";
+        String currency = initialPremium != null ? initialPremium.currency() : CurrencyEnum.CNY.getCode();
         CreateAccountRequest request = new CreateAccountRequest();
         request.setPolicyId(policyId);
         request.setAccountType(resolveAccountType(form));

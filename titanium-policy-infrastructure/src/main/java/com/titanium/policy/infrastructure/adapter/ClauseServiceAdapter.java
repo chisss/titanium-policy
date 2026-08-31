@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 import com.titanium.clause.api.ClauseApi;
 import com.titanium.clause.api.response.ClauseResponse;
 import com.titanium.clause.api.response.CoverageResponse;
+import com.titanium.metadata.enums.CurrencyEnum;
 import com.titanium.metadata.enums.clause.DeductibleType;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.port.ClauseServicePort;
@@ -35,7 +36,7 @@ import lombok.extern.slf4j.Slf4j;
 public class ClauseServiceAdapter implements ClauseServicePort {
 
     /** 缺省币种（条款域责任保额未带币种，按人民币处理） */
-    private static final String DEFAULT_CURRENCY = "CNY";
+    private static final String DEFAULT_CURRENCY = CurrencyEnum.CNY.getCode();
 
     private final ClauseApi clauseApi;
 

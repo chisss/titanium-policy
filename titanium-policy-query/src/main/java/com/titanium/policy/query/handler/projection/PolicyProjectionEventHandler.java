@@ -3,6 +3,7 @@ package com.titanium.policy.query.handler.projection;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Consumer;
 
 import org.axonframework.config.ProcessingGroup;
 import org.axonframework.eventhandling.EventHandler;
@@ -11,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.titanium.common.jpa.BasePersistable;
 import com.titanium.metadata.enums.policy.PolicyEnum;
+import com.titanium.policy.common.enums.PolicyStatusCode;
 import com.titanium.policy.entity.insurance.InsuredPartyList;
 import com.titanium.policy.entity.policy.PolicyProduct;
 import com.titanium.policy.event.AccountValueUpdatedEvent;
@@ -32,7 +34,6 @@ import com.titanium.policy.event.PremiumWaivedEvent;
 import com.titanium.policy.query.mapper.PolicyViewMapper;
 import com.titanium.policy.query.repository.PolicyViewRepository;
 import com.titanium.policy.query.view.PolicyView;
-import com.titanium.policy.valueobject.PolicyStatus;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -129,7 +130,7 @@ public class PolicyProjectionEventHandler {
     @EventHandler
     @Transactional
     public void on(PolicyActivatedEvent event) {
-        applyStatus(event.policyId(), event.tenantId(), PolicyStatus.StatusCode.EFFECTIVE);
+        applyStatus(event.policyId(), event.tenantId(), PolicyStatusCode.EFFECTIVE);
     }
 
     /**
@@ -138,7 +139,7 @@ public class PolicyProjectionEventHandler {
     @EventHandler
     @Transactional
     public void on(PolicySuspendedEvent event) {
-        applyStatus(event.policyId(), event.tenantId(), PolicyStatus.StatusCode.SUSPENDED);
+        applyStatus(event.policyId(), event.tenantId(), PolicyStatusCode.SUSPENDED);
     }
 
     /**
@@ -147,7 +148,7 @@ public class PolicyProjectionEventHandler {
     @EventHandler
     @Transactional
     public void on(PolicyResumedEvent event) {
-        applyStatus(event.policyId(), event.tenantId(), PolicyStatus.StatusCode.EFFECTIVE);
+        applyStatus(event.policyId(), event.tenantId(), PolicyStatusCode.EFFECTIVE);
     }
 
     /**
@@ -156,7 +157,7 @@ public class PolicyProjectionEventHandler {
     @EventHandler
     @Transactional
     public void on(PolicyTerminatedEvent event) {
-        applyStatus(event.policyId(), event.tenantId(), PolicyStatus.StatusCode.TERMINATED);
+        applyStatus(event.policyId(), event.tenantId(), PolicyStatusCode.TERMINATED);
     }
 
     /**
@@ -165,7 +166,7 @@ public class PolicyProjectionEventHandler {
     @EventHandler
     @Transactional
     public void on(PolicyExpiredEvent event) {
-        applyStatus(event.policyId(), event.tenantId(), PolicyStatus.StatusCode.EXPIRED);
+        applyStatus(event.policyId(), event.tenantId(), PolicyStatusCode.EXPIRED);
     }
 
     /**
@@ -174,7 +175,7 @@ public class PolicyProjectionEventHandler {
     @EventHandler
     @Transactional
     public void on(PolicyLapsedEvent event) {
-        applyStatus(event.policyId(), event.tenantId(), PolicyStatus.StatusCode.LAPSED);
+        applyStatus(event.policyId(), event.tenantId(), PolicyStatusCode.LAPSED);
     }
 
     /**
@@ -183,7 +184,7 @@ public class PolicyProjectionEventHandler {
     @EventHandler
     @Transactional
     public void on(PolicyReinstatedEvent event) {
-        applyStatus(event.policyId(), event.tenantId(), PolicyStatus.StatusCode.EFFECTIVE);
+        applyStatus(event.policyId(), event.tenantId(), PolicyStatusCode.EFFECTIVE);
     }
 
     /** 状态类保全以统一权威事件刷新保单状态读模型。 */
@@ -199,7 +200,7 @@ public class PolicyProjectionEventHandler {
     @EventHandler
     @Transactional
     public void on(PolicyCancelledEvent event) {
-        applyStatus(event.policyId(), event.tenantId(), PolicyStatus.StatusCode.CANCELLED);
+        applyStatus(event.policyId(), event.tenantId(), PolicyStatusCode.CANCELLED);
     }
 
     /**
@@ -211,7 +212,7 @@ public class PolicyProjectionEventHandler {
         log.info("[读模型投影] 保单满期给付: policyId={}, 满期金={}", event.policyId(), event.maturityBenefit());
         applyUpdate(event.policyId(), event.tenantId(), "满期给付", view -> {
             view.setMaturityBenefit(event.maturityBenefit());
-            view.setPolicyStatus(mapStatus(PolicyStatus.StatusCode.EXPIRED));
+            view.setPolicyStatus(mapStatus(PolicyStatusCode.EXPIRED));
         });
     }
 
@@ -268,7 +269,7 @@ public class PolicyProjectionEventHandler {
      * @param tenantId 租户ID
      * @param newStatus 目标状态
      */
-    private void applyStatus(String policyId, String tenantId, PolicyStatus.StatusCode newStatus) {
+    private void applyStatus(String policyId, String tenantId, PolicyStatusCode newStatus) {
         log.info("[读模型投影] 状态变更: policyId={}, status={}", policyId, newStatus.name());
         applyUpdate(policyId, tenantId, "状态变更-" + newStatus.name(),
                 view -> view.setPolicyStatus(mapStatus(newStatus)));
@@ -283,7 +284,7 @@ public class PolicyProjectionEventHandler {
      * @param statusCode 本地状态机编码
      * @return metadata 保单状态枚举
      */
-    private PolicyEnum.PolicyStatus mapStatus(PolicyStatus.StatusCode statusCode) {
+    private PolicyEnum.PolicyStatus mapStatus(PolicyStatusCode statusCode) {
         return switch (statusCode) {
             case NOT_EFFECTIVE -> PolicyEnum.PolicyStatus.PENDING_EFFECTIVE;
             case EFFECTIVE -> PolicyEnum.PolicyStatus.EFFECTIVE;
@@ -304,7 +305,7 @@ public class PolicyProjectionEventHandler {
      * @param mutator 字段变更逻辑
      */
     private void applyUpdate(String policyId, String tenantId, String action,
-                             java.util.function.Consumer<PolicyView> mutator) {
+                             Consumer<PolicyView> mutator) {
         policyViewRepository.findByPolicyIdAndTenantId(policyId, tenantId).ifPresentOrElse(view -> {
             mutator.accept(view);
             view.setUpdateTime(LocalDateTime.now());

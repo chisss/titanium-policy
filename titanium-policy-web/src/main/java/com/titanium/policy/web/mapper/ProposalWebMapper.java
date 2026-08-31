@@ -5,6 +5,7 @@ import java.math.BigDecimal;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
+import com.titanium.metadata.enums.CurrencyEnum;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.api.request.CreateProposalRequest;
 import com.titanium.policy.api.response.ProposalResponse;
@@ -66,7 +67,7 @@ public interface ProposalWebMapper {
     /**
      * 读模型结果 → 对外 DTO（Provider 用）
      * <p>
-     * 状态字段由领域枚举 {@code ProposalStatus.StatusCode} 以 {@code .name()} 转为 String，
+     * 状态字段由领域枚举 {@code ProposalStatusCode} 以 {@code .name()} 转为 String，
      * 避免 api 模块依赖 domain 层枚举。
      * </p>
      *
@@ -80,6 +81,6 @@ public interface ProposalWebMapper {
      * BigDecimal + 币种 → Money 值对象（空安全，缺省币种 CNY）
      */
     default Money toMoney(BigDecimal value, String currency) {
-        return value != null ? Money.of(value, currency != null ? currency : "CNY") : null;
+        return value != null ? Money.of(value, currency != null ? currency : CurrencyEnum.CNY.getCode()) : null;
     }
 }

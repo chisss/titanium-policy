@@ -1,5 +1,6 @@
 package com.titanium.policy.service.maintenance;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -40,7 +41,7 @@ public class PolicyMaintenanceFieldExecutorRegistry {
         }
         Set<String> keys = new HashSet<>();
         PolicyMaintenanceExecutionState state = initialState;
-        java.util.ArrayList<PolicyMaintenanceAppliedField> appliedFields = new java.util.ArrayList<>();
+        ArrayList<PolicyMaintenanceAppliedField> appliedFields = new ArrayList<>();
         for (PolicyMaintenanceFieldChange change : changes) {
             if (!keys.add(change.key())) {
                 throw new PolicyBusinessRuleException(

@@ -10,11 +10,11 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.titanium.policy.common.enums.InsuranceStatusCode;
 import com.titanium.policy.query.repository.InsuranceViewRepository;
 import com.titanium.policy.query.result.InsuranceQueryResult;
 import com.titanium.policy.query.service.InsuranceQueryService;
 import com.titanium.policy.query.view.InsuranceView;
-import com.titanium.policy.valueobject.insurance.InsuranceStatus;
 
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
@@ -89,7 +89,7 @@ public class InsuranceQueryServiceImpl implements InsuranceQueryService {
             }
             if (isNotBlank(status)) {
                 try {
-                    InsuranceStatus.StatusCode statusEnum = InsuranceStatus.StatusCode.valueOf(status);
+                    InsuranceStatusCode statusEnum = InsuranceStatusCode.valueOf(status);
                     predicates.add(cb.equal(root.get("status"), statusEnum));
                 } catch (IllegalArgumentException e) {
                     log.warn("无效的投保单状态值: {}", status);

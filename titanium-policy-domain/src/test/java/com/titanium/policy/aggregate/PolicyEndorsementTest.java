@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.policy.command.ApplyPolicyEndorsementCommand;
 import com.titanium.policy.common.enums.PolicyDataUpdateType;
+import com.titanium.policy.common.enums.PolicyStatusCode;
 import com.titanium.policy.event.PolicyActivatedEvent;
 import com.titanium.policy.event.PolicyCreatedEvent;
 import com.titanium.policy.event.PolicyEndorsedEvent;
@@ -43,7 +44,7 @@ class PolicyEndorsementTest {
     private PolicyCreatedEvent createdEvent() {
         LocalDateTime now = LocalDateTime.now();
         return new PolicyCreatedEvent(POLICY_ID, new PolicyNo("POL-2024-0001"), PolicyForm.INDIVIDUAL, null, null, null, null, null,
-                PolicyPeriod.of(now.minusDays(1), now.plusYears(1), 0, 0), null, null, java.util.List.of(), null, null, null, new PolicyStatus(PolicyStatus.StatusCode.NOT_EFFECTIVE, now, "创建", "system"),
+                PolicyPeriod.of(now.minusDays(1), now.plusYears(1), 0, 0), null, null, java.util.List.of(), null, null, null, new PolicyStatus(PolicyStatusCode.NOT_EFFECTIVE, now, "创建", "system"),
                 null, null, TENANT_ID);
     }
 

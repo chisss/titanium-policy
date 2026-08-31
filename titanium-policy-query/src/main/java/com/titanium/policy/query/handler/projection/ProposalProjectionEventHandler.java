@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.titanium.common.jpa.BasePersistable;
+import com.titanium.policy.common.enums.ProposalStatusCode;
 import com.titanium.policy.entity.proposal.ProposalLine;
 import com.titanium.policy.event.proposal.ProposalConvertedEvent;
 import com.titanium.policy.event.proposal.ProposalCreatedEvent;
@@ -17,7 +18,6 @@ import com.titanium.policy.event.proposal.ProposalVoidedEvent;
 import com.titanium.policy.query.mapper.ProposalViewMapper;
 import com.titanium.policy.query.repository.ProposalViewRepository;
 import com.titanium.policy.query.view.ProposalView;
-import com.titanium.policy.valueobject.proposal.ProposalStatus;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -74,7 +74,7 @@ public class ProposalProjectionEventHandler {
             view.setLineCount(1);
         }
         // 初始状态 DRAFT 属创建期语义，由处理器显式赋值，不下沉映射器
-        view.setStatus(ProposalStatus.StatusCode.DRAFT);
+        view.setStatus(ProposalStatusCode.DRAFT);
         stampAuditTime(view);
 
         proposalViewRepository.save(view);
@@ -87,7 +87,7 @@ public class ProposalProjectionEventHandler {
     @Transactional
     public void on(ProposalSubmittedEvent event) {
         applyUpdate(event.proposalId(), event.tenantId(), "意向单提交",
-                view -> view.setStatus(ProposalStatus.StatusCode.SUBMITTED));
+                view -> view.setStatus(ProposalStatusCode.SUBMITTED));
     }
 
     /**
@@ -97,7 +97,7 @@ public class ProposalProjectionEventHandler {
     @Transactional
     public void on(ProposalConvertedEvent event) {
         applyUpdate(event.proposalId(), event.tenantId(), "意向单转投保单",
-                view -> view.setStatus(ProposalStatus.StatusCode.CONVERTED_TO_APPLICATION));
+                view -> view.setStatus(ProposalStatusCode.CONVERTED_TO_APPLICATION));
     }
 
     /**
@@ -107,7 +107,7 @@ public class ProposalProjectionEventHandler {
     @Transactional
     public void on(ProposalVoidedEvent event) {
         applyUpdate(event.proposalId(), event.tenantId(), "意向单作废",
-                view -> view.setStatus(ProposalStatus.StatusCode.VOIDED));
+                view -> view.setStatus(ProposalStatusCode.VOIDED));
     }
 
     /**

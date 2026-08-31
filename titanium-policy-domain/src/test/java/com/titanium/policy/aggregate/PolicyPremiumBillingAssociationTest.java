@@ -17,6 +17,7 @@ import com.titanium.metadata.enums.billing.PremiumCollectionMode;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.command.AssociatePremiumBillingCommand;
+import com.titanium.policy.common.enums.PolicyStatusCode;
 import com.titanium.policy.common.enums.PremiumCollectionStatus;
 import com.titanium.policy.event.PolicyCreatedEvent;
 import com.titanium.policy.event.PremiumBillingAssociatedEvent;
@@ -91,7 +92,7 @@ class PolicyPremiumBillingAssociationTest {
                 "PRODUCT_001", null, null, null, "BIZ_001", null,
                 PolicyPeriod.of(now.minusMinutes(1), now.plusYears(1), 0, 0), premium, null, List.of(), null,
                 CollectionInfo.initial(PremiumCollectionMode.ONLINE, premium, now), null,
-                new PolicyStatus(PolicyStatus.StatusCode.NOT_EFFECTIVE, now, "创建", "SYSTEM"), null, null,
+                new PolicyStatus(PolicyStatusCode.NOT_EFFECTIVE, now, "创建", "SYSTEM"), null, null,
                 TENANT_ID);
     }
 }

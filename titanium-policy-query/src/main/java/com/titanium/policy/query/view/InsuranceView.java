@@ -9,7 +9,7 @@ import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.enums.product.ProductEnum.PaymentFrequency;
 import com.titanium.metadata.enums.underwriting.UnderwritingEnum.ConclusionType;
-import com.titanium.policy.valueobject.insurance.InsuranceStatus;
+import com.titanium.policy.common.enums.InsuranceStatusCode;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -29,7 +29,7 @@ import lombok.Setter;
  * </p>
  * <p>
  * 继承 {@link BaseView}，复用租户ID、创建/更新时间（投影时间）、乐观锁版本等读模型公共字段。
- * 状态直接采用领域状态枚举 {@link InsuranceStatus.StatusCode}（investment 域尚无 metadata 级投保单状态枚举）。
+ * 状态直接采用领域状态枚举 {@link InsuranceStatusCode}（investment 域尚无 metadata 级投保单状态枚举）。
  * </p>
  */
 @Entity
@@ -126,7 +126,7 @@ public class InsuranceView extends BaseView {
     /** 投保单状态（领域状态机编码） */
     @Enumerated(EnumType.STRING)
     @Column(name = "status_code", nullable = false, length = 32)
-    private InsuranceStatus.StatusCode status;
+    private InsuranceStatusCode status;
 
     /** 核保结论（核保结果回流后填充） */
     @Enumerated(EnumType.STRING)

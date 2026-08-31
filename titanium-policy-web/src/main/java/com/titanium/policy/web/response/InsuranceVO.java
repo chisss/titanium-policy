@@ -8,7 +8,7 @@ import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.enums.product.ProductEnum.PaymentFrequency;
 import com.titanium.metadata.enums.underwriting.UnderwritingEnum.ConclusionType;
-import com.titanium.policy.valueobject.insurance.InsuranceStatus;
+import com.titanium.policy.common.enums.InsuranceStatusCode;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
@@ -85,7 +85,7 @@ public class InsuranceVO {
     private LocalDateTime              insurancePeriodEnd;
 
     @Schema(description = "投保单状态")
-    private InsuranceStatus.StatusCode status;
+    private InsuranceStatusCode status;
 
     @Schema(description = "核保结论")
     private ConclusionType             underwritingResultCode;

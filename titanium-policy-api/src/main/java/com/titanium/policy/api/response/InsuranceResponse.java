@@ -17,7 +17,7 @@ import lombok.Data;
  * <p>
  * 跨服务远程调用出参，由 web 层 {@code InsuranceWebMapper} 从读模型查询结果
  * {@code InsuranceQueryResult} 转换而来。api 模块零内部依赖，不得引用 domain 层的
- * {@code InsuranceStatus.StatusCode}，故投保单状态以 {@code String} 承载（Mapper 侧 {@code .name()} 转换）；
+ * {@code InsuranceStatusCode}，故投保单状态以 {@code String} 承载（Mapper 侧 {@code .name()} 转换）；
  * {@code PolicyForm}/{@code ConclusionType} 属 metadata 公共枚举，可直接使用。
  * </p>
  */

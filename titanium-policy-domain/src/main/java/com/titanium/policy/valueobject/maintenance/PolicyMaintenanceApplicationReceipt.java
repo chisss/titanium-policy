@@ -4,7 +4,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import com.titanium.metadata.enums.maintenance.PolicyMaintenanceAction;
-import com.titanium.policy.valueobject.PolicyStatus;
+import com.titanium.policy.common.enums.PolicyStatusCode;
 
 /** Policy 聚合返回并通过事件重放恢复的保全应用权威回执。 */
 public record PolicyMaintenanceApplicationReceipt(
@@ -18,8 +18,8 @@ public record PolicyMaintenanceApplicationReceipt(
         List<PolicyMaintenanceAppliedField> appliedFields,
         LocalDateTime appliedAt,
         PolicyMaintenanceAction stateAction,
-        PolicyStatus.StatusCode statusBefore,
-        PolicyStatus.StatusCode statusAfter,
+        PolicyStatusCode statusBefore,
+        PolicyStatusCode statusAfter,
         PolicyMaintenanceRetroactiveEvidence retroactiveEvidence) {
 
     public PolicyMaintenanceApplicationReceipt {
@@ -55,8 +55,8 @@ public record PolicyMaintenanceApplicationReceipt(
             List<PolicyMaintenanceAppliedField> appliedFields,
             LocalDateTime appliedAt,
             PolicyMaintenanceAction stateAction,
-            PolicyStatus.StatusCode statusBefore,
-            PolicyStatus.StatusCode statusAfter) {
+            PolicyStatusCode statusBefore,
+            PolicyStatusCode statusAfter) {
         this(requestId, requestPayloadHash, endorsementNo, expectedPolicyVersion, actualPolicyVersion,
                 applicationHash, appliedSnapshot, appliedFields, appliedAt,
                 stateAction, statusBefore, statusAfter, null);

@@ -50,7 +50,7 @@ public class PolicyView extends BaseView {
     @Column(name = "insurance_id", length = 36)
     private String        insuranceId;
 
-    /** 保单状态（来源 PolicyStatus.StatusCode 名称） */
+    /** 保单状态（来源 PolicyStatusCode 名称） */
     @Enumerated(EnumType.STRING)
     @Column(name = "policy_status", nullable = false, length = 32)
     private PolicyEnum.PolicyStatus policyStatus;

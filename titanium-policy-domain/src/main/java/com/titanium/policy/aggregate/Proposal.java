@@ -12,7 +12,9 @@ import org.axonframework.modelling.command.AggregateLifecycle;
 import org.axonframework.spring.stereotype.Aggregate;
 
 import com.titanium.common.domain.BaseAggregate;
+import com.titanium.metadata.enums.CurrencyEnum;
 import com.titanium.metadata.enums.insurance.InsuranceProductType;
+import com.titanium.metadata.enums.insurance.SubjectType;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.enums.product.ProductEnum.SalesChannel;
 import com.titanium.metadata.valueobject.Money;
@@ -20,6 +22,7 @@ import com.titanium.policy.command.ConvertProposalCommand;
 import com.titanium.policy.command.CreateProposalCommand;
 import com.titanium.policy.command.SubmitProposalCommand;
 import com.titanium.policy.command.VoidProposalCommand;
+import com.titanium.policy.common.enums.ProposalStatusCode;
 import com.titanium.policy.entity.proposal.ProposalHolder;
 import com.titanium.policy.entity.proposal.ProposalLine;
 import com.titanium.policy.entity.proposal.ProposalSubject;
@@ -113,8 +116,8 @@ public class Proposal extends BaseAggregate {
      */
     @CommandHandler
     public void handle(VoidProposalCommand command) {
-        ProposalStatus.StatusCode currentStatus = this.status.statusCode();
-        if (currentStatus != ProposalStatus.StatusCode.DRAFT && currentStatus != ProposalStatus.StatusCode.SUBMITTED) {
+        ProposalStatusCode currentStatus = this.status.statusCode();
+        if (currentStatus != ProposalStatusCode.DRAFT && currentStatus != ProposalStatusCode.SUBMITTED) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION",
                     "Only draft or submitted proposals can be voided");
         }
@@ -132,7 +135,7 @@ public class Proposal extends BaseAggregate {
      */
     @CommandHandler
     public void handle(ConvertProposalCommand command) {
-        if (this.status.statusCode() != ProposalStatus.StatusCode.SUBMITTED) {
+        if (this.status.statusCode() != ProposalStatusCode.SUBMITTED) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION",
                     "Only submitted proposals can be converted to application");
         }
@@ -160,10 +163,10 @@ public class Proposal extends BaseAggregate {
                 : new ArrayList<>();
         this.bizNo = event.bizNo();
         this.marketPackageId = event.marketPackageId();
-        this.status = new ProposalStatus(ProposalStatus.StatusCode.DRAFT, event.createTime(), "创建草稿");
+        this.status = new ProposalStatus(ProposalStatusCode.DRAFT, event.createTime(), "创建草稿");
         this.basicInfo = new ProposalBasicInfo(event.customerId(),
-                event.intendedSumInsured() != null ? Money.of(event.intendedSumInsured(), "CNY") : null,
-                event.intendedPremium() != null ? Money.of(event.intendedPremium(), "CNY") : null,
+                event.intendedSumInsured() != null ? Money.of(event.intendedSumInsured(), CurrencyEnum.CNY.getCode()) : null,
+                event.intendedPremium() != null ? Money.of(event.intendedPremium(), CurrencyEnum.CNY.getCode()) : null,
                 event.insurancePeriodStart(), event.insurancePeriodEnd(), event.expectedProductCode());
     }
 
@@ -195,7 +198,7 @@ public class Proposal extends BaseAggregate {
         }
         for (var insured : event.insuredPartyList().insuredList()) {
             initial.add(new ProposalSubject(insured.insuredId(),
-                    com.titanium.metadata.enums.insurance.SubjectType.PERSON, insured.name(), null, Map.of()));
+                    SubjectType.PERSON, insured.name(), null, Map.of()));
         }
         return initial;
     }
@@ -209,20 +212,20 @@ public class Proposal extends BaseAggregate {
 
     @EventSourcingHandler
     public void on(ProposalSubmittedEvent event) {
-        this.status = this.status.transitionStatus(ProposalStatus.StatusCode.SUBMITTED, event.changeReason());
+        this.status = this.status.transitionStatus(ProposalStatusCode.SUBMITTED, event.changeReason());
         this.updateTime = event.submitTime();
     }
 
     @EventSourcingHandler
     public void on(ProposalConvertedEvent event) {
-        this.status = this.status.transitionStatus(ProposalStatus.StatusCode.CONVERTED_TO_APPLICATION,
+        this.status = this.status.transitionStatus(ProposalStatusCode.CONVERTED_TO_APPLICATION,
                 event.changeReason());
         this.updateTime = event.convertTime();
     }
 
     @EventSourcingHandler
     public void on(ProposalVoidedEvent event) {
-        this.status = this.status.transitionStatus(ProposalStatus.StatusCode.VOIDED, event.changeReason());
+        this.status = this.status.transitionStatus(ProposalStatusCode.VOIDED, event.changeReason());
         this.updateTime = event.voidTime();
     }
 
@@ -253,7 +256,7 @@ public class Proposal extends BaseAggregate {
         proposal.updateTime = now;
         proposal.applicants = new ArrayList<>();
         proposal.subjects = new ArrayList<>();
-        proposal.status = new ProposalStatus(ProposalStatus.StatusCode.DRAFT, now, "创建草稿");
+        proposal.status = new ProposalStatus(ProposalStatusCode.DRAFT, now, "创建草稿");
         return proposal;
     }
 
@@ -265,7 +268,7 @@ public class Proposal extends BaseAggregate {
     public void submitProposal(String changeReason) {
         validateApplicants();
         validateSubjects();
-        this.status = this.status.transitionStatus(ProposalStatus.StatusCode.SUBMITTED, changeReason);
+        this.status = this.status.transitionStatus(ProposalStatusCode.SUBMITTED, changeReason);
         this.updateTime = LocalDateTime.now();
     }
 
@@ -275,12 +278,12 @@ public class Proposal extends BaseAggregate {
      * @param changeReason 变更原因
      */
     public void voidProposal(String changeReason) {
-        ProposalStatus.StatusCode currentStatus = this.status.statusCode();
-        if (currentStatus != ProposalStatus.StatusCode.DRAFT && currentStatus != ProposalStatus.StatusCode.SUBMITTED) {
+        ProposalStatusCode currentStatus = this.status.statusCode();
+        if (currentStatus != ProposalStatusCode.DRAFT && currentStatus != ProposalStatusCode.SUBMITTED) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION",
                     "Only draft or submitted proposals can be voided");
         }
-        this.status = this.status.transitionStatus(ProposalStatus.StatusCode.VOIDED, changeReason);
+        this.status = this.status.transitionStatus(ProposalStatusCode.VOIDED, changeReason);
         this.updateTime = LocalDateTime.now();
     }
 
@@ -290,11 +293,11 @@ public class Proposal extends BaseAggregate {
      * @param changeReason 转换原因
      */
     public void convertToApplication(String changeReason) {
-        if (this.status.statusCode() != ProposalStatus.StatusCode.SUBMITTED) {
+        if (this.status.statusCode() != ProposalStatusCode.SUBMITTED) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION",
                     "Only submitted proposals can be converted to application");
         }
-        this.status = this.status.transitionStatus(ProposalStatus.StatusCode.CONVERTED_TO_APPLICATION, changeReason);
+        this.status = this.status.transitionStatus(ProposalStatusCode.CONVERTED_TO_APPLICATION, changeReason);
         this.updateTime = LocalDateTime.now();
     }
 
@@ -354,7 +357,7 @@ public class Proposal extends BaseAggregate {
     }
 
     private void ensureDraftStatus() {
-        if (this.status.statusCode() != ProposalStatus.StatusCode.DRAFT) {
+        if (this.status.statusCode() != ProposalStatusCode.DRAFT) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "Only draft proposals can be modified");
         }
     }

@@ -19,6 +19,7 @@ import org.axonframework.spring.stereotype.Aggregate;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import com.titanium.common.domain.BaseAggregate;
+import com.titanium.metadata.enums.CurrencyEnum;
 import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.maintenance.PolicyMaintenanceAction;
 import com.titanium.metadata.enums.policy.PolicyEnum;
@@ -51,7 +52,10 @@ import com.titanium.policy.command.UpdateAccountValueCommand;
 import com.titanium.policy.command.UpdateLineUnderwritingResultCommand;
 import com.titanium.policy.command.WaivePremiumCommand;
 import com.titanium.policy.common.constant.PolicyConstants;
+import com.titanium.policy.common.enums.EndorsementCategory;
 import com.titanium.policy.common.enums.PolicyDataUpdateType;
+import com.titanium.policy.common.enums.PolicyStatusCode;
+import com.titanium.policy.common.enums.PremiumPaymentStatus;
 import com.titanium.policy.common.enums.PremiumWaiverReason;
 import com.titanium.policy.entity.Endorsement;
 import com.titanium.policy.entity.PaymentRecord;
@@ -182,7 +186,7 @@ public class Policy extends BaseAggregate {
     /** 关联投资账户ID（投连/万能保单出单后挂接，investment 域生成） */
     private String                 investmentAccountId;
     /** 投资账户最新价值（投连/万能保单，由 investment 域回写，展示型最终一致数据） */
-    private java.math.BigDecimal   investmentAccountValue;
+    private BigDecimal   investmentAccountValue;
     /** 产品ID（承保载体，供签发事件透传下游监管采集/自动分保） */
     private String                 productId;
     /** 保额（承保关键要素，供签发事件透传下游） */
@@ -230,7 +234,7 @@ public class Policy extends BaseAggregate {
                 command.standardPremium(), command.premium(), command.sumInsured(), command.policyProducts(),
                 command.premiumPlan(), command.collectionInfo(),
                 command.channelInfo(),
-                new PolicyStatus(PolicyStatus.StatusCode.NOT_EFFECTIVE, LocalDateTime.now(), "创建保单",
+                new PolicyStatus(PolicyStatusCode.NOT_EFFECTIVE, LocalDateTime.now(), "创建保单",
                         PolicyConstants.POLICY_SYSTEM),
                 command.insuredPartyList(), command.insuranceType(), command.tenantId()));
     }
@@ -252,7 +256,7 @@ public class Policy extends BaseAggregate {
                 command.policyForm(), command.productId(), null, null, null, command.bizNo(), command.marketPackageId(),
                 command.policyPeriod(), command.totalPremium(), command.totalPremium(), command.sumInsured(),
                 command.policyProducts(), command.premiumPlan(), command.collectionInfo(), command.channelInfo(),
-                new PolicyStatus(PolicyStatus.StatusCode.NOT_EFFECTIVE, LocalDateTime.now(), "一步出单创建保单",
+                new PolicyStatus(PolicyStatusCode.NOT_EFFECTIVE, LocalDateTime.now(), "一步出单创建保单",
                         PolicyConstants.POLICY_SYSTEM),
                 command.insuredPartyList(), command.insuranceType(), command.tenantId()));
     }
@@ -280,7 +284,7 @@ public class Policy extends BaseAggregate {
      */
     @CommandHandler
     public void handle(IssuePolicyCommand command) {
-        if (this.status.statusCode() != PolicyStatus.StatusCode.NOT_EFFECTIVE) {
+        if (this.status.statusCode() != PolicyStatusCode.NOT_EFFECTIVE) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "Only NOT_EFFECTIVE policies can be issued");
         }
         generateDocument();
@@ -300,7 +304,7 @@ public class Policy extends BaseAggregate {
      */
     @CommandHandler
     public void handle(ActivatePolicyCommand command) {
-        if (this.status.statusCode() != PolicyStatus.StatusCode.NOT_EFFECTIVE) {
+        if (this.status.statusCode() != PolicyStatusCode.NOT_EFFECTIVE) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION",
                     "Only NOT_EFFECTIVE policies can be activated");
         }
@@ -325,7 +329,7 @@ public class Policy extends BaseAggregate {
      */
     @CommandHandler
     public void handle(SuspendPolicyCommand command) {
-        if (this.status.statusCode() != PolicyStatus.StatusCode.EFFECTIVE) {
+        if (this.status.statusCode() != PolicyStatusCode.EFFECTIVE) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "Only EFFECTIVE policies can be suspended");
         }
         AggregateLifecycle.apply(new PolicySuspendedEvent(this.policyId, LocalDateTime.now(), this.tenantId));
@@ -336,7 +340,7 @@ public class Policy extends BaseAggregate {
      */
     @CommandHandler
     public void handle(ResumePolicyCommand command) {
-        if (this.status.statusCode() != PolicyStatus.StatusCode.SUSPENDED) {
+        if (this.status.statusCode() != PolicyStatusCode.SUSPENDED) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "Only SUSPENDED policies can be resumed");
         }
         AggregateLifecycle.apply(new PolicyResumedEvent(this.policyId, LocalDateTime.now(), this.tenantId));
@@ -347,7 +351,7 @@ public class Policy extends BaseAggregate {
      */
     @CommandHandler
     public void handle(LapsePolicyCommand command) {
-        if (this.status.statusCode() != PolicyStatus.StatusCode.EFFECTIVE) {
+        if (this.status.statusCode() != PolicyStatusCode.EFFECTIVE) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "Only EFFECTIVE policies can lapse");
         }
         AggregateLifecycle.apply(new PolicyLapsedEvent(this.policyId, command.reason(), LocalDateTime.now(),
@@ -359,7 +363,7 @@ public class Policy extends BaseAggregate {
      */
     @CommandHandler
     public void handle(ReinstatePolicyCommand command) {
-        if (this.status.statusCode() != PolicyStatus.StatusCode.LAPSED) {
+        if (this.status.statusCode() != PolicyStatusCode.LAPSED) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "Only LAPSED policies can be reinstated");
         }
         AggregateLifecycle.apply(new PolicyReinstatedEvent(this.policyId, command.reason(), LocalDateTime.now(),
@@ -371,9 +375,9 @@ public class Policy extends BaseAggregate {
      */
     @CommandHandler
     public void handle(TerminatePolicyCommand command) {
-        PolicyStatus.StatusCode currentStatus = this.status.statusCode();
-        if (currentStatus != PolicyStatus.StatusCode.EFFECTIVE && currentStatus != PolicyStatus.StatusCode.SUSPENDED
-                && currentStatus != PolicyStatus.StatusCode.LAPSED) {
+        PolicyStatusCode currentStatus = this.status.statusCode();
+        if (currentStatus != PolicyStatusCode.EFFECTIVE && currentStatus != PolicyStatusCode.SUSPENDED
+                && currentStatus != PolicyStatusCode.LAPSED) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION",
                     "Only EFFECTIVE, SUSPENDED or LAPSED policies can be terminated");
         }
@@ -389,7 +393,7 @@ public class Policy extends BaseAggregate {
      */
     @CommandHandler
     public void handle(ApplyPolicyEndorsementCommand command) {
-        if (this.status.statusCode() != PolicyStatus.StatusCode.EFFECTIVE) {
+        if (this.status.statusCode() != PolicyStatusCode.EFFECTIVE) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "Only EFFECTIVE policies can be endorsed");
         }
         if (command.updateType() == null || command.updateType().changesStatus()) {
@@ -448,8 +452,8 @@ public class Policy extends BaseAggregate {
         PolicyMaintenanceFieldExecutorRegistry.ExecutionResult execution = command.changes().isEmpty()
                 ? new PolicyMaintenanceFieldExecutorRegistry.ExecutionResult(beforeState, List.of())
                 : executorRegistry.execute(this.policyId, beforeState, command.changes());
-        PolicyStatus.StatusCode statusBefore = this.status.statusCode();
-        PolicyStatus.StatusCode statusAfter = maintenanceStatusAfter(command.stateAction(), statusBefore);
+        PolicyStatusCode statusBefore = this.status.statusCode();
+        PolicyStatusCode statusAfter = maintenanceStatusAfter(command.stateAction(), statusBefore);
         int actualVersion = this.policyVersion + 1;
         LocalDateTime appliedAt = LocalDateTime.now();
         String endorsementNo = PolicyMaintenanceHashing.stableEndorsementNo(
@@ -467,7 +471,7 @@ public class Policy extends BaseAggregate {
             AggregateLifecycle.apply(new PolicyMaintenanceStateAppliedEvent(
                     this.policyId, command.requestId(), command.requestPayloadHash().toLowerCase(),
                     command.sourceMaintenanceId(), endorsementNo, command.stateAction().name(),
-                    com.titanium.policy.common.enums.EndorsementCategory.LIFECYCLE,
+                    EndorsementCategory.LIFECYCLE,
                     command.expectedPolicyVersion(), actualVersion, command.effectiveAt(), command.changeSummary(),
                     command.proposedSnapshotHash().toLowerCase(), originalSnapshotHash, snapshotStorageKey,
                     appliedSnapshotHash, applicationHash, execution.appliedFields(), execution.state(),
@@ -579,7 +583,7 @@ public class Policy extends BaseAggregate {
         // 缴费计划的缴费状态随收讫同步（收讫则视为已缴）
         if (this.premiumPlan != null && event.collectionStatus() != null && event.collectionStatus().allowsActivation()) {
             this.premiumPlan = new PremiumPlan(this.premiumPlan.premiumAmount(), this.premiumPlan.paymentMethod(),
-                    this.premiumPlan.paymentCycle(), this.premiumPlan.premiumDueDate(), PremiumPlan.PaymentStatus.PAID);
+                    this.premiumPlan.paymentCycle(), this.premiumPlan.premiumDueDate(), PremiumPaymentStatus.PAID);
         }
     }
 
@@ -646,7 +650,7 @@ public class Policy extends BaseAggregate {
      */
     @CommandHandler
     public void handle(CancelPolicyCommand command) {
-        if (this.status.statusCode() != PolicyStatus.StatusCode.NOT_EFFECTIVE) {
+        if (this.status.statusCode() != PolicyStatusCode.NOT_EFFECTIVE) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION",
                     "Only NOT_EFFECTIVE policies can be cancelled");
         }
@@ -771,36 +775,36 @@ public class Policy extends BaseAggregate {
 
     @EventSourcingHandler
     public void on(PolicyActivatedEvent event) {
-        this.status = this.status.transitionStatus(PolicyStatus.StatusCode.EFFECTIVE, "保单生效",
+        this.status = this.status.transitionStatus(PolicyStatusCode.EFFECTIVE, "保单生效",
                 PolicyConstants.POLICY_SYSTEM);
     }
 
     @EventSourcingHandler
     public void on(PolicySuspendedEvent event) {
-        this.status = this.status.transitionStatus(PolicyStatus.StatusCode.SUSPENDED, "保单暂停",
+        this.status = this.status.transitionStatus(PolicyStatusCode.SUSPENDED, "保单暂停",
                 PolicyConstants.POLICY_SYSTEM);
     }
 
     @EventSourcingHandler
     public void on(PolicyResumedEvent event) {
-        this.status = this.status.transitionStatus(PolicyStatus.StatusCode.EFFECTIVE, "保单恢复",
+        this.status = this.status.transitionStatus(PolicyStatusCode.EFFECTIVE, "保单恢复",
                 PolicyConstants.POLICY_SYSTEM);
     }
 
     @EventSourcingHandler
     public void on(PolicyLapsedEvent event) {
-        this.status = this.status.transitionStatus(PolicyStatus.StatusCode.LAPSED, event.reason(), event.operatorId());
+        this.status = this.status.transitionStatus(PolicyStatusCode.LAPSED, event.reason(), event.operatorId());
     }
 
     @EventSourcingHandler
     public void on(PolicyReinstatedEvent event) {
-        this.status = this.status.transitionStatus(PolicyStatus.StatusCode.EFFECTIVE, event.reason(),
+        this.status = this.status.transitionStatus(PolicyStatusCode.EFFECTIVE, event.reason(),
                 event.operatorId());
     }
 
     @EventSourcingHandler
     public void on(PolicyTerminatedEvent event) {
-        this.status = this.status.transitionStatus(PolicyStatus.StatusCode.TERMINATED, event.reason(),
+        this.status = this.status.transitionStatus(PolicyStatusCode.TERMINATED, event.reason(),
                 event.operatorId());
         // 保单终止（身故给付/退保等）联动中止年金给付计划：被保险人身故后不再有生存年金，
         // 避免读模型年金计划停留 PAYING 与保单已终止的语义不一致。
@@ -811,13 +815,13 @@ public class Policy extends BaseAggregate {
 
     @EventSourcingHandler
     public void on(PolicyExpiredEvent event) {
-        this.status = this.status.transitionStatus(PolicyStatus.StatusCode.EXPIRED, "保单满期",
+        this.status = this.status.transitionStatus(PolicyStatusCode.EXPIRED, "保单满期",
                 PolicyConstants.POLICY_SYSTEM);
     }
 
     @EventSourcingHandler
     public void on(PolicyCancelledEvent event) {
-        this.status = this.status.transitionStatus(PolicyStatus.StatusCode.CANCELLED, "保单取消",
+        this.status = this.status.transitionStatus(PolicyStatusCode.CANCELLED, "保单取消",
                 PolicyConstants.POLICY_SYSTEM);
     }
 
@@ -925,7 +929,7 @@ public class Policy extends BaseAggregate {
      * @return 可生效返回 {@code true}
      */
     public boolean canActivate() {
-        return this.status != null && this.status.statusCode() == PolicyStatus.StatusCode.NOT_EFFECTIVE
+        return this.status != null && this.status.statusCode() == PolicyStatusCode.NOT_EFFECTIVE
                 && isPremiumConditionSatisfied()
                 && (this.policyPeriod == null || this.policyPeriod.hasStarted(LocalDateTime.now()));
     }
@@ -942,7 +946,7 @@ public class Policy extends BaseAggregate {
             return this.collectionInfo.allowsActivation();
         }
         if (this.premiumPlan != null) {
-            return this.premiumPlan.paymentStatus() != PremiumPlan.PaymentStatus.UNPAID;
+            return this.premiumPlan.paymentStatus() != PremiumPaymentStatus.UNPAID;
         }
         return true;
     }
@@ -953,7 +957,7 @@ public class Policy extends BaseAggregate {
      * 保单到期失效（定时任务触发）
      */
     public void expire() {
-        if (this.status.statusCode() != PolicyStatus.StatusCode.EFFECTIVE) {
+        if (this.status.statusCode() != PolicyStatusCode.EFFECTIVE) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "Only EFFECTIVE policies can expire");
         }
         AggregateLifecycle.apply(new PolicyExpiredEvent(this.policyId, LocalDateTime.now(), this.tenantId));
@@ -968,7 +972,7 @@ public class Policy extends BaseAggregate {
         if (this.premiumPlan != null) {
             // 根据累计缴费金额判断状态
             this.premiumPlan = new PremiumPlan(this.premiumPlan.premiumAmount(), this.premiumPlan.paymentMethod(),
-                    this.premiumPlan.paymentCycle(), this.premiumPlan.premiumDueDate(), PremiumPlan.PaymentStatus.PAID);
+                    this.premiumPlan.paymentCycle(), this.premiumPlan.premiumDueDate(), PremiumPaymentStatus.PAID);
         }
         AggregateLifecycle.apply(new PolicyPaymentRecordedEvent(this.policyId, paymentRecord.paymentId(),
                 paymentRecord.paymentAmount().value(), paymentRecord.paymentAmount().currency(),
@@ -982,7 +986,7 @@ public class Policy extends BaseAggregate {
      * 等事件触发的级联编排器对每个子保单单独下发命令实现。
      * </p>
      */
-    public void updatePolicyStatus(PolicyStatus.StatusCode newStatusCode, String changeReason, String operatorId) {
+    public void updatePolicyStatus(PolicyStatusCode newStatusCode, String changeReason, String operatorId) {
         this.status = this.status.transitionStatus(newStatusCode, changeReason, operatorId);
     }
 
@@ -1044,7 +1048,7 @@ public class Policy extends BaseAggregate {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION",
                     "回写账户与已挂接账户不一致：已挂接=" + this.investmentAccountId + "，回写=" + command.accountId());
         }
-        if (command.accountValue() == null || command.accountValue().compareTo(java.math.BigDecimal.ZERO) < 0) {
+        if (command.accountValue() == null || command.accountValue().compareTo(BigDecimal.ZERO) < 0) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "账户价值不能为空或负数");
         }
         AggregateLifecycle.apply(new AccountValueUpdatedEvent(this.policyId, this.investmentAccountId,
@@ -1123,7 +1127,7 @@ public class Policy extends BaseAggregate {
      */
     @CommandHandler
     public void handle(StartAnnuityPayoutCommand command) {
-        if (this.status.statusCode() != PolicyStatus.StatusCode.EFFECTIVE) {
+        if (this.status.statusCode() != PolicyStatusCode.EFFECTIVE) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "仅生效保单可启动年金给付");
         }
         if (this.insuranceType != InsuranceProductType.ANNUITY) {
@@ -1183,7 +1187,7 @@ public class Policy extends BaseAggregate {
      */
     @CommandHandler
     public void handle(MaturePolicyCommand command) {
-        if (this.status.statusCode() != PolicyStatus.StatusCode.EFFECTIVE) {
+        if (this.status.statusCode() != PolicyStatusCode.EFFECTIVE) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "仅生效保单可满期给付");
         }
         // 满期金仅生存给付型险种具备：两全险（ENDOWMENT）满期给付满期金；年金险满期给付完毕另经年金给付计划。
@@ -1192,7 +1196,7 @@ public class Policy extends BaseAggregate {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION",
                     "仅两全险(ENDOWMENT)可满期给付满期金，当前险种：" + this.insuranceType.getCode());
         }
-        if (command.maturityBenefit() == null || command.maturityBenefit().compareTo(java.math.BigDecimal.ZERO) <= 0) {
+        if (command.maturityBenefit() == null || command.maturityBenefit().compareTo(BigDecimal.ZERO) <= 0) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "满期给付金额必须大于零");
         }
         AggregateLifecycle.apply(new PolicyMaturedEvent(this.policyId, command.maturityBenefit(), command.operatorId(),
@@ -1208,14 +1212,14 @@ public class Policy extends BaseAggregate {
      */
     @CommandHandler
     public void handle(MatureDuePolicyCommand command) {
-        if (this.status.statusCode() != PolicyStatus.StatusCode.EFFECTIVE) {
+        if (this.status.statusCode() != PolicyStatusCode.EFFECTIVE) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "仅生效保单可满期给付");
         }
         if (this.insuranceType != null && this.insuranceType != InsuranceProductType.ENDOWMENT) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION",
                     "仅两全险(ENDOWMENT)可满期给付满期金，当前险种：" + this.insuranceType.getCode());
         }
-        if (this.sumInsured == null || this.sumInsured.value().compareTo(java.math.BigDecimal.ZERO) <= 0) {
+        if (this.sumInsured == null || this.sumInsured.value().compareTo(BigDecimal.ZERO) <= 0) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "保单基本保额缺失或非正，不可满期给付");
         }
         AggregateLifecycle.apply(new PolicyMaturedEvent(this.policyId, this.sumInsured.value(), command.operatorId(),
@@ -1224,7 +1228,7 @@ public class Policy extends BaseAggregate {
 
     @EventSourcingHandler
     public void on(PolicyMaturedEvent event) {
-        this.status = this.status.transitionStatus(PolicyStatus.StatusCode.EXPIRED, "满期给付", event.operatorId());
+        this.status = this.status.transitionStatus(PolicyStatusCode.EXPIRED, "满期给付", event.operatorId());
     }
 
     /**
@@ -1236,7 +1240,7 @@ public class Policy extends BaseAggregate {
      */
     @CommandHandler
     public void handle(WaivePremiumCommand command) {
-        if (this.status.statusCode() != PolicyStatus.StatusCode.EFFECTIVE) {
+        if (this.status.statusCode() != PolicyStatusCode.EFFECTIVE) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "仅生效保单可办理保费豁免");
         }
         if (this.premiumWaived) {
@@ -1265,7 +1269,7 @@ public class Policy extends BaseAggregate {
      */
     @CommandHandler
     public void handle(DistributeDividendCommand command) {
-        if (this.status.statusCode() != PolicyStatus.StatusCode.EFFECTIVE) {
+        if (this.status.statusCode() != PolicyStatusCode.EFFECTIVE) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "仅生效保单可派发红利");
         }
         // 投连/万能险为账户价值型产品，其收益走单位净值/结算利率（investment 域账户），非分红险红利机制，
@@ -1275,16 +1279,16 @@ public class Policy extends BaseAggregate {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION",
                     "投连/万能险不适用红利派发（其收益走账户价值/结算利率）");
         }
-        if (command.dividendAmount() == null || command.dividendAmount().compareTo(java.math.BigDecimal.ZERO) <= 0) {
+        if (command.dividendAmount() == null || command.dividendAmount().compareTo(BigDecimal.ZERO) <= 0) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "红利金额必须大于零");
         }
         if (command.option() == null) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "红利领取方式不能为空");
         }
         // 留存类方式累加累计红利，现金/抵缴不累加
-        java.math.BigDecimal currentAccumulated = this.accumulatedDividend != null
-                ? this.accumulatedDividend.value() : java.math.BigDecimal.ZERO;
-        java.math.BigDecimal newAccumulated = command.option().isRetained()
+        BigDecimal currentAccumulated = this.accumulatedDividend != null
+                ? this.accumulatedDividend.value() : BigDecimal.ZERO;
+        BigDecimal newAccumulated = command.option().isRetained()
                 ? currentAccumulated.add(command.dividendAmount()) : currentAccumulated;
         AggregateLifecycle.apply(new DividendDistributedEvent(this.policyId, command.dividendAmount(), command.option(),
                 command.policyYear(), newAccumulated, command.operatorId(), LocalDateTime.now(), this.tenantId));
@@ -1293,7 +1297,7 @@ public class Policy extends BaseAggregate {
     @EventSourcingHandler
     public void on(DividendDistributedEvent event) {
         // 累计红利以事件携带的累计值为准（留存类累加，现金/抵缴保持不变）
-        String currency = this.sumInsured != null ? this.sumInsured.currency() : "CNY";
+        String currency = this.sumInsured != null ? this.sumInsured.currency() : CurrencyEnum.CNY.getCode();
         this.accumulatedDividend = Money.of(event.accumulatedDividend(), currency);
     }
 
@@ -1313,7 +1317,7 @@ public class Policy extends BaseAggregate {
         if (this.policyForm == null || !(this.policyForm.isGroup() || this.policyForm.isFamily())) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "仅团单/家庭险可动态增减被保险人");
         }
-        if (this.status.statusCode() != PolicyStatus.StatusCode.EFFECTIVE) {
+        if (this.status.statusCode() != PolicyStatusCode.EFFECTIVE) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "仅生效保单可增减被保险人");
         }
     }
@@ -1382,7 +1386,7 @@ public class Policy extends BaseAggregate {
                     "POLICY_MAINTENANCE_REQUEST_INVALID", "字段变更和状态动作不能同时为空");
         }
         if (!action.changesStatus()) {
-            if (this.status.statusCode() != PolicyStatus.StatusCode.EFFECTIVE) {
+            if (this.status.statusCode() != PolicyStatusCode.EFFECTIVE) {
                 throw new PolicyBusinessRuleException(
                         "POLICY_MAINTENANCE_STATUS_INVALID", "仅生效保单可应用字段型保全变更");
             }
@@ -1407,39 +1411,39 @@ public class Policy extends BaseAggregate {
         maintenanceStatusAfter(action, this.status.statusCode());
     }
 
-    private PolicyStatus.StatusCode maintenanceStatusAfter(
+    private PolicyStatusCode maintenanceStatusAfter(
             PolicyMaintenanceAction action,
-            PolicyStatus.StatusCode currentStatus) {
+            PolicyStatusCode currentStatus) {
         return switch (action) {
             case NONE -> currentStatus;
             case SUSPEND -> {
-                requireMaintenanceStatus(currentStatus, PolicyStatus.StatusCode.EFFECTIVE, action);
-                yield PolicyStatus.StatusCode.SUSPENDED;
+                requireMaintenanceStatus(currentStatus, PolicyStatusCode.EFFECTIVE, action);
+                yield PolicyStatusCode.SUSPENDED;
             }
             case RESUME -> {
-                requireMaintenanceStatus(currentStatus, PolicyStatus.StatusCode.SUSPENDED, action);
-                yield PolicyStatus.StatusCode.EFFECTIVE;
+                requireMaintenanceStatus(currentStatus, PolicyStatusCode.SUSPENDED, action);
+                yield PolicyStatusCode.EFFECTIVE;
             }
             case REINSTATE -> {
-                requireMaintenanceStatus(currentStatus, PolicyStatus.StatusCode.LAPSED, action);
-                yield PolicyStatus.StatusCode.EFFECTIVE;
+                requireMaintenanceStatus(currentStatus, PolicyStatusCode.LAPSED, action);
+                yield PolicyStatusCode.EFFECTIVE;
             }
             case TERMINATE -> {
-                if (currentStatus != PolicyStatus.StatusCode.EFFECTIVE
-                        && currentStatus != PolicyStatus.StatusCode.SUSPENDED
-                        && currentStatus != PolicyStatus.StatusCode.LAPSED) {
+                if (currentStatus != PolicyStatusCode.EFFECTIVE
+                        && currentStatus != PolicyStatusCode.SUSPENDED
+                        && currentStatus != PolicyStatusCode.LAPSED) {
                     throw new PolicyBusinessRuleException(
                             "POLICY_MAINTENANCE_STATUS_INVALID",
                             "仅 EFFECTIVE、SUSPENDED 或 LAPSED 保单可终止");
                 }
-                yield PolicyStatus.StatusCode.TERMINATED;
+                yield PolicyStatusCode.TERMINATED;
             }
         };
     }
 
     private void requireMaintenanceStatus(
-            PolicyStatus.StatusCode actual,
-            PolicyStatus.StatusCode expected,
+            PolicyStatusCode actual,
+            PolicyStatusCode expected,
             PolicyMaintenanceAction action) {
         if (actual != expected) {
             throw new PolicyBusinessRuleException(
@@ -1482,7 +1486,7 @@ public class Policy extends BaseAggregate {
     private String maintenanceSnapshotHash(
             long version,
             PolicyMaintenanceExecutionState executionState,
-            PolicyStatus.StatusCode snapshotStatus) {
+            PolicyStatusCode snapshotStatus) {
         PolicyProduct mainProduct = requireMainProductForMaintenance(executionState.policyProducts());
         Map<String, PolicyMaintenanceSnapshotFieldValue> fields = maintenanceSnapshotFields(
                 mainProduct, executionState.insuredPartyList(), snapshotStatus);
@@ -1494,7 +1498,7 @@ public class Policy extends BaseAggregate {
     private Map<String, PolicyMaintenanceSnapshotFieldValue> maintenanceSnapshotFields(
             PolicyProduct mainProduct,
             InsuredPartyList parties,
-            PolicyStatus.StatusCode snapshotStatus) {
+            PolicyStatusCode snapshotStatus) {
         TreeMap<String, PolicyMaintenanceSnapshotFieldValue> fields = new TreeMap<>();
         InsuredPartyList.HolderInfo holder = parties != null ? parties.holderInfo() : null;
         Money lineCurrencySource = mainProduct.premium() != null ? mainProduct.premium() : mainProduct.sumInsured();

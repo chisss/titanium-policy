@@ -3,8 +3,8 @@ package com.titanium.policy.valueobject.product;
 import java.math.BigDecimal;
 import java.util.List;
 
-import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.enums.insurance.SubjectType;
+import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.enums.product.ProductEnum.PaymentFrequency;
 import com.titanium.metadata.enums.product.ProductEnum.PeriodUnit;
 import com.titanium.metadata.enums.product.ProductEnum.UnderwritingMode;

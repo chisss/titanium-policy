@@ -1,7 +1,10 @@
 package com.titanium.policy.application.orchestration.issuance.assembler;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
@@ -62,7 +65,7 @@ public class InsuranceLineAssembler {
             return List.of();
         }
         // 先为每个方案行分配段ID，供 RIDER 回填 parentLineId
-        java.util.Map<Integer, String> lineIdByNo = new java.util.HashMap<>();
+        Map<Integer, String> lineIdByNo = new HashMap<>();
         for (IssuancePlanLine planLine : planLines) {
             lineIdByNo.put(planLine.lineNo(), UUID.randomUUID().toString());
         }
@@ -79,7 +82,7 @@ public class InsuranceLineAssembler {
      * 装配单个投保段。
      */
     private InsuranceLine assembleLine(IssuanceRequest request, IssuancePlanLine planLine,
-                                       java.util.Map<Integer, String> lineIdByNo) {
+                                       Map<Integer, String> lineIdByNo) {
         String lineId = lineIdByNo.get(planLine.lineNo());
         String parentLineId = planLine.parentLineNo() != null ? lineIdByNo.get(planLine.parentLineNo()) : null;
         ProductBasicInfo product = productServicePort.getProductBasicInfo(planLine.productId(),
@@ -99,7 +102,7 @@ public class InsuranceLineAssembler {
     private LineCoveragePeriod assemblePeriod(IssuanceRequest request, IssuancePlanLine planLine) {
         if (planLine.coveragePeriodValue() != null && planLine.coveragePeriodUnit() != null
                 && request.periodStart() != null) {
-            java.time.LocalDateTime end = switch (planLine.coveragePeriodUnit()) {
+            LocalDateTime end = switch (planLine.coveragePeriodUnit()) {
                 case YEAR -> request.periodStart().plusYears(planLine.coveragePeriodValue());
                 case MONTH -> request.periodStart().plusMonths(planLine.coveragePeriodValue());
                 case DAY -> request.periodStart().plusDays(planLine.coveragePeriodValue());
@@ -163,7 +166,7 @@ public class InsuranceLineAssembler {
         }
         List<InsuredSubject> subjects = new ArrayList<>();
         for (InsuredPartyList.InsuredInfo insured : partyList.insuredList()) {
-            java.util.Map<String, Object> attributes = new java.util.HashMap<>();
+            Map<String, Object> attributes = new HashMap<>();
             attributes.put("age", insured.age());
             if (insured.gender() != null) {
                 attributes.put("gender", insured.gender().getCode());

@@ -15,11 +15,13 @@ import org.junit.jupiter.api.Test;
 import com.titanium.metadata.enums.billing.PremiumCollectionMode;
 import com.titanium.metadata.enums.policy.IssuanceStrategy;
 import com.titanium.metadata.enums.policy.PolicyForm;
+import com.titanium.metadata.errorcode.PolicyErrorCode;
 import com.titanium.policy.common.enums.IssuanceStage;
 import com.titanium.policy.query.repository.IssuanceProgressViewRepository;
 import com.titanium.policy.query.view.IssuanceProgressView;
 import com.titanium.policy.valueobject.IssuanceRequest;
 import com.titanium.policy.valueobject.IssuanceResult;
+import com.titanium.policy.valueobject.RuleDecision;
 
 class IssuanceProgressBaselineWriterTest {
 
@@ -42,16 +44,17 @@ class IssuanceProgressBaselineWriterTest {
         IssuanceProgressViewRepository repository = mock(IssuanceProgressViewRepository.class);
         IssuanceProgressBaselineWriter writer = new IssuanceProgressBaselineWriter(repository);
         IssuanceRequest request = request();
-        IssuanceResult rejected = IssuanceResult.rejected(request.bizNo(), "ISSUANCE_RISK_REJECTED", "核保拒绝");
+        IssuanceResult rejected = IssuanceResult.rejected(request.bizNo(),
+                RuleDecision.rejected(PolicyErrorCode.ISSUANCE_RISK_REJECTED, "基础自动核保"));
         when(repository.markUntouchedBaselineRejected(eq("BIZ_001"), eq("TENANT_001"), eq("ACCEPTED"),
-                eq("REJECTED"), eq("ISSUANCE_RISK_REJECTED"), eq("核保拒绝"), any(LocalDateTime.class)))
+                eq("REJECTED"), eq("20007010"), eq("出单风控步骤 基础自动核保 不通过"), any(LocalDateTime.class)))
                 .thenReturn(1);
 
         boolean updated = writer.markRejectedIfUntouched(request, rejected);
 
         assertTrue(updated);
         verify(repository).markUntouchedBaselineRejected(eq("BIZ_001"), eq("TENANT_001"), eq("ACCEPTED"),
-                eq("REJECTED"), eq("ISSUANCE_RISK_REJECTED"), eq("核保拒绝"), any(LocalDateTime.class));
+                eq("REJECTED"), eq("20007010"), eq("出单风控步骤 基础自动核保 不通过"), any(LocalDateTime.class));
     }
 
     @Test

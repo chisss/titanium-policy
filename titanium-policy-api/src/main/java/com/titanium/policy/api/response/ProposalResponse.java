@@ -13,7 +13,7 @@ import lombok.Data;
 /**
  * 投保意向单 DTO（跨域集成远程传输契约）
  * <p>
- * 状态字段以 {@code String} 承载：意向单状态枚举 {@code ProposalStatus.StatusCode} 位于
+ * 状态字段以 {@code String} 承载：意向单状态枚举 {@code ProposalStatusCode} 位于
  * domain 层，api 模块零内部领域依赖（仅依赖 metadata/feign/swagger），故不引入领域枚举，
  * 由 web 层 {@code ProposalWebMapper} 以 {@code .name()} 转换。
  * </p>

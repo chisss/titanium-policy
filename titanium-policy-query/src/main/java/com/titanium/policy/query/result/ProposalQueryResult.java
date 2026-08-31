@@ -6,7 +6,7 @@ import java.time.LocalDateTime;
 import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.enums.product.ProductEnum.SalesChannel;
-import com.titanium.policy.valueobject.proposal.ProposalStatus;
+import com.titanium.policy.common.enums.ProposalStatusCode;
 
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -67,7 +67,7 @@ public class ProposalQueryResult {
     private Integer                   lineCount;
 
     /** 意向单状态 */
-    private ProposalStatus.StatusCode status;
+    private ProposalStatusCode status;
 
     /** 创建时间 */
     private LocalDateTime             createTime;

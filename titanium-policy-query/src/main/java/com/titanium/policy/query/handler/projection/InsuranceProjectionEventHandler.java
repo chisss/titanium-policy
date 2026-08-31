@@ -12,6 +12,7 @@ import com.titanium.common.jpa.BasePersistable;
 import com.titanium.metadata.enums.BaseEnum;
 import com.titanium.metadata.enums.product.ProductEnum.PaymentFrequency;
 import com.titanium.metadata.enums.underwriting.UnderwritingEnum.ConclusionType;
+import com.titanium.policy.common.enums.InsuranceStatusCode;
 import com.titanium.policy.entity.insurance.InsuranceLine;
 import com.titanium.policy.event.insurance.InsuranceCreatedEvent;
 import com.titanium.policy.event.insurance.InsuranceIssuedEvent;
@@ -20,7 +21,6 @@ import com.titanium.policy.event.insurance.UnderwritingResultReceivedEvent;
 import com.titanium.policy.query.mapper.InsuranceViewMapper;
 import com.titanium.policy.query.repository.InsuranceViewRepository;
 import com.titanium.policy.query.view.InsuranceView;
-import com.titanium.policy.valueobject.insurance.InsuranceStatus;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -85,7 +85,7 @@ public class InsuranceProjectionEventHandler {
             }
         }
         // 初始状态 DRAFT 属创建期语义，由处理器显式赋值，不下沉映射器
-        view.setStatus(InsuranceStatus.StatusCode.DRAFT);
+        view.setStatus(InsuranceStatusCode.DRAFT);
         stampAuditTime(view);
 
         insuranceViewRepository.save(view);
@@ -98,7 +98,7 @@ public class InsuranceProjectionEventHandler {
     @Transactional
     public void on(InsuranceSubmittedForUnderwritingEvent event) {
         applyUpdate(event.insuranceId(), event.tenantId(), "提交核保", view -> {
-            view.setStatus(InsuranceStatus.StatusCode.UNDERWRITING);
+            view.setStatus(InsuranceStatusCode.UNDERWRITING);
             view.setCurrency(event.currency());
         });
     }
@@ -123,7 +123,7 @@ public class InsuranceProjectionEventHandler {
     @Transactional
     public void on(InsuranceIssuedEvent event) {
         applyUpdate(event.insuranceId(), event.tenantId(), "承保出单", view -> {
-            view.setStatus(InsuranceStatus.StatusCode.ISSUED);
+            view.setStatus(InsuranceStatusCode.ISSUED);
             view.setIssuedTime(event.issuedTime());
         });
     }
@@ -131,11 +131,11 @@ public class InsuranceProjectionEventHandler {
     /**
      * 核保结论 → 投保单状态映射（与聚合根 UnderwritingResultReceivedEvent 处理逻辑一致）
      */
-    private InsuranceStatus.StatusCode mapUnderwritingStatus(ConclusionType resultCode) {
+    private InsuranceStatusCode mapUnderwritingStatus(ConclusionType resultCode) {
         return switch (resultCode) {
-            case ACCEPT, MODIFY -> InsuranceStatus.StatusCode.UNDERWRITING_APPROVED;
-            case REJECT -> InsuranceStatus.StatusCode.UNDERWRITING_REJECTED;
-            case POSTPONE -> InsuranceStatus.StatusCode.UNDERWRITING_SUSPENDED;
+            case ACCEPT, MODIFY -> InsuranceStatusCode.UNDERWRITING_APPROVED;
+            case REJECT -> InsuranceStatusCode.UNDERWRITING_REJECTED;
+            case POSTPONE -> InsuranceStatusCode.UNDERWRITING_SUSPENDED;
         };
     }
 

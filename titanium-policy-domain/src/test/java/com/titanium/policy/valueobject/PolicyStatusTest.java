@@ -9,6 +9,7 @@ import java.time.LocalDateTime;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import com.titanium.policy.common.enums.PolicyStatusCode;
 import com.titanium.policy.exception.PolicyStatusTransitionException;
 
 /**
@@ -20,44 +21,44 @@ import com.titanium.policy.exception.PolicyStatusTransitionException;
  */
 class PolicyStatusTest {
 
-    private PolicyStatus statusOf(PolicyStatus.StatusCode code) {
+    private PolicyStatus statusOf(PolicyStatusCode code) {
         return new PolicyStatus(code, LocalDateTime.now(), "init", "op");
     }
 
     @Test
     @DisplayName("生效→失效：宽限期满未缴费")
     void shouldLapseFromEffective() {
-        PolicyStatus lapsed = statusOf(PolicyStatus.StatusCode.EFFECTIVE)
-                .transitionStatus(PolicyStatus.StatusCode.LAPSED, "宽限期满未缴", "system");
-        assertEquals(PolicyStatus.StatusCode.LAPSED, lapsed.statusCode());
+        PolicyStatus lapsed = statusOf(PolicyStatusCode.EFFECTIVE)
+                .transitionStatus(PolicyStatusCode.LAPSED, "宽限期满未缴", "system");
+        assertEquals(PolicyStatusCode.LAPSED, lapsed.statusCode());
     }
 
     @Test
     @DisplayName("失效→复效：补缴+核保通过")
     void shouldReinstateFromLapsed() {
-        PolicyStatus reinstated = statusOf(PolicyStatus.StatusCode.LAPSED)
-                .transitionStatus(PolicyStatus.StatusCode.EFFECTIVE, "复效", "op");
-        assertEquals(PolicyStatus.StatusCode.EFFECTIVE, reinstated.statusCode());
+        PolicyStatus reinstated = statusOf(PolicyStatusCode.LAPSED)
+                .transitionStatus(PolicyStatusCode.EFFECTIVE, "复效", "op");
+        assertEquals(PolicyStatusCode.EFFECTIVE, reinstated.statusCode());
     }
 
     @Test
     @DisplayName("失效→终止：超复效期限")
     void shouldTerminateFromLapsed() {
-        assertDoesNotThrow(() -> statusOf(PolicyStatus.StatusCode.LAPSED)
-                .transitionStatus(PolicyStatus.StatusCode.TERMINATED, "超复效期限", "system"));
+        assertDoesNotThrow(() -> statusOf(PolicyStatusCode.LAPSED)
+                .transitionStatus(PolicyStatusCode.TERMINATED, "超复效期限", "system"));
     }
 
     @Test
     @DisplayName("满期为终态：EXPIRED 不可复效")
     void shouldRejectReinstateFromExpired() {
-        assertThrows(PolicyStatusTransitionException.class, () -> statusOf(PolicyStatus.StatusCode.EXPIRED)
-                .transitionStatus(PolicyStatus.StatusCode.EFFECTIVE, "非法复效", "op"));
+        assertThrows(PolicyStatusTransitionException.class, () -> statusOf(PolicyStatusCode.EXPIRED)
+                .transitionStatus(PolicyStatusCode.EFFECTIVE, "非法复效", "op"));
     }
 
     @Test
     @DisplayName("未生效不可直接失效")
     void shouldRejectLapseFromNotEffective() {
-        assertThrows(PolicyStatusTransitionException.class, () -> statusOf(PolicyStatus.StatusCode.NOT_EFFECTIVE)
-                .transitionStatus(PolicyStatus.StatusCode.LAPSED, "非法失效", "op"));
+        assertThrows(PolicyStatusTransitionException.class, () -> statusOf(PolicyStatusCode.NOT_EFFECTIVE)
+                .transitionStatus(PolicyStatusCode.LAPSED, "非法失效", "op"));
     }
 }

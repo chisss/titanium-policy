@@ -8,6 +8,7 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.ReportingPolicy;
 
+import com.titanium.metadata.enums.CurrencyEnum;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.api.model.Amount;
 import com.titanium.policy.api.request.CreatePolicyRequest;
@@ -286,7 +287,7 @@ public interface PolicyWebMapper {
      * BigDecimal + 币种 → Money 值对象（空安全，缺省币种 CNY）
      */
     default Money toMoney(BigDecimal value, String currency) {
-        return value != null ? Money.of(value, currency != null ? currency : "CNY") : null;
+        return value != null ? Money.of(value, currency != null ? currency : CurrencyEnum.CNY.getCode()) : null;
     }
 
     /**

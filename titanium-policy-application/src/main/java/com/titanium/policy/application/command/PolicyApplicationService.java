@@ -1,6 +1,8 @@
 package com.titanium.policy.application.command;
 
 
+import java.math.BigDecimal;
+
 import org.axonframework.commandhandling.gateway.CommandGateway;
 import org.springframework.stereotype.Service;
 
@@ -256,7 +258,7 @@ public class PolicyApplicationService {
      * @param currency 币种
      * @param tenantId 租户ID
      */
-    public void updateAccountValue(String policyId, String accountId, java.math.BigDecimal accountValue, String currency,
+    public void updateAccountValue(String policyId, String accountId, BigDecimal accountValue, String currency,
                                    String tenantId) {
         commandGateway.sendAndWait(new UpdateAccountValueCommand(policyId, accountId, accountValue, currency, tenantId));
     }

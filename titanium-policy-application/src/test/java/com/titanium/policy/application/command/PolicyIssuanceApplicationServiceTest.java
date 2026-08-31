@@ -30,6 +30,7 @@ import com.titanium.metadata.enums.product.ProductEnum.IssuanceMode;
 import com.titanium.metadata.enums.product.ProductEnum.PaymentFrequency;
 import com.titanium.metadata.enums.product.ProductEnum.ProductCategory;
 import com.titanium.metadata.enums.product.ProductEnum.SalesChannel;
+import com.titanium.metadata.errorcode.PolicyErrorCode;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.application.exception.CustomerResolutionException;
 import com.titanium.policy.application.exception.IssuanceOrchestrationException;
@@ -114,14 +115,14 @@ class PolicyIssuanceApplicationServiceTest {
     @Test
     void transientCustomerFailureDoesNotPersistRejectedBaselineAndSameBizCanRetry() {
         CustomerResolutionException failure = new CustomerResolutionException(
-                "ISSUANCE_CUSTOMER_RESOLUTION_FAILED", "客户服务不可用", new IllegalStateException(), true);
+                PolicyErrorCode.ISSUANCE_CUSTOMER_RESOLUTION_FAILED, "客户服务不可用", new IllegalStateException(), true);
         when(customerResolver.resolve(request)).thenThrow(failure, failure);
 
         IssuanceResult first = service.submitIssuance(request);
         IssuanceResult retry = service.submitIssuance(request);
 
-        assertEquals("ISSUANCE_CUSTOMER_RESOLUTION_FAILED", first.rejectCode());
-        assertEquals("ISSUANCE_CUSTOMER_RESOLUTION_FAILED", retry.rejectCode());
+        assertEquals(PolicyErrorCode.ISSUANCE_CUSTOMER_RESOLUTION_FAILED.getCode(), first.rejectCode());
+        assertEquals(PolicyErrorCode.ISSUANCE_CUSTOMER_RESOLUTION_FAILED.getCode(), retry.rejectCode());
         verify(progressBaselineWriter, never()).save(any(), any());
         verify(customerResolver, org.mockito.Mockito.times(2)).resolve(request);
     }
@@ -244,7 +245,8 @@ class PolicyIssuanceApplicationServiceTest {
 
     @Test
     void synchronousOrchestrationRejectionMarksUntouchedBaselineRejected() {
-        IssuanceResult rejected = IssuanceResult.rejected(BIZ_NO, "ISSUANCE_RISK_REJECTED", "基础自动核保不通过");
+        IssuanceResult rejected = IssuanceResult.rejected(BIZ_NO,
+                RuleDecision.rejected(PolicyErrorCode.ISSUANCE_RISK_REJECTED, "基础自动核保"));
         when(productServicePort.getIssueRules(PRODUCT_ID, TENANT_ID)).thenReturn(unrestrictedRules());
         when(eligibilityDomainService.validate(eq(request), any())).thenReturn(RuleDecision.accepted());
         when(issuanceOrchestrator.orchestrate(IssuanceProcessConfig.threeStep(PRODUCT_ID), request))
@@ -294,7 +296,7 @@ class PolicyIssuanceApplicationServiceTest {
     private void assertProductRulesUnavailable(IssuanceResult result) {
         assertFalse(result.success());
         assertEquals(IssuanceStage.REJECTED, result.currentStage());
-        assertEquals("ISSUANCE_PRODUCT_RULES_UNAVAILABLE", result.rejectCode());
+        assertEquals(PolicyErrorCode.ISSUANCE_PRODUCT_RULES_UNAVAILABLE.getCode(), result.rejectCode());
         verify(progressBaselineWriter).save(eq(request), any(IssuanceResult.class));
         verify(eligibilityDomainService, never()).validate(any(), any());
         verify(issuanceOrchestrator, never()).orchestrate(any(IssuanceProcessConfig.class),

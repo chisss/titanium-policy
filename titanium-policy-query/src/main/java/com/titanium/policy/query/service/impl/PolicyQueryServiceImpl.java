@@ -10,6 +10,7 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.stream.Collectors;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -241,7 +242,7 @@ public class PolicyQueryServiceImpl implements PolicyQueryService {
             long policyVersion,
             Map<String, PolicySnapshotFieldValueQueryResult> fields) {
         Map<String, PolicyMaintenanceSnapshotFieldValue> domainFields = fields.entrySet().stream()
-                .collect(java.util.stream.Collectors.toMap(
+                .collect(Collectors.toMap(
                         Map.Entry::getKey,
                         entry -> new PolicyMaintenanceSnapshotFieldValue(
                                 entry.getValue().dataType(), entry.getValue().canonicalValue())));

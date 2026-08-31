@@ -7,6 +7,7 @@ import java.util.List;
 import org.axonframework.commandhandling.gateway.CommandGateway;
 import org.springframework.stereotype.Service;
 
+import com.titanium.metadata.enums.CurrencyEnum;
 import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.enums.product.ProductEnum.SalesChannel;
@@ -55,7 +56,7 @@ public class ProposalApplicationService {
                                  String customerId, BigDecimal intendedSumInsured, BigDecimal intendedPremium,
                                  String currency, LocalDateTime insurancePeriodStart, LocalDateTime insurancePeriodEnd,
                                  String expectedProductCode, InsuranceProductType insuranceType, String tenantId) {
-        String resolvedCurrency = currency != null ? currency : "CNY";
+        String resolvedCurrency = currency != null ? currency : CurrencyEnum.CNY.getCode();
         // 🔴 标量重载为遗留兼容路径：单值 expectedProductCode 无法表达多险种意向组合
         // （客户在 App 勾选「重疾 + 医疗」时意向单本就多段）。完整出单请走 PolicyIssuanceApi。
         CreateProposalCommand command = CreateProposalCommand.builder()

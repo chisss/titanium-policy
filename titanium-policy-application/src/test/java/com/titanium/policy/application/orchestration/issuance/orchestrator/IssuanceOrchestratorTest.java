@@ -36,6 +36,7 @@ import com.titanium.metadata.enums.product.ProductEnum.IssuanceMode;
 import com.titanium.metadata.enums.product.ProductEnum.PaymentFrequency;
 import com.titanium.metadata.enums.product.ProductEnum.ProductCategory;
 import com.titanium.metadata.enums.product.ProductEnum.SalesChannel;
+import com.titanium.metadata.errorcode.PolicyErrorCode;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.application.exception.IssuanceOrchestrationException;
 import com.titanium.policy.application.orchestration.issuance.InsuranceLinePremiumConfirmationService;
@@ -93,8 +94,10 @@ class IssuanceOrchestratorTest {
         PolicyProductAssembler policyProductAssembler = new PolicyProductAssembler(productServicePort, null,
                 insuranceLineAssembler);
         orchestrator = new IssuanceOrchestrator(commandGateway, new TestPolicyNoGenerator(), riskAssessmentExecutor,
-                productServicePort, insuranceLineAssembler, policyProductAssembler, proposalLineAssembler,
-                new InsuranceLinePremiumConfirmationService(confirmedPremiumPricingPort),
+                productServicePort, insuranceLineAssembler, policyProductAssembler, proposalLineAssembler, null, null, null,
+                new InsuranceLinePremiumConfirmationService(confirmedPremiumPricingPort,
+                        new com.titanium.policy.application.orchestration.issuance.ConfirmedPremiumRequestValidator(),
+                        new com.titanium.policy.application.orchestration.issuance.assembler.ConfirmedPremiumRequestAssembler()),
                 premiumCollectionOrchestrator,
                 new PremiumScheduleOrchestrator(billingServicePort));
         when(riskAssessmentExecutor.execute(any(), any())).thenReturn(true);
@@ -218,6 +221,24 @@ class IssuanceOrchestratorTest {
     }
 
     @Test
+    void oneStepTreatsMissingOptionalPeriodConfigAsZero() {
+        when(productServicePort.getClauseRefs(PRODUCT_ID, TENANT_ID)).thenReturn(List.of());
+        when(productServicePort.getIssueRules(PRODUCT_ID, TENANT_ID))
+                .thenReturn(new ProductIssueRules(0, 65, null, null, null, null, List.of(), List.of(), List.of(),
+                        null, null, null, false, List.of(), List.of(), null, List.of(), null, null, false, false));
+        when(premiumCollectionOrchestrator.collect(any(), any(), any(), any(), any(LocalDate.class), any(), anyList()))
+                .thenReturn(CollectionResult.pending("BILL_001", "ACCOUNT_001", "PAY_001", "credential"));
+
+        IssuanceResult result = orchestrator.orchestrate(IssuanceProcessConfig.oneStep(PRODUCT_ID), request());
+
+        assertEquals(IssuanceStage.PENDING_COLLECTION, result.currentStage());
+        ArgumentCaptor<CreatePolicyDirectlyCommand> command = ArgumentCaptor.forClass(CreatePolicyDirectlyCommand.class);
+        verify(commandGateway).sendAndWait(command.capture());
+        assertEquals(0, command.getValue().policyPeriod().waitingPeriodDays());
+        assertEquals(0, command.getValue().policyPeriod().hesitationPeriodDays());
+    }
+
+    @Test
     void oneStepGeneratesAnnualScheduleAfterBillCreation() {
         when(productServicePort.getClauseRefs(PRODUCT_ID, TENANT_ID)).thenReturn(List.of());
         when(premiumCollectionOrchestrator.collect(
@@ -266,7 +287,7 @@ class IssuanceOrchestratorTest {
         BusinessException exception = assertThrows(BusinessException.class,
                 () -> orchestrator.orchestrate(IssuanceProcessConfig.oneStep(PRODUCT_ID), request()));
 
-        assertEquals("ISSUANCE_PREMIUM_CONFIRMATION_FAILED", exception.getErrorCode());
+        assertEquals(PolicyErrorCode.ISSUANCE_PREMIUM_CONFIRMATION_FAILED.getCode(), exception.getErrorCode());
         verifyNoInteractions(commandGateway, premiumCollectionOrchestrator);
     }
 

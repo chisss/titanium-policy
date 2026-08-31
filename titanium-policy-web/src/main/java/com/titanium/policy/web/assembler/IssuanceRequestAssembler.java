@@ -1,6 +1,7 @@
 package com.titanium.policy.web.assembler;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -8,6 +9,7 @@ import java.util.UUID;
 import org.springframework.stereotype.Component;
 
 import com.titanium.metadata.enums.BaseEnum;
+import com.titanium.metadata.enums.CurrencyEnum;
 import com.titanium.metadata.enums.billing.PremiumCollectionMode;
 import com.titanium.metadata.enums.customer.CustomerEnum.CustomerGender;
 import com.titanium.metadata.enums.customer.CustomerEnum.IdCardType;
@@ -46,7 +48,7 @@ import com.titanium.policy.valueobject.IssuanceResult;
 public class IssuanceRequestAssembler {
 
     /** 缺省币种 */
-    private static final String DEFAULT_CURRENCY = "CNY";
+    private static final String DEFAULT_CURRENCY = CurrencyEnum.CNY.getCode();
     /** 受益份额百分比 → 比例的换算基数（契约传 100 表示 100%，领域侧以 1.0 表示） */
     private static final BigDecimal RATIO_BASE = new BigDecimal("100");
 
@@ -204,7 +206,7 @@ public class IssuanceRequestAssembler {
         if (shareRatio == null) {
             return 0d;
         }
-        return shareRatio.divide(RATIO_BASE, 6, java.math.RoundingMode.HALF_UP).doubleValue();
+        return shareRatio.divide(RATIO_BASE, 6, RoundingMode.HALF_UP).doubleValue();
     }
 
     /**

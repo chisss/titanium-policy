@@ -18,7 +18,9 @@ import com.titanium.metadata.enums.customer.CustomerEnum.IdCardType;
 import com.titanium.metadata.enums.policy.PolicyLineStatus;
 import com.titanium.metadata.enums.product.ProductEnum.ProductCategory;
 import com.titanium.metadata.enums.underwriting.UnderwritingEnum.ConclusionType;
+import com.titanium.metadata.errorcode.PolicyErrorCode;
 import com.titanium.metadata.valueobject.Money;
+import com.titanium.policy.application.orchestration.issuance.assembler.ConfirmedPremiumRequestAssembler;
 import com.titanium.policy.entity.insurance.InsuranceLine;
 import com.titanium.policy.entity.insurance.InsuredPartyList;
 import com.titanium.policy.entity.policy.InsuredSubject;
@@ -38,7 +40,8 @@ class InsuranceLinePremiumConfirmationServiceTest {
         port.result = new ConfirmedPremiumResult(
                 "CALC-1", "CONFIRMED", "ISSUANCE_CONFIRM", "PRODUCT-1", "V3", "CNY",
                 new BigDecimal("1000.00"), new BigDecimal("1123.45"), "PP-7", "HASH-1");
-        InsuranceLinePremiumConfirmationService service = new InsuranceLinePremiumConfirmationService(port);
+        InsuranceLinePremiumConfirmationService service = new InsuranceLinePremiumConfirmationService(port, new ConfirmedPremiumRequestValidator(),
+                new ConfirmedPremiumRequestAssembler());
 
         InsuranceLinePremiumConfirmationService.ConfirmationSummary summary = service.confirm(
                 List.of(line(new BigDecimal("0.12345"))), null, "INSURANCE-1", "BIZ-1",
@@ -52,8 +55,8 @@ class InsuranceLinePremiumConfirmationServiceTest {
                 port.requests.get(0).calculationRequestId());
         assertEquals("SURCHARGE_RATE", port.requests.get(0).underwritingAdjustments().get(0).type());
         assertEquals(new BigDecimal("0.12345"), port.requests.get(0).underwritingAdjustments().get(0).value());
-        assertEquals("CHANNEL-1", port.requests.get(0).requestSnapshot().get("channelId"));
-        assertEquals(1, port.requests.get(0).requestSnapshot().get("policyYear"));
+        assertEquals("CHANNEL-1", port.requests.get(0).requestSnapshot().channelId());
+        assertEquals(1, port.requests.get(0).requestSnapshot().policyYear());
     }
 
     @Test
@@ -61,13 +64,15 @@ class InsuranceLinePremiumConfirmationServiceTest {
         ConfirmedPremiumPricingPort failingPort = request -> {
             throw new IllegalStateException("pricing unavailable");
         };
-        InsuranceLinePremiumConfirmationService service = new InsuranceLinePremiumConfirmationService(failingPort);
+        InsuranceLinePremiumConfirmationService service = new InsuranceLinePremiumConfirmationService(failingPort,
+                new ConfirmedPremiumRequestValidator(),
+                new ConfirmedPremiumRequestAssembler());
 
         BusinessException exception = assertThrows(BusinessException.class, () -> service.confirm(
                 List.of(line(null).withPremium(Money.of(new BigDecimal("999.00"), "CNY"))), null,
                 "INSURANCE-1", "BIZ-1", BUSINESS_TIME, "TENANT-1", false));
 
-        assertEquals("ISSUANCE_PREMIUM_CONFIRMATION_FAILED", exception.getErrorCode());
+        assertEquals(PolicyErrorCode.ISSUANCE_PREMIUM_CONFIRMATION_FAILED.getCode(), exception.getErrorCode());
     }
 
     @Test
@@ -76,7 +81,8 @@ class InsuranceLinePremiumConfirmationServiceTest {
         port.result = new ConfirmedPremiumResult(
                 "CALC-1", "CONFIRMED", "ISSUANCE_CONFIRM", "PRODUCT-1", "V3", "CNY",
                 new BigDecimal("1000.00"), new BigDecimal("1000.00"), "PP-7", "HASH-1");
-        InsuranceLinePremiumConfirmationService service = new InsuranceLinePremiumConfirmationService(port);
+        InsuranceLinePremiumConfirmationService service = new InsuranceLinePremiumConfirmationService(port, new ConfirmedPremiumRequestValidator(),
+                new ConfirmedPremiumRequestAssembler());
 
         service.confirm(List.of(line(null)), null, "x".repeat(200), "BIZ-1", BUSINESS_TIME,
                 "TENANT-1", false);
@@ -90,7 +96,8 @@ class InsuranceLinePremiumConfirmationServiceTest {
         port.result = new ConfirmedPremiumResult(
                 "CALC-1", "CONFIRMED", "ISSUANCE_CONFIRM", "PRODUCT-1", "V3", "CNY",
                 new BigDecimal("1000.00"), new BigDecimal("1000.00"), "PP-7", "HASH-1");
-        InsuranceLinePremiumConfirmationService service = new InsuranceLinePremiumConfirmationService(port);
+        InsuranceLinePremiumConfirmationService service = new InsuranceLinePremiumConfirmationService(port, new ConfirmedPremiumRequestValidator(),
+                new ConfirmedPremiumRequestAssembler());
         InsuranceLine propertyLine = line(null);
         propertyLine = new InsuranceLine(
                 propertyLine.lineId(), propertyLine.lineNo(), propertyLine.productCategory(),
@@ -119,7 +126,8 @@ class InsuranceLinePremiumConfirmationServiceTest {
         port.result = new ConfirmedPremiumResult(
                 "CALC-1", "CONFIRMED", "ISSUANCE_CONFIRM", "PRODUCT-1", "V3", "CNY",
                 new BigDecimal("1000.00"), new BigDecimal("1000.00"), "PP-7", "HASH-1");
-        InsuranceLinePremiumConfirmationService service = new InsuranceLinePremiumConfirmationService(port);
+        InsuranceLinePremiumConfirmationService service = new InsuranceLinePremiumConfirmationService(port, new ConfirmedPremiumRequestValidator(),
+                new ConfirmedPremiumRequestAssembler());
         LocalDateTime start = LocalDateTime.of(2026, 9, 1, 0, 0);
         InsuranceLine oneYearLine = new InsuranceLine(
                 "LINE-1", 1, ProductCategory.MAIN, null, "PRODUCT-1", "P001", "测试产品", "V3", null,

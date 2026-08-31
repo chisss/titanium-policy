@@ -7,6 +7,7 @@ import java.util.List;
 import org.axonframework.commandhandling.gateway.CommandGateway;
 import org.springframework.stereotype.Service;
 
+import com.titanium.metadata.enums.CurrencyEnum;
 import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.valueobject.Money;
@@ -60,7 +61,7 @@ public class InsuranceApplicationService {
                                       LocalDateTime insurancePeriodStart, LocalDateTime insurancePeriodEnd,
                                       List<String> productCodes, int underwritingPriority, String changeReason,
                                       InsuranceProductType insuranceType, String tenantId) {
-        Money premium = exactPremium != null ? Money.of(exactPremium, currency != null ? currency : "CNY") : null;
+        Money premium = exactPremium != null ? Money.of(exactPremium, currency != null ? currency : CurrencyEnum.CNY.getCode()) : null;
         // 🔴 标量重载为遗留兼容路径：无参与方清单、无结构化险种段（productCodes 裸编码无法承载段级
         // 保额/期间/缴费/标的）。产出的投保单在读侧查不到险种段明细。完整出单请走
         // PolicyIssuanceApi → IssuanceOrchestrator（装配段与快照）。

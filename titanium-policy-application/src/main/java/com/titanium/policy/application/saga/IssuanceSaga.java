@@ -2,6 +2,7 @@ package com.titanium.policy.application.saga;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -256,7 +257,7 @@ public class IssuanceSaga {
         this.underwritingId = event.underwritingId();
         // 段级结论回写：整单结论下发各段，拒保段保费不计入总保费
         if (this.insuranceLines != null) {
-            List<InsuranceLine> updated = new java.util.ArrayList<>();
+            List<InsuranceLine> updated = new ArrayList<>();
             for (InsuranceLine line : this.insuranceLines) {
                 updated.add(line.withUnderwritingResult(event.resultCode(), event.extraPremiumRatio()));
             }

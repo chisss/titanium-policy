@@ -1,5 +1,6 @@
 package com.titanium.policy.query.handler.projection;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 import org.axonframework.config.ProcessingGroup;
@@ -127,7 +128,7 @@ public class PolicyCollectionProjectionEventHandler {
     /**
      * 金额取值（空安全）。
      */
-    private java.math.BigDecimal amount(Money money) {
+    private BigDecimal amount(Money money) {
         return money != null ? money.value() : null;
     }
 

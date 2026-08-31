@@ -95,7 +95,9 @@ public class IssuanceSagaTest {
         fixture.registerResource(new TestPolicyNoGenerator());
         fixture.registerResource(new PolicyIssuanceDomainServiceImpl());
         confirmedPremiumPricingPort = new StubConfirmedPremiumPricingPort();
-        fixture.registerResource(new InsuranceLinePremiumConfirmationService(confirmedPremiumPricingPort));
+        fixture.registerResource(new InsuranceLinePremiumConfirmationService(confirmedPremiumPricingPort,
+                new com.titanium.policy.application.orchestration.issuance.ConfirmedPremiumRequestValidator(),
+                new com.titanium.policy.application.orchestration.issuance.assembler.ConfirmedPremiumRequestAssembler()));
         // 险种段化后 Saga 新增依赖：产品配置（等待期/犹豫期）、条款责任装配、计费开单、投资开户
         StubProductServicePort productServicePort = new StubProductServicePort();
         fixture.registerResource(productServicePort);

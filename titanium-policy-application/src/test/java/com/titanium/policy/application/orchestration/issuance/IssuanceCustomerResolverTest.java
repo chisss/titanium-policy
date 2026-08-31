@@ -27,6 +27,7 @@ import com.titanium.metadata.enums.policy.BeneficiaryType;
 import com.titanium.metadata.enums.policy.IssuanceStrategy;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.enums.product.ProductEnum.ProductCategory;
+import com.titanium.metadata.errorcode.PolicyErrorCode;
 import com.titanium.policy.application.exception.CustomerResolutionException;
 import com.titanium.policy.entity.insurance.InsuredPartyList;
 import com.titanium.policy.port.CustomerServicePort;
@@ -55,7 +56,7 @@ class IssuanceCustomerResolverTest {
                 () -> resolver.resolve(request(new InsuredPartyList("PARTIES_001", holder(HOLDER_ID),
                         List.of(), List.of()))));
 
-        assertEquals("ISSUANCE_CUSTOMER_NOT_FOUND", exception.errorCode());
+        assertEquals(PolicyErrorCode.ISSUANCE_CUSTOMER_NOT_FOUND.getCode(), exception.errorCode());
         verify(customerServicePort, never()).resolveCustomer(any(), eq(TENANT_ID));
     }
 
@@ -68,7 +69,7 @@ class IssuanceCustomerResolverTest {
                 () -> resolver.resolve(request(new InsuredPartyList("PARTIES_001", holder(HOLDER_ID),
                         List.of(), List.of()))));
 
-        assertEquals("ISSUANCE_CUSTOMER_IDENTITY_MISMATCH", exception.errorCode());
+        assertEquals(PolicyErrorCode.ISSUANCE_CUSTOMER_IDENTITY_MISMATCH.getCode(), exception.errorCode());
         assertFalse(exception.retryable());
     }
 
@@ -132,7 +133,7 @@ class IssuanceCustomerResolverTest {
         CustomerResolutionException exception = assertThrows(CustomerResolutionException.class,
                 () -> resolver.resolve(request(parties)));
 
-        assertEquals("ISSUANCE_CUSTOMER_IDENTITY_MISMATCH", exception.errorCode());
+        assertEquals(PolicyErrorCode.ISSUANCE_CUSTOMER_IDENTITY_MISMATCH.getCode(), exception.errorCode());
     }
 
     @Test
@@ -164,7 +165,7 @@ class IssuanceCustomerResolverTest {
                 () -> resolver.resolve(request(new InsuredPartyList("PARTIES_006", holder(HOLDER_ID),
                         List.of(), List.of()))));
 
-        assertEquals("ISSUANCE_CUSTOMER_RESOLUTION_FAILED", exception.errorCode());
+        assertEquals(PolicyErrorCode.ISSUANCE_CUSTOMER_RESOLUTION_FAILED.getCode(), exception.errorCode());
         assertTrue(exception.retryable());
     }
 

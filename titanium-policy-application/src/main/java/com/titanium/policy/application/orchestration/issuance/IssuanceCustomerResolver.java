@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 
 import com.titanium.metadata.enums.customer.CustomerEnum.CustomerGender;
 import com.titanium.metadata.enums.customer.CustomerEnum.IdCardType;
+import com.titanium.metadata.errorcode.PolicyErrorCode;
 import com.titanium.policy.application.exception.CustomerResolutionException;
 import com.titanium.policy.entity.insurance.InsuredPartyList;
 import com.titanium.policy.port.CustomerServicePort;
@@ -34,11 +35,6 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class IssuanceCustomerResolver {
 
-    private static final String CUSTOMER_IDENTITY_REQUIRED = "ISSUANCE_CUSTOMER_IDENTITY_REQUIRED";
-    private static final String CUSTOMER_NOT_FOUND = "ISSUANCE_CUSTOMER_NOT_FOUND";
-    private static final String CUSTOMER_IDENTITY_MISMATCH = "ISSUANCE_CUSTOMER_IDENTITY_MISMATCH";
-    private static final String CUSTOMER_RESOLUTION_FAILED = "ISSUANCE_CUSTOMER_RESOLUTION_FAILED";
-
     private final CustomerServicePort customerServicePort;
 
     /**
@@ -49,7 +45,7 @@ public class IssuanceCustomerResolver {
      */
     public IssuanceRequest resolve(IssuanceRequest request) {
         if (request == null || request.insuredPartyList() == null) {
-            throw new CustomerResolutionException(CUSTOMER_IDENTITY_REQUIRED, "出单参与方清单不能为空");
+            throw new CustomerResolutionException(PolicyErrorCode.ISSUANCE_CUSTOMER_IDENTITY_REQUIRED, "出单参与方清单不能为空");
         }
 
         Map<IdentityKey, String> resolvedByIdentity = new HashMap<>();
@@ -167,7 +163,7 @@ public class IssuanceCustomerResolver {
     }
 
     private String resolveCustomer(String existingId, String name, IdCardType idType, String idNo,
-                                   com.titanium.metadata.enums.customer.CustomerEnum.CustomerGender gender,
+                                   CustomerGender gender,
                                    String phone, String tenantId, String operatorId,
                                    Map<IdentityKey, String> byIdentity,
                                    Map<String, CustomerIdentitySnapshot> identityByCustomerId) {
@@ -175,7 +171,7 @@ public class IssuanceCustomerResolver {
             String customerId = existingId.strip();
             try {
                 CustomerIdentitySnapshot actual = customerServicePort.findCustomerIdentity(customerId, tenantId)
-                        .orElseThrow(() -> new CustomerResolutionException(CUSTOMER_NOT_FOUND,
+                        .orElseThrow(() -> new CustomerResolutionException(PolicyErrorCode.ISSUANCE_CUSTOMER_NOT_FOUND,
                                 "客户不存在或不属于当前租户: " + customerId));
                 validateIdentity(customerId, name, idType, idNo, actual);
                 rememberIdentity(customerId, actual, byIdentity, identityByCustomerId);
@@ -184,7 +180,7 @@ public class IssuanceCustomerResolver {
                 throw exception;
             } catch (RuntimeException exception) {
                 log.warn("客户存在性查询失败: tenantId={}, customerId={}", tenantId, customerId, exception);
-                throw new CustomerResolutionException(CUSTOMER_RESOLUTION_FAILED,
+                throw new CustomerResolutionException(PolicyErrorCode.ISSUANCE_CUSTOMER_RESOLUTION_FAILED,
                         "客户主数据服务不可用，无法校验出单参与方", exception, true);
             }
         }
@@ -210,7 +206,7 @@ public class IssuanceCustomerResolver {
             throw exception;
         } catch (RuntimeException exception) {
             log.warn("客户解析失败: tenantId={}, idType={}, idNo={}", tenantId, idType, mask(key.idNo()), exception);
-            throw new CustomerResolutionException(CUSTOMER_RESOLUTION_FAILED,
+            throw new CustomerResolutionException(PolicyErrorCode.ISSUANCE_CUSTOMER_RESOLUTION_FAILED,
                     "客户主数据服务不可用，无法完成出单参与方建档", exception, true);
         }
     }
@@ -320,12 +316,12 @@ public class IssuanceCustomerResolver {
     }
 
     private CustomerResolutionException missingIdentity(String party) {
-        return new CustomerResolutionException(CUSTOMER_IDENTITY_REQUIRED,
+        return new CustomerResolutionException(PolicyErrorCode.ISSUANCE_CUSTOMER_IDENTITY_REQUIRED,
                 party + "缺少客户ID，且姓名、证件类型、证件号不完整");
     }
 
     private CustomerResolutionException identityMismatch(String message) {
-        return new CustomerResolutionException(CUSTOMER_IDENTITY_MISMATCH, message);
+        return new CustomerResolutionException(PolicyErrorCode.ISSUANCE_CUSTOMER_IDENTITY_MISMATCH, message);
     }
 
     private boolean hasText(String value) {

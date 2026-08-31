@@ -10,11 +10,11 @@ import org.junit.jupiter.api.Test;
 
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.aggregate.Proposal;
+import com.titanium.policy.common.enums.ProposalStatusCode;
 import com.titanium.policy.entity.proposal.ProposalHolder;
 import com.titanium.policy.entity.proposal.ProposalSubject;
 import com.titanium.policy.exception.PolicyBusinessRuleException;
 import com.titanium.policy.valueobject.proposal.ProposalBasicInfo;
-import com.titanium.policy.valueobject.proposal.ProposalStatus;
 
 /**
  * 投保意向单聚合测试
@@ -76,7 +76,7 @@ class ProposalTest {
         assertEquals("PROP-202601220001", proposal.getProposalNo());
         assertEquals(com.titanium.metadata.enums.policy.PolicyForm.INDIVIDUAL, proposal.getPolicyForm());
         assertEquals(com.titanium.metadata.enums.product.ProductEnum.SalesChannel.ONLINE, proposal.getChannel());
-        assertEquals(ProposalStatus.StatusCode.DRAFT, proposal.getStatus().statusCode());
+        assertEquals(ProposalStatusCode.DRAFT, proposal.getStatus().statusCode());
         assertNotNull(proposal.getCreateTime());
         assertNotNull(proposal.getUpdateTime());
         assertEquals("tenant-123", proposal.getTenantId());
@@ -118,7 +118,7 @@ class ProposalTest {
         // 提交投保意向单
         proposal.submitProposal("客户确认提交");
         // 验证状态是否更新为已提交
-        assertEquals(ProposalStatus.StatusCode.SUBMITTED, proposal.getStatus().statusCode());
+        assertEquals(ProposalStatusCode.SUBMITTED, proposal.getStatus().statusCode());
         assertEquals("客户确认提交", proposal.getStatus().changeReason());
     }
 
@@ -163,7 +163,7 @@ class ProposalTest {
         // 转为投保单
         proposal.convertToApplication("转为投保单");
         // 验证状态是否更新为已转投保单
-        assertEquals(ProposalStatus.StatusCode.CONVERTED_TO_APPLICATION, proposal.getStatus().statusCode());
+        assertEquals(ProposalStatusCode.CONVERTED_TO_APPLICATION, proposal.getStatus().statusCode());
         assertEquals("转为投保单", proposal.getStatus().changeReason());
     }
 
@@ -180,7 +180,7 @@ class ProposalTest {
         // 作废投保意向单
         proposal.voidProposal("客户取消投保");
         // 验证状态是否更新为作废
-        assertEquals(ProposalStatus.StatusCode.VOIDED, proposal.getStatus().statusCode());
+        assertEquals(ProposalStatusCode.VOIDED, proposal.getStatus().statusCode());
         assertEquals("客户取消投保", proposal.getStatus().changeReason());
     }
 

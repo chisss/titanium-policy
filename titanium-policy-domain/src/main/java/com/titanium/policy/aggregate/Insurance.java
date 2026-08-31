@@ -11,6 +11,7 @@ import org.axonframework.modelling.command.AggregateLifecycle;
 import org.axonframework.spring.stereotype.Aggregate;
 
 import com.titanium.common.domain.BaseAggregate;
+import com.titanium.metadata.enums.CurrencyEnum;
 import com.titanium.metadata.enums.billing.PremiumCollectionMode;
 import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.policy.PolicyForm;
@@ -21,6 +22,7 @@ import com.titanium.policy.command.CreateInsuranceDirectlyCommand;
 import com.titanium.policy.command.ReceiveUnderwritingResultCommand;
 import com.titanium.policy.command.SubmitUnderwritingCommand;
 import com.titanium.policy.command.TriggerIssuanceCommand;
+import com.titanium.policy.common.enums.InsuranceStatusCode;
 import com.titanium.policy.entity.insurance.InsuranceLine;
 import com.titanium.policy.entity.insurance.InsuredPartyList;
 import com.titanium.policy.event.insurance.InsuranceCreatedEvent;
@@ -128,9 +130,9 @@ public class Insurance extends BaseAggregate {
     @CommandHandler
     public void handle(SubmitUnderwritingCommand command) {
         // 校验状态
-        InsuranceStatus.StatusCode currentStatus = this.status.statusCode();
-        if (currentStatus != InsuranceStatus.StatusCode.DRAFT && currentStatus != InsuranceStatus.StatusCode.SUBMITTED
-                && currentStatus != InsuranceStatus.StatusCode.UNDERWRITING_SUSPENDED) {
+        InsuranceStatusCode currentStatus = this.status.statusCode();
+        if (currentStatus != InsuranceStatusCode.DRAFT && currentStatus != InsuranceStatusCode.SUBMITTED
+                && currentStatus != InsuranceStatusCode.UNDERWRITING_SUSPENDED) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION",
                     "Only draft, submitted or suspended applications can be submitted for underwriting");
         }
@@ -143,7 +145,7 @@ public class Insurance extends BaseAggregate {
         AggregateLifecycle.apply(new InsuranceSubmittedForUnderwritingEvent(this.insuranceId, this.insuranceNo,
                 this.basicInfo.holderId(), this.basicInfo.insuredCount(),
                 this.basicInfo.exactPremium() != null ? this.basicInfo.exactPremium().value() : null,
-                this.basicInfo.exactPremium() != null ? this.basicInfo.exactPremium().currency() : "CNY",
+                this.basicInfo.exactPremium() != null ? this.basicInfo.exactPremium().currency() : CurrencyEnum.CNY.getCode(),
                 this.basicInfo.insurancePeriodStart(), this.basicInfo.insurancePeriodEnd(), lineProductCodes(),
                 this.basicInfo.underwritingPriority(), this.policyForm, this.tenantId, this.bizNo));
     }
@@ -153,7 +155,7 @@ public class Insurance extends BaseAggregate {
      */
     @CommandHandler
     public void handle(ReceiveUnderwritingResultCommand command) {
-        if (this.status.statusCode() != InsuranceStatus.StatusCode.UNDERWRITING) {
+        if (this.status.statusCode() != InsuranceStatusCode.UNDERWRITING) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION",
                     "Only applications in underwriting can receive results");
         }
@@ -168,7 +170,7 @@ public class Insurance extends BaseAggregate {
      */
     @CommandHandler
     public void handle(TriggerIssuanceCommand command) {
-        if (this.status.statusCode() != InsuranceStatus.StatusCode.UNDERWRITING_APPROVED) {
+        if (this.status.statusCode() != InsuranceStatusCode.UNDERWRITING_APPROVED) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION",
                     "Only underwriting approved applications can trigger issuance");
         }
@@ -198,17 +200,17 @@ public class Insurance extends BaseAggregate {
         this.marketPackageId = event.marketPackageId();
         // 参与方清单从事件初始化；事件无清单时置 null，兼容存量事件（SubmitUnderwriting 有 null 校验保护）
         this.insuredPartyList = event.insuredPartyList();
-        this.status = new InsuranceStatus(InsuranceStatus.StatusCode.DRAFT, event.createTime(),
+        this.status = new InsuranceStatus(InsuranceStatusCode.DRAFT, event.createTime(),
                 event.proposalId() != null ? "从意向单创建投保单" : "直接创建投保单");
         this.basicInfo = new InsuranceBasicInfo(event.holderId(), event.insuredCount(),
-                event.exactPremium() != null ? Money.of(event.exactPremium(), "CNY") : null,
+                event.exactPremium() != null ? Money.of(event.exactPremium(), CurrencyEnum.CNY.getCode()) : null,
                 event.insurancePeriodStart(), event.insurancePeriodEnd(), event.productCodes(),
                 event.underwritingPriority());
     }
 
     @EventSourcingHandler
     public void on(InsuranceSubmittedForUnderwritingEvent event) {
-        this.status = this.status.transitionStatus(InsuranceStatus.StatusCode.UNDERWRITING, "提交核保");
+        this.status = this.status.transitionStatus(InsuranceStatusCode.UNDERWRITING, "提交核保");
         this.updateTime = LocalDateTime.now();
     }
 
@@ -219,10 +221,10 @@ public class Insurance extends BaseAggregate {
                 event.underwriterId(), event.underwritingTime(), event.underwritingCondition(),
                 event.extraPremiumRatio());
 
-        InsuranceStatus.StatusCode newStatus = switch (resultCode) {
-            case ACCEPT, MODIFY -> InsuranceStatus.StatusCode.UNDERWRITING_APPROVED;
-            case REJECT -> InsuranceStatus.StatusCode.UNDERWRITING_REJECTED;
-            case POSTPONE -> InsuranceStatus.StatusCode.UNDERWRITING_SUSPENDED;
+        InsuranceStatusCode newStatus = switch (resultCode) {
+            case ACCEPT, MODIFY -> InsuranceStatusCode.UNDERWRITING_APPROVED;
+            case REJECT -> InsuranceStatusCode.UNDERWRITING_REJECTED;
+            case POSTPONE -> InsuranceStatusCode.UNDERWRITING_SUSPENDED;
         };
         String changeReason = switch (resultCode) {
             case ACCEPT -> "核保通过";
@@ -244,7 +246,7 @@ public class Insurance extends BaseAggregate {
 
     @EventSourcingHandler
     public void on(InsuranceIssuedEvent event) {
-        this.status = this.status.transitionStatus(InsuranceStatus.StatusCode.ISSUED, "触发承保流程");
+        this.status = this.status.transitionStatus(InsuranceStatusCode.ISSUED, "触发承保流程");
         this.updateTime = event.issuedTime();
     }
 
@@ -397,7 +399,7 @@ public class Insurance extends BaseAggregate {
     }
 
     private void ensureDraftStatus() {
-        if (this.status.statusCode() != InsuranceStatus.StatusCode.DRAFT) {
+        if (this.status.statusCode() != InsuranceStatusCode.DRAFT) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "Only draft applications can be modified");
         }
     }

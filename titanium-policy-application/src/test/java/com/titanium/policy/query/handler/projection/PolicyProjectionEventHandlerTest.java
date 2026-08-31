@@ -17,13 +17,13 @@ import com.titanium.metadata.enums.maintenance.PolicyMaintenanceAction;
 import com.titanium.metadata.enums.policy.PolicyEnum;
 import com.titanium.metadata.enums.product.ProductEnum.ProductCategory;
 import com.titanium.policy.common.enums.EndorsementCategory;
+import com.titanium.policy.common.enums.PolicyStatusCode;
 import com.titanium.policy.entity.policy.PolicyProduct;
 import com.titanium.policy.event.PolicyCreatedEvent;
 import com.titanium.policy.event.PolicyMaintenanceStateAppliedEvent;
 import com.titanium.policy.query.mapper.PolicyViewMapper;
 import com.titanium.policy.query.repository.PolicyViewRepository;
 import com.titanium.policy.query.view.PolicyView;
-import com.titanium.policy.valueobject.PolicyStatus;
 
 class PolicyProjectionEventHandlerTest {
 
@@ -145,7 +145,7 @@ class PolicyProjectionEventHandlerTest {
                 "POLICY_SUSPENSION", EndorsementCategory.LIFECYCLE, 7, 8, appliedAt,
                 "保单暂停", "b".repeat(64), "c".repeat(64), "axon-event://policy/POLICY_001/8",
                 "d".repeat(64), "e".repeat(64), List.of(), null, PolicyMaintenanceAction.SUSPEND,
-                PolicyStatus.StatusCode.EFFECTIVE, PolicyStatus.StatusCode.SUSPENDED,
+                PolicyStatusCode.EFFECTIVE, PolicyStatusCode.SUSPENDED,
                 "客户申请暂停", null, appliedAt, "operator-1", "TENANT_001");
     }
 

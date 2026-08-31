@@ -10,7 +10,7 @@ import lombok.Getter;
  * 年金给付频率枚举
  * <p>
  * 年金保险（{@code InsuranceProductType.ANNUITY}）进入给付期后，按本频率周期性向受益人给付生存年金。
- * 与缴费频率（{@code PremiumPlan.PaymentCycle}）语义不同：缴费是保单存续前期投保人向保险人交费，
+ * 与缴费频率（{@code PremiumPaymentCycle}）语义不同：缴费是保单存续前期投保人向保险人交费，
  * 给付是给付期保险人向被保险人/受益人付款，故为 policy 域内独立约定，归属本模块 common 层。
  * </p>
  */

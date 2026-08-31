@@ -15,6 +15,7 @@ import com.titanium.policy.command.AddInsuredMemberCommand;
 import com.titanium.policy.command.LinkInvestmentAccountCommand;
 import com.titanium.policy.command.RemoveInsuredMemberCommand;
 import com.titanium.policy.common.enums.FamilyRelation;
+import com.titanium.policy.common.enums.PolicyStatusCode;
 import com.titanium.policy.entity.insurance.InsuredPartyList.InsuredInfo;
 import com.titanium.policy.event.InsuredMemberAddedEvent;
 import com.titanium.policy.event.InsuredMemberRemovedEvent;
@@ -50,7 +51,7 @@ class PolicyFormBehaviorTest {
     private PolicyCreatedEvent createdEvent(PolicyForm form) {
         LocalDateTime now = LocalDateTime.now();
         return new PolicyCreatedEvent(POLICY_ID, new PolicyNo("POL-2024-0001"), form, null, null, null, null, null,
-                PolicyPeriod.of(now, now.plusYears(1), 0, 0), null, null, java.util.List.of(), null, null, null, new PolicyStatus(PolicyStatus.StatusCode.NOT_EFFECTIVE, now, "创建", "system"),
+                PolicyPeriod.of(now, now.plusYears(1), 0, 0), null, null, java.util.List.of(), null, null, null, new PolicyStatus(PolicyStatusCode.NOT_EFFECTIVE, now, "创建", "system"),
                 null, null, TENANT_ID);
     }
 

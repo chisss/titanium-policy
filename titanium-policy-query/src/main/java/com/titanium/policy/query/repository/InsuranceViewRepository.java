@@ -8,8 +8,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
 
+import com.titanium.policy.common.enums.InsuranceStatusCode;
 import com.titanium.policy.query.view.InsuranceView;
-import com.titanium.policy.valueobject.insurance.InsuranceStatus;
 
 /**
  * 投保单读模型仓储
@@ -30,5 +30,5 @@ public interface InsuranceViewRepository
 
     List<InsuranceView> findByHolderIdAndTenantId(String holderId, String tenantId, Pageable pageable);
 
-    List<InsuranceView> findByStatusAndTenantId(InsuranceStatus.StatusCode status, String tenantId, Pageable pageable);
+    List<InsuranceView> findByStatusAndTenantId(InsuranceStatusCode status, String tenantId, Pageable pageable);
 }

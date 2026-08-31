@@ -2,6 +2,7 @@ package com.titanium.policy.service.impl;
 
 import org.springframework.stereotype.Service;
 
+import com.titanium.metadata.enums.CurrencyEnum;
 import com.titanium.metadata.enums.underwriting.UnderwritingEnum.ConclusionType;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.aggregate.Insurance;
@@ -37,7 +38,7 @@ public class PolicyIssuanceDomainServiceImpl implements PolicyIssuanceDomainServ
         // 规则三：从投保单聚合推导保单构建要素（跨「投保单→保单」的领域转换规则）
         InsuranceBasicInfo basicInfo = insurance.getBasicInfo();
         Money premium = basicInfo != null && basicInfo.exactPremium() != null ? basicInfo.exactPremium()
-                : Money.zero("CNY");
+                : Money.zero(CurrencyEnum.CNY.getCode());
 
         // 规则四：仅 MODIFY（修改条件承保）携带核保加费/特约条件，ACCEPT 无附加条件
         String underwritingCondition = conclusion == ConclusionType.MODIFY ? underwritingResult.condition() : null;

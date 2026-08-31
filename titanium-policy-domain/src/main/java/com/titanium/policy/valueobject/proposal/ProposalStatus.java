@@ -2,22 +2,21 @@ package com.titanium.policy.valueobject.proposal;
 
 import java.time.LocalDateTime;
 
-import com.titanium.metadata.enums.BaseEnum;
+import com.titanium.policy.common.enums.ProposalStatusCode;
 import com.titanium.policy.exception.PolicyStatusTransitionException;
-
-import lombok.Getter;
 
 /**
  * 投保意向单状态值对象
  * <p>
- * 管控意向单生命周期状态流转，包含状态编码、状态变更时间和变更原因
+ * 管控意向单生命周期状态流转，包含状态编码、状态变更时间和变更原因。
+ * 状态编码枚举已迁至 common/enums 的 {@link ProposalStatusCode}。
  * </p>
  *
  * @param statusCode 状态编码
  * @param statusTime 状态变更时间
  * @param changeReason 变更原因
  */
-public record ProposalStatus(StatusCode statusCode, LocalDateTime statusTime, String changeReason) {
+public record ProposalStatus(ProposalStatusCode statusCode, LocalDateTime statusTime, String changeReason) {
 
     /**
      * 状态流转方法
@@ -29,7 +28,7 @@ public record ProposalStatus(StatusCode statusCode, LocalDateTime statusTime, St
      * @param changeReason 变更原因
      * @return 新的状态值对象
      */
-    public ProposalStatus transitionStatus(StatusCode newStatusCode, String changeReason) {
+    public ProposalStatus transitionStatus(ProposalStatusCode newStatusCode, String changeReason) {
         // 状态流转规则校验
         validateTransition(newStatusCode);
         return new ProposalStatus(newStatusCode, LocalDateTime.now(), changeReason);
@@ -40,51 +39,19 @@ public record ProposalStatus(StatusCode statusCode, LocalDateTime statusTime, St
      *
      * @param newStatusCode 新状态编码
      */
-    private void validateTransition(StatusCode newStatusCode) {
+    private void validateTransition(ProposalStatusCode newStatusCode) {
         // 草稿状态可以转为已提交
-        if (this.statusCode == StatusCode.DRAFT && newStatusCode == StatusCode.SUBMITTED) {
+        if (this.statusCode == ProposalStatusCode.DRAFT && newStatusCode == ProposalStatusCode.SUBMITTED) {
             return;
         }
         // 已提交状态可以转为已转投保单或作废
-        if (this.statusCode == StatusCode.SUBMITTED
-                && (newStatusCode == StatusCode.CONVERTED_TO_APPLICATION || newStatusCode == StatusCode.VOIDED)) {
+        if (this.statusCode == ProposalStatusCode.SUBMITTED
+                && (newStatusCode == ProposalStatusCode.CONVERTED_TO_APPLICATION
+                || newStatusCode == ProposalStatusCode.VOIDED)) {
             return;
         }
         // 其他状态流转不允许
         throw new PolicyStatusTransitionException(
                 "投保意向单", "", this.statusCode.name(), newStatusCode.name());
-    }
-
-    /**
-     * 状态编码枚举
-     */
-    @Getter
-    public enum StatusCode implements BaseEnum {
-        /**
-         * 草稿
-         */
-        DRAFT(1, "DRAFT", "草稿"),
-        /**
-         * 已提交
-         */
-        SUBMITTED(2, "SUBMITTED", "已提交"),
-        /**
-         * 已转投保单
-         */
-        CONVERTED_TO_APPLICATION(3, "CONVERTED_TO_APPLICATION", "已转投保单"),
-        /**
-         * 作废
-         */
-        VOIDED(4, "VOIDED", "作废");
-
-        private final Integer enumCode;
-        private final String  code;
-        private final String  name;
-
-        StatusCode(Integer enumCode, String code, String name) {
-            this.enumCode = enumCode;
-            this.code = code;
-            this.name = name;
-        }
     }
 }

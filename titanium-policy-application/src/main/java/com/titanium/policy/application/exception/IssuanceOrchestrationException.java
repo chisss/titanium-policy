@@ -1,5 +1,6 @@
 package com.titanium.policy.application.exception;
 
+import com.titanium.metadata.errorcode.BaseErrorCode;
 import com.titanium.policy.valueobject.IssuanceResult;
 
 /**
@@ -13,6 +14,25 @@ public class IssuanceOrchestrationException extends RuntimeException {
 
     private final IssuanceResult partialResult;
 
+    /**
+     * 携带错误码枚举构造（规约红线 16：异常必须携带 BaseErrorCode，禁止裸串 code）。
+     *
+     * @param errorCode     错误码枚举
+     * @param partialResult 已落地的部分出单结果
+     * @param cause         失败原因
+     */
+    public IssuanceOrchestrationException(BaseErrorCode errorCode, IssuanceResult partialResult, Throwable cause) {
+        this(errorCode.getMessage(), partialResult, cause);
+    }
+
+    /**
+     * @param message       错误信息
+     * @param partialResult 已落地的部分出单结果
+     * @param cause         失败原因
+     * @deprecated 裸字符串消息无法国际化，新代码请改用
+     *         {@link #IssuanceOrchestrationException(BaseErrorCode, IssuanceResult, Throwable)}
+     */
+    @Deprecated
     public IssuanceOrchestrationException(String message, IssuanceResult partialResult, Throwable cause) {
         super(message, cause);
         this.partialResult = partialResult;

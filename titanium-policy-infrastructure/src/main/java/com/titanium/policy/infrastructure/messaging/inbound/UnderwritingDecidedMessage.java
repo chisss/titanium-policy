@@ -1,5 +1,7 @@
 package com.titanium.policy.infrastructure.messaging.inbound;
 
+import java.math.BigDecimal;
+
 /**
  * 核保决策事件入站消息（policy 域防腐镜像）
  * <p>
@@ -22,7 +24,7 @@ public record UnderwritingDecidedMessage(ValueRef policyId, ValueRef underwritin
      * 核保域 {@code ExtraPremium} 加费值对象的防腐镜像（UW-3 结构化加费异步回流）。
      * 仅承接 policy 出单所需的加费率字段，其余（固定额/期限/原因）忽略。
      */
-    public record ExtraPremiumRef(java.math.BigDecimal ratio) {
+    public record ExtraPremiumRef(BigDecimal ratio) {
     }
 
     /** 空安全提取投保单/保单关联键 */
@@ -36,7 +38,7 @@ public record UnderwritingDecidedMessage(ValueRef policyId, ValueRef underwritin
     }
 
     /** 空安全提取加费率（无加费时返回 null） */
-    public java.math.BigDecimal extraPremiumRatioValue() {
+    public BigDecimal extraPremiumRatioValue() {
         return extraPremium != null ? extraPremium.ratio() : null;
     }
 }

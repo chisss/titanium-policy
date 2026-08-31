@@ -4,6 +4,7 @@ import java.util.List;
 
 import com.titanium.metadata.enums.policy.IssuanceStrategy;
 import com.titanium.metadata.enums.product.ProductEnum.IssuanceMode;
+import com.titanium.metadata.errorcode.BaseErrorCode;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.common.enums.IssuanceStage;
 import com.titanium.policy.valueobject.policy.CollectionResult;
@@ -48,17 +49,36 @@ public record IssuanceResult(boolean success, String bizNo, IssuanceMode issuanc
                              String rejectReason) {
 
     /**
-     * 构造受理拒绝结果。
+     * 构造受理拒绝结果（裸字符串错误码）。
      *
      * @param bizNo  业务流水号
      * @param code   拒绝业务码
      * @param reason 拒绝原因（🔴 仅用于领域内部固定文案；面向调用方的文案应走
      *               {@link #rejected(String, RuleDecision)} 以支持多语言渲染）
      * @return 拒绝结果
+     * @deprecated 裸字符串错误码无法国际化（规约红线 16），新代码请改用
+     *         {@link #rejected(String, RuleDecision)} 或 {@link #rejected(String, BaseErrorCode, String)}
      */
+    @Deprecated
     public static IssuanceResult rejected(String bizNo, String code, String reason) {
         return new IssuanceResult(false, bizNo, null, null, IssuanceStage.REJECTED, null, null, null, null, List.of(),
                 null, null, null, null, null, null, null, code, reason);
+    }
+
+    /**
+     * 构造受理拒绝结果（携带错误码枚举，文案已由调用方确定）。
+     * <p>
+     * 适用于携带动态文案的拒绝场景（如跨服务异常透传）；可静态确定文案的场景优先用
+     * {@link #rejected(String, RuleDecision)}。
+     * </p>
+     *
+     * @param bizNo     业务流水号
+     * @param errorCode 拒绝业务错误码枚举
+     * @param reason    拒绝原因
+     * @return 拒绝结果
+     */
+    public static IssuanceResult rejected(String bizNo, BaseErrorCode errorCode, String reason) {
+        return rejected(bizNo, errorCode.getCode(), reason);
     }
 
     /**

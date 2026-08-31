@@ -10,11 +10,11 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.titanium.policy.common.enums.ProposalStatusCode;
 import com.titanium.policy.query.repository.ProposalViewRepository;
 import com.titanium.policy.query.result.ProposalQueryResult;
 import com.titanium.policy.query.service.ProposalQueryService;
 import com.titanium.policy.query.view.ProposalView;
-import com.titanium.policy.valueobject.proposal.ProposalStatus;
 
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
@@ -89,7 +89,7 @@ public class ProposalQueryServiceImpl implements ProposalQueryService {
             }
             if (isNotBlank(status)) {
                 try {
-                    ProposalStatus.StatusCode statusEnum = ProposalStatus.StatusCode.valueOf(status);
+                    ProposalStatusCode statusEnum = ProposalStatusCode.valueOf(status);
                     predicates.add(cb.equal(root.get("status"), statusEnum));
                 } catch (IllegalArgumentException e) {
                     log.warn("无效的意向单状态值: {}", status);

@@ -1,6 +1,8 @@
 package com.titanium.policy.application.command;
 
+import java.math.BigDecimal;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -8,7 +10,10 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.titanium.metadata.enums.CurrencyEnum;
+import com.titanium.metadata.enums.policy.IssuanceStrategy;
 import com.titanium.metadata.enums.product.ProductEnum.IssuanceMode;
+import com.titanium.metadata.errorcode.PolicyErrorCode;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.application.exception.CustomerResolutionException;
 import com.titanium.policy.application.exception.IssuanceOrchestrationException;
@@ -57,9 +62,6 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class PolicyIssuanceApplicationService {
 
-    private static final String PRODUCT_RULES_UNAVAILABLE = "ISSUANCE_PRODUCT_RULES_UNAVAILABLE";
-    private static final String PRODUCT_RULES_UNAVAILABLE_MESSAGE = "产品投保规则暂不可用，请稍后重试";
-
     private final IssuanceOrchestrator             issuanceOrchestrator;
     private final IssuanceEligibilityDomainService eligibilityDomainService;
     private final ProductServicePort               productServicePort;
@@ -97,8 +99,9 @@ public class PolicyIssuanceApplicationService {
             resolvedRequest = issuanceCustomerResolver.resolve(request);
         } catch (CustomerResolutionException exception) {
             log.warn("[出单入口] 参与方客户解析失败: bizNo={}, 错误码={}", request.bizNo(), exception.errorCode());
-            IssuanceResult rejected = IssuanceResult.rejected(request.bizNo(), exception.errorCode(),
-                    exception.getMessage());
+            IssuanceResult rejected = exception.errorCodeEnum() != null
+                    ? IssuanceResult.rejected(request.bizNo(), exception.errorCodeEnum(), exception.getMessage())
+                    : IssuanceResult.rejected(request.bizNo(), exception.errorCode(), exception.getMessage());
             if (exception.retryable()) {
                 // 客户服务瞬时故障不写幂等终态；调用方可用同一 bizNo 原样重试。
                 return rejected;
@@ -112,8 +115,8 @@ public class PolicyIssuanceApplicationService {
             rulesByProduct = loadIssueRules(resolvedRequest);
         } catch (RuntimeException exception) {
             log.warn("[出单入口] 产品投保规则不可用: bizNo={}", resolvedRequest.bizNo(), exception);
-            IssuanceResult rejected = IssuanceResult.rejected(resolvedRequest.bizNo(), PRODUCT_RULES_UNAVAILABLE,
-                    PRODUCT_RULES_UNAVAILABLE_MESSAGE);
+            IssuanceResult rejected = IssuanceResult.rejected(resolvedRequest.bizNo(),
+                    RuleDecision.rejected(PolicyErrorCode.ISSUANCE_PRODUCT_RULES_UNAVAILABLE));
             return saveBaselineOrFirstResult(resolvedRequest, rejected).orElse(rejected);
         }
 
@@ -204,7 +207,7 @@ public class PolicyIssuanceApplicationService {
     private IssuanceResult acceptedBaseline(IssuanceRequest request, IssuanceMode issuanceMode) {
         return new IssuanceResult(true, request.bizNo(), issuanceMode, request.issuanceStrategy(),
                 IssuanceStage.ACCEPTED,
-                null, null, null, null, java.util.List.of(), null, null, null, null, null, null, null, null, null);
+                null, null, null, null, List.of(), null, null, null, null, null, null, null, null, null);
     }
 
     /**
@@ -241,15 +244,15 @@ public class PolicyIssuanceApplicationService {
         IssuanceResult.IssuedPolicy policy = toIssuedPolicy(view, policyView);
         return new IssuanceResult(view.getRejectCode() == null, view.getBizNo(),
                 view.getIssuanceMode() != null
-                        ? com.titanium.metadata.enums.product.ProductEnum.IssuanceMode.fromCode(view.getIssuanceMode())
+                        ? IssuanceMode.fromCode(view.getIssuanceMode())
                         : null,
                 view.getIssuanceStrategy() != null
-                        ? com.titanium.metadata.enums.policy.IssuanceStrategy.fromCode(view.getIssuanceStrategy())
+                        ? IssuanceStrategy.fromCode(view.getIssuanceStrategy())
                         : null,
                 IssuanceStage.fromCode(view.getCurrentStage()), view.getProposalId(),
                 proposal != null ? proposal.getProposalNo() : null, view.getInsuranceId(),
                 insurance != null ? insurance.getInsuranceNo() : null,
-                policy != null ? java.util.List.of(policy) : java.util.List.of(), view.getUnderwritingId(),
+                policy != null ? List.of(policy) : List.of(), view.getUnderwritingId(),
                 money(view.getStandardPremium()), extraPremium(view), money(view.getPayablePremium()), view.getBillId(),
                 view.getPaymentOrderId(), null, view.getRejectCode(), view.getRejectReason());
     }
@@ -278,7 +281,8 @@ public class PolicyIssuanceApplicationService {
         }
         int lineCount = policy != null && policy.getLineCount() != null
                 ? policy.getLineCount() : progress.getLineCount() != null ? progress.getLineCount() : 0;
-        String currency = policy != null && policy.getCurrency() != null ? policy.getCurrency().getCode() : "CNY";
+        String currency = policy != null && policy.getCurrency() != null ? policy.getCurrency().getCode()
+                : CurrencyEnum.CNY.getCode();
         Money totalPremium = policy != null && policy.getTotalPremium() != null
                 ? Money.of(policy.getTotalPremium(), currency) : null;
         return new IssuanceResult.IssuedPolicy(progress.getPolicyId(),
@@ -290,8 +294,8 @@ public class PolicyIssuanceApplicationService {
     /**
      * 数值 → 金额值对象（空安全，缺省币种 CNY）。
      */
-    private Money money(java.math.BigDecimal value) {
-        return value != null ? Money.of(value, "CNY") : null;
+    private Money money(BigDecimal value) {
+        return value != null ? Money.of(value, CurrencyEnum.CNY.getCode()) : null;
     }
 
     private Money extraPremium(IssuanceProgressView view) {

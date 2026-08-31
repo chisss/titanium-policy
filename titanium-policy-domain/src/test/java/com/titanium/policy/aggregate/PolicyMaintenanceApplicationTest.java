@@ -21,6 +21,7 @@ import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.enums.product.ProductEnum.ProductCategory;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.command.ApplyPolicyMaintenanceCommand;
+import com.titanium.policy.common.enums.PolicyStatusCode;
 import com.titanium.policy.entity.insurance.InsuredPartyList;
 import com.titanium.policy.entity.policy.PolicyProduct;
 import com.titanium.policy.event.PolicyActivatedEvent;
@@ -237,8 +238,8 @@ class PolicyMaintenanceApplicationTest {
         assertStateApplication(
                 stateCommand(PolicyMaintenanceAction.SUSPEND),
                 new Object[]{createdEvent(), activatedEvent()},
-                PolicyStatus.StatusCode.EFFECTIVE,
-                PolicyStatus.StatusCode.SUSPENDED);
+                PolicyStatusCode.EFFECTIVE,
+                PolicyStatusCode.SUSPENDED);
     }
 
     @Test
@@ -247,8 +248,8 @@ class PolicyMaintenanceApplicationTest {
                 stateCommand(PolicyMaintenanceAction.RESUME),
                 new Object[]{createdEvent(), activatedEvent(),
                     new PolicySuspendedEvent(POLICY_ID, EFFECTIVE_AT.minusHours(1), TENANT_ID)},
-                PolicyStatus.StatusCode.SUSPENDED,
-                PolicyStatus.StatusCode.EFFECTIVE);
+                PolicyStatusCode.SUSPENDED,
+                PolicyStatusCode.EFFECTIVE);
     }
 
     @Test
@@ -258,8 +259,8 @@ class PolicyMaintenanceApplicationTest {
                 new Object[]{createdEvent(), activatedEvent(),
                     new PolicyLapsedEvent(POLICY_ID, "欠费失效", EFFECTIVE_AT.minusHours(1),
                             "billing", TENANT_ID)},
-                PolicyStatus.StatusCode.LAPSED,
-                PolicyStatus.StatusCode.EFFECTIVE);
+                PolicyStatusCode.LAPSED,
+                PolicyStatusCode.EFFECTIVE);
     }
 
     @Test
@@ -267,8 +268,8 @@ class PolicyMaintenanceApplicationTest {
         assertStateApplication(
                 stateCommand(PolicyMaintenanceAction.TERMINATE),
                 new Object[]{createdEvent(), activatedEvent()},
-                PolicyStatus.StatusCode.EFFECTIVE,
-                PolicyStatus.StatusCode.TERMINATED);
+                PolicyStatusCode.EFFECTIVE,
+                PolicyStatusCode.TERMINATED);
     }
 
     @Test
@@ -282,8 +283,8 @@ class PolicyMaintenanceApplicationTest {
     private void assertStateApplication(
             ApplyPolicyMaintenanceCommand command,
             Object[] history,
-            PolicyStatus.StatusCode statusBefore,
-            PolicyStatus.StatusCode statusAfter) {
+            PolicyStatusCode statusBefore,
+            PolicyStatusCode statusAfter) {
         fixture.given(history)
                 .when(command)
                 .expectSuccessfulHandlerExecution()
@@ -422,7 +423,7 @@ class PolicyMaintenanceApplicationTest {
                 "product-v3", "plan-v8", null, amount, amount, null, null, null, null,
                 List.of(), List.of(), List.of());
         PolicyStatus status = new PolicyStatus(
-                PolicyStatus.StatusCode.NOT_EFFECTIVE, EFFECTIVE_AT.minusDays(1), "创建", "system");
+                PolicyStatusCode.NOT_EFFECTIVE, EFFECTIVE_AT.minusDays(1), "创建", "system");
         return new PolicyCreatedEvent(
                 POLICY_ID, new PolicyNo("P202608250001"), PolicyForm.INDIVIDUAL, "product-1",
                 null, null, null, null, null,

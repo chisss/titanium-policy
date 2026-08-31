@@ -4,6 +4,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
@@ -83,7 +84,7 @@ public final class PolicyMaintenanceHashing {
         append(canonical, effectiveAt == null ? null : effectiveAt.toString());
         append(canonical, changeSummary);
         changes.stream()
-                .sorted(java.util.Comparator.comparing(PolicyMaintenanceFieldChange::fieldCode)
+                .sorted(Comparator.comparing(PolicyMaintenanceFieldChange::fieldCode)
                         .thenComparing(PolicyMaintenanceFieldChange::objectId))
                 .forEach(field -> {
                     append(canonical, field.itemCode());
@@ -164,7 +165,7 @@ public final class PolicyMaintenanceHashing {
         append(canonical, Long.toString(actualVersion));
         append(canonical, snapshotHash);
         appliedFields.stream()
-                .sorted(java.util.Comparator.comparing(PolicyMaintenanceAppliedField::fieldCode)
+                .sorted(Comparator.comparing(PolicyMaintenanceAppliedField::fieldCode)
                         .thenComparing(PolicyMaintenanceAppliedField::objectId))
                 .forEach(field -> {
                     append(canonical, field.itemCode());

@@ -17,6 +17,7 @@ import com.titanium.policy.command.MaturePolicyCommand;
 import com.titanium.policy.command.UpdateAccountValueCommand;
 import com.titanium.policy.command.WaivePremiumCommand;
 import com.titanium.policy.common.enums.DividendOption;
+import com.titanium.policy.common.enums.PolicyStatusCode;
 import com.titanium.policy.common.enums.PremiumWaiverReason;
 import com.titanium.policy.event.AccountValueUpdatedEvent;
 import com.titanium.policy.event.DividendDistributedEvent;
@@ -53,7 +54,7 @@ class PolicyLifeBenefitTest {
     private PolicyCreatedEvent createdEvent(InsuranceProductType type) {
         LocalDateTime now = LocalDateTime.now();
         return new PolicyCreatedEvent(POLICY_ID, new PolicyNo("POL-2024-0001"), PolicyForm.INDIVIDUAL, null, null, null, null, null,
-                PolicyPeriod.of(now, now.plusYears(10), 0, 0), null, null, java.util.List.of(), null, null, null, new PolicyStatus(PolicyStatus.StatusCode.NOT_EFFECTIVE, now, "创建", "system"),
+                PolicyPeriod.of(now, now.plusYears(10), 0, 0), null, null, java.util.List.of(), null, null, null, new PolicyStatus(PolicyStatusCode.NOT_EFFECTIVE, now, "创建", "system"),
                 null, type, TENANT_ID);
     }
 
@@ -118,7 +119,7 @@ class PolicyLifeBenefitTest {
         return new PolicyCreatedEvent(POLICY_ID, new PolicyNo("POL-2024-0003"), PolicyForm.INDIVIDUAL, null, null, null,
                 null, null, PolicyPeriod.of(now, now.plusYears(10), 0, 0), null,
                 com.titanium.metadata.valueobject.Money.of(sumInsured, "CNY"), java.util.List.of(), null, null, null,
-                new PolicyStatus(PolicyStatus.StatusCode.NOT_EFFECTIVE, now, "创建", "system"), null, type, TENANT_ID);
+                new PolicyStatus(PolicyStatusCode.NOT_EFFECTIVE, now, "创建", "system"), null, type, TENANT_ID);
     }
 
     @Test
@@ -142,7 +143,7 @@ class PolicyLifeBenefitTest {
                                 org.hamcrest.CoreMatchers.instanceOf(PremiumWaivedEvent.class))))
                 .expectState(p -> {
                     if (!p.isPremiumWaived()
-                            || p.getStatus().statusCode() != PolicyStatus.StatusCode.EFFECTIVE) {
+                            || p.getStatus().statusCode() != PolicyStatusCode.EFFECTIVE) {
                         throw new AssertionError("豁免后保单应保持生效且标记已豁免");
                     }
                 });
@@ -244,7 +245,7 @@ class PolicyLifeBenefitTest {
     private PolicyCreatedEvent universalCreatedEvent() {
         LocalDateTime now = LocalDateTime.now();
         return new PolicyCreatedEvent(POLICY_ID, new PolicyNo("POL-2024-0002"), PolicyForm.UNIVERSAL, null, null, null, null, null,
-                PolicyPeriod.of(now, now.plusYears(10), 0, 0), null, null, java.util.List.of(), null, null, null, new PolicyStatus(PolicyStatus.StatusCode.NOT_EFFECTIVE, now, "创建", "system"),
+                PolicyPeriod.of(now, now.plusYears(10), 0, 0), null, null, java.util.List.of(), null, null, null, new PolicyStatus(PolicyStatusCode.NOT_EFFECTIVE, now, "创建", "system"),
                 null, InsuranceProductType.WHOLE_LIFE, TENANT_ID);
     }
 }

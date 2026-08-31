@@ -7,7 +7,7 @@ import com.titanium.common.jpa.BaseView;
 import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.enums.product.ProductEnum.SalesChannel;
-import com.titanium.policy.valueobject.proposal.ProposalStatus;
+import com.titanium.policy.common.enums.ProposalStatusCode;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -27,7 +27,7 @@ import lombok.Setter;
  * </p>
  * <p>
  * 继承 {@link BaseView}，复用租户ID、创建/更新时间（投影时间）、乐观锁版本等读模型公共字段。
- * 状态直接采用领域状态枚举 {@link ProposalStatus.StatusCode}。申请人/标的明细不进领域事件，读模型仅投影 basicInfo 级数据。
+ * 状态直接采用领域状态枚举 {@link ProposalStatusCode}。申请人/标的明细不进领域事件，读模型仅投影 basicInfo 级数据。
  * </p>
  */
 @Entity
@@ -103,5 +103,5 @@ public class ProposalView extends BaseView {
     /** 意向单状态（领域状态机编码） */
     @Enumerated(EnumType.STRING)
     @Column(name = "status_code", nullable = false, length = 32)
-    private ProposalStatus.StatusCode status;
+    private ProposalStatusCode status;
 }

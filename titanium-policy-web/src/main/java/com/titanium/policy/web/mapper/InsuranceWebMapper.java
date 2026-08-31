@@ -5,6 +5,7 @@ import java.math.BigDecimal;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
+import com.titanium.metadata.enums.CurrencyEnum;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.api.request.ConvertToInsuranceRequest;
 import com.titanium.policy.api.response.InsuranceResponse;
@@ -80,7 +81,7 @@ public interface InsuranceWebMapper {
     /**
      * 读模型结果 → 对外 DTO（Provider 用）
      * <p>
-     * 投保单状态在读模型为 domain 值对象 {@code InsuranceStatus.StatusCode}，api 侧以 {@code String}
+     * 投保单状态在读模型为 domain 值对象 {@code InsuranceStatusCode}，api 侧以 {@code String}
      * 承载，故经 {@code .name()} 转换（空安全）。
      * </p>
      *
@@ -98,6 +99,6 @@ public interface InsuranceWebMapper {
      * @return Money 值对象
      */
     default Money toMoney(BigDecimal value, String currency) {
-        return value != null ? Money.of(value, currency != null ? currency : "CNY") : null;
+        return value != null ? Money.of(value, currency != null ? currency : CurrencyEnum.CNY.getCode()) : null;
     }
 }

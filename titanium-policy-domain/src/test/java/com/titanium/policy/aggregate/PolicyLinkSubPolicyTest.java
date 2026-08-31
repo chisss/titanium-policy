@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.policy.command.LinkSubPolicyCommand;
+import com.titanium.policy.common.enums.PolicyStatusCode;
 import com.titanium.policy.event.PolicyCreatedEvent;
 import com.titanium.policy.event.SubPolicyLinkedEvent;
 import com.titanium.policy.valueobject.PolicyNo;
@@ -41,7 +42,7 @@ class PolicyLinkSubPolicyTest {
     private PolicyCreatedEvent createdEvent() {
         LocalDateTime now = LocalDateTime.now();
         return new PolicyCreatedEvent(PARENT_ID, new PolicyNo("POL-2024-0001"), PolicyForm.GROUP, null, null, null, null, null,
-                PolicyPeriod.of(now, now.plusYears(1), 0, 0), null, null, java.util.List.of(), null, null, null, new PolicyStatus(PolicyStatus.StatusCode.NOT_EFFECTIVE, now, "创建", "system"),
+                PolicyPeriod.of(now, now.plusYears(1), 0, 0), null, null, java.util.List.of(), null, null, null, new PolicyStatus(PolicyStatusCode.NOT_EFFECTIVE, now, "创建", "system"),
                 null, null, TENANT_ID);
     }
 

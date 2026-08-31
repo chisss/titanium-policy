@@ -1,6 +1,7 @@
 package com.titanium.policy.application.saga;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -19,6 +20,7 @@ import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility;
 
 import com.titanium.metadata.enums.BaseEnum;
+import com.titanium.metadata.enums.CurrencyEnum;
 import com.titanium.metadata.enums.billing.PremiumCollectionMode;
 import com.titanium.metadata.enums.insurance.InsuranceCategory;
 import com.titanium.metadata.enums.insurance.InsuranceProductType;
@@ -83,9 +85,9 @@ public class ProposalIssuanceSaga {
     /** 意向保费（客户预算或粗略报价，不作为实际保费） */
     private BigDecimal intendedPremium;
     /** 保障起期 */
-    private java.time.LocalDateTime insurancePeriodStart;
+    private LocalDateTime insurancePeriodStart;
     /** 保障止期 */
-    private java.time.LocalDateTime insurancePeriodEnd;
+    private LocalDateTime insurancePeriodEnd;
     /** 期望险种编码（单险种意向的遗留字段；多险种意向以 proposalLines 承载） */
     private String expectedProductCode;
     /** 意向险种段列表（多险种意向组合，转投保单时精化为投保段） */
@@ -162,7 +164,7 @@ public class ProposalIssuanceSaga {
                 return List.of();
             }
             String lineId = UUID.randomUUID().toString();
-            Money sumInsured = intendedSumInsured != null ? Money.of(intendedSumInsured, "CNY") : null;
+            Money sumInsured = intendedSumInsured != null ? Money.of(intendedSumInsured, CurrencyEnum.CNY.getCode()) : null;
             return List.of(new InsuranceLine(lineId, 1, ProductCategory.MAIN, null, null,
                     expectedProductCode, null, null, insuranceType,
                     sumInsured, null, coveragePeriod, mainPaymentTerms, subjectsForLine(insuranceType, sumInsured),

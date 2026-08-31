@@ -8,8 +8,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
 
+import com.titanium.policy.common.enums.ProposalStatusCode;
 import com.titanium.policy.query.view.ProposalView;
-import com.titanium.policy.valueobject.proposal.ProposalStatus;
 
 /**
  * 投保意向单读模型仓储
@@ -28,5 +28,5 @@ public interface ProposalViewRepository
 
     List<ProposalView> findByCustomerIdAndTenantId(String customerId, String tenantId, Pageable pageable);
 
-    List<ProposalView> findByStatusAndTenantId(ProposalStatus.StatusCode status, String tenantId, Pageable pageable);
+    List<ProposalView> findByStatusAndTenantId(ProposalStatusCode status, String tenantId, Pageable pageable);
 }

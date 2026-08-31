@@ -6,7 +6,7 @@ import java.util.List;
 import com.titanium.metadata.enums.maintenance.PolicyMaintenanceAction;
 import com.titanium.metadata.enums.policy.PolicyEnum.TerminationReason;
 import com.titanium.policy.common.enums.EndorsementCategory;
-import com.titanium.policy.valueobject.PolicyStatus;
+import com.titanium.policy.common.enums.PolicyStatusCode;
 import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceAppliedField;
 import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceExecutionState;
 
@@ -31,8 +31,8 @@ public record PolicyMaintenanceStateAppliedEvent(
         List<PolicyMaintenanceAppliedField> appliedFields,
         PolicyMaintenanceExecutionState executionStateAfter,
         PolicyMaintenanceAction stateAction,
-        PolicyStatus.StatusCode statusBefore,
-        PolicyStatus.StatusCode statusAfter,
+        PolicyStatusCode statusBefore,
+        PolicyStatusCode statusAfter,
         String stateReason,
         TerminationReason terminationReason,
         LocalDateTime appliedAt,

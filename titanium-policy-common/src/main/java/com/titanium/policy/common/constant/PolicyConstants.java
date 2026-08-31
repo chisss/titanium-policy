@@ -6,9 +6,12 @@ package com.titanium.policy.common.constant;
 public class PolicyConstants {
     public static final String POLICY_SYSTEM = "POLICY_SYSTEM";
 
+    /** 统一出单自动提交意向单的变更原因（落库字符串，红线 17：必须收敛到常量而非散落字面量） */
+    public static final String ISSUANCE_AUTO_SUBMIT_REASON = "统一出单自动提交意向单";
+
     // 保单状态已统一为 com.titanium.metadata.enums.policy.PolicyEnum.PolicyStatus
-    // 与本地 com.titanium.policy.valueobject.PolicyStatus.StatusCode，此处原 PolicyStatus 字符串常量已删除。
-    // 事件类型已迁移为枚举 com.titanium.policy.valueobject.PolicyEventType，此处原 EventType 字符串常量已删除。
+    // 与本地 com.titanium.policy.common.enums.PolicyStatusCode，此处原 PolicyStatus 字符串常量已删除。
+    // 事件类型已迁移为枚举 com.titanium.policy.common.enums.PolicyEventType，此处原 EventType 字符串常量已删除。
 
     /**
      * 消息队列主题常量

@@ -2,6 +2,7 @@ package com.titanium.policy.infrastructure.adapter;
 
 import org.springframework.stereotype.Component;
 
+import com.titanium.metadata.enums.CurrencyEnum;
 import com.titanium.metadata.response.ApiResponse;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.payment.api.PaymentApi;
@@ -125,6 +126,6 @@ public class PaymentServiceAdapter implements PaymentServicePort {
         if (order.getAmount() == null) {
             return null;
         }
-        return Money.of(order.getAmount(), order.getCurrency() != null ? order.getCurrency() : "CNY");
+        return Money.of(order.getAmount(), order.getCurrency() != null ? order.getCurrency() : CurrencyEnum.CNY.getCode());
     }
 }

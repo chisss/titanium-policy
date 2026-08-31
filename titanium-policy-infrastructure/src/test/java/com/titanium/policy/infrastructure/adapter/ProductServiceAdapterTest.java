@@ -10,9 +10,9 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
-import com.titanium.metadata.enums.product.ProductEnum.IssuanceMode;
 import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.insurance.SubjectType;
+import com.titanium.metadata.enums.product.ProductEnum.IssuanceMode;
 import com.titanium.metadata.response.ApiResponse;
 import com.titanium.product.api.ProductApi;
 import com.titanium.product.api.ProductTemplateApi;

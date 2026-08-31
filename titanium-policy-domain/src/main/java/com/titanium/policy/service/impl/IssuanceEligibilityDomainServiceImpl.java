@@ -14,10 +14,10 @@ import static com.titanium.metadata.errorcode.PolicyErrorCode.ELIGIBILITY_PAYMEN
 import static com.titanium.metadata.errorcode.PolicyErrorCode.ELIGIBILITY_PAYMENT_TERM_NOT_ALLOWED;
 import static com.titanium.metadata.errorcode.PolicyErrorCode.ELIGIBILITY_REGION_FORBIDDEN;
 import static com.titanium.metadata.errorcode.PolicyErrorCode.ELIGIBILITY_REGION_NOT_ALLOWED;
+import static com.titanium.metadata.errorcode.PolicyErrorCode.ELIGIBILITY_SUBJECT_ATTRIBUTE_MISSING;
 import static com.titanium.metadata.errorcode.PolicyErrorCode.ELIGIBILITY_SUM_INSURED_BELOW_MIN;
 import static com.titanium.metadata.errorcode.PolicyErrorCode.ELIGIBILITY_SUM_INSURED_EXCEEDS_MAX;
 import static com.titanium.metadata.errorcode.PolicyErrorCode.ELIGIBILITY_SUM_INSURED_REQUIRED;
-import static com.titanium.metadata.errorcode.PolicyErrorCode.ELIGIBILITY_SUBJECT_ATTRIBUTE_MISSING;
 
 import java.util.List;
 import java.util.Map;

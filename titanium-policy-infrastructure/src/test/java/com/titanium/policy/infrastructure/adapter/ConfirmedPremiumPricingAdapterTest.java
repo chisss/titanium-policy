@@ -11,7 +11,6 @@ import static org.mockito.Mockito.when;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -65,7 +64,8 @@ class ConfirmedPremiumPricingAdapterTest {
         return new ConfirmedPremiumRequest(
                 "REQ-1", "BIZ-1", "PRODUCT-1", "V3", LocalDateTime.of(2026, 9, 1, 0, 0),
                 "CNY", new BigDecimal("100000"), 35, "M", 20, 20, 20,
-                Map.of("lineNo", 1, "channelId", "CHANNEL-1", "policyYear", 1),
+                new com.titanium.policy.valueobject.pricing.ConfirmationContextSnapshot(
+                        "LINE-1", 1, "PRODUCT-CODE-1", "INSURANCE-1", "CHANNEL-1", 1),
                 List.of(new PremiumAdjustmentInput(
                         "UW-1", "SURCHARGE_RATE", new BigDecimal("0.20"), "核保加费", "UW-V1")),
                 "TENANT-1");
