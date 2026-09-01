@@ -21,8 +21,8 @@ import com.titanium.metadata.response.ApiResponse;
 import com.titanium.policy.valueobject.pricing.ConfirmedPremiumRequest;
 import com.titanium.policy.valueobject.pricing.PremiumAdjustmentInput;
 import com.titanium.product.api.ProductPremiumCalculationApi;
-import com.titanium.product.api.request.PremiumCalculationRequest;
-import com.titanium.product.api.response.PremiumCalculationResponse;
+import com.titanium.product.api.request.premium.PremiumCalculationRequest;
+import com.titanium.product.api.response.premium.PremiumCalculationResponse;
 
 class ConfirmedPremiumPricingAdapterTest {
 

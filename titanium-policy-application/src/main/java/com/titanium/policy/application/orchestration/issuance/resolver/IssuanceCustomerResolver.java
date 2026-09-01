@@ -1,4 +1,4 @@
-package com.titanium.policy.application.orchestration.issuance;
+package com.titanium.policy.application.orchestration.issuance.resolver;
 
 import java.text.Normalizer;
 import java.util.ArrayList;

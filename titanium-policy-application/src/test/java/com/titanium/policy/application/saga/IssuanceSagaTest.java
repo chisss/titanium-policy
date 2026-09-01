@@ -26,7 +26,7 @@ import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.enums.product.ProductEnum.PaymentFrequency;
 import com.titanium.metadata.enums.underwriting.UnderwritingEnum.ConclusionType;
 import com.titanium.metadata.valueobject.Money;
-import com.titanium.policy.application.orchestration.issuance.InsuranceLinePremiumConfirmationService;
+import com.titanium.policy.application.orchestration.issuance.service.InsuranceLinePremiumConfirmationService;
 import com.titanium.policy.application.orchestration.issuance.assembler.InsuranceLineAssembler;
 import com.titanium.policy.application.orchestration.issuance.assembler.PolicyProductAssembler;
 import com.titanium.policy.application.orchestration.issuance.orchestrator.PremiumCollectionOrchestrator;

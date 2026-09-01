@@ -7,8 +7,8 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.Named;
 
-import com.titanium.billing.api.request.ConfirmedPremiumReferenceRequest;
-import com.titanium.billing.api.request.CreateBillRequest;
+import com.titanium.billing.api.request.bill.ConfirmedPremiumReferenceRequest;
+import com.titanium.billing.api.request.bill.CreateBillRequest;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.valueobject.billing.PremiumBillRequest;
 import com.titanium.policy.valueobject.pricing.PremiumCalculationReference;

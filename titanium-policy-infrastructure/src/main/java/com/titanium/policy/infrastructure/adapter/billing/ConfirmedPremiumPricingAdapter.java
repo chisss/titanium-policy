@@ -14,9 +14,9 @@ import com.titanium.policy.valueobject.pricing.ConfirmationContextSnapshot;
 import com.titanium.policy.valueobject.pricing.ConfirmedPremiumRequest;
 import com.titanium.policy.valueobject.pricing.ConfirmedPremiumResult;
 import com.titanium.product.api.ProductPremiumCalculationApi;
-import com.titanium.product.api.request.PremiumCalculationRequest;
-import com.titanium.product.api.request.UnderwritingAdjustmentRequest;
-import com.titanium.product.api.response.PremiumCalculationResponse;
+import com.titanium.product.api.request.premium.PremiumCalculationRequest;
+import com.titanium.product.api.request.config.UnderwritingAdjustmentRequest;
+import com.titanium.product.api.response.premium.PremiumCalculationResponse;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

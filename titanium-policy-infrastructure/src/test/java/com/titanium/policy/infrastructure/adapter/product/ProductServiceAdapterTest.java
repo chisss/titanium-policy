@@ -16,9 +16,9 @@ import com.titanium.metadata.enums.product.ProductEnum.IssuanceMode;
 import com.titanium.metadata.response.ApiResponse;
 import com.titanium.product.api.ProductApi;
 import com.titanium.product.api.ProductTemplateApi;
-import com.titanium.product.api.response.IssuanceProcessConfigResponse;
-import com.titanium.product.api.response.ProductResponse;
-import com.titanium.product.api.response.ProductTemplateResponse;
+import com.titanium.product.api.response.config.IssuanceProcessConfigResponse;
+import com.titanium.product.api.response.product.ProductResponse;
+import com.titanium.product.api.response.product.ProductTemplateResponse;
 
 class ProductServiceAdapterTest {
 

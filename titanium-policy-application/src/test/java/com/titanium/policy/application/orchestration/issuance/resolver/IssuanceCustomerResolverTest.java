@@ -1,4 +1,4 @@
-package com.titanium.policy.application.orchestration.issuance;
+package com.titanium.policy.application.orchestration.issuance.resolver;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;

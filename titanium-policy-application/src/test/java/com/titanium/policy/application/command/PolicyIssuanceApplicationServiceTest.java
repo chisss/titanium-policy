@@ -34,7 +34,7 @@ import com.titanium.metadata.errorcode.PolicyErrorCode;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.application.exception.CustomerResolutionException;
 import com.titanium.policy.application.exception.IssuanceOrchestrationException;
-import com.titanium.policy.application.orchestration.issuance.IssuanceCustomerResolver;
+import com.titanium.policy.application.orchestration.issuance.resolver.IssuanceCustomerResolver;
 import com.titanium.policy.application.orchestration.issuance.orchestrator.IssuanceOrchestrator;
 import com.titanium.policy.common.enums.IssuanceStage;
 import com.titanium.policy.entity.insurance.InsuredPartyList;

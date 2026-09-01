@@ -39,7 +39,7 @@ import com.titanium.metadata.enums.product.ProductEnum.SalesChannel;
 import com.titanium.metadata.errorcode.PolicyErrorCode;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.application.exception.IssuanceOrchestrationException;
-import com.titanium.policy.application.orchestration.issuance.InsuranceLinePremiumConfirmationService;
+import com.titanium.policy.application.orchestration.issuance.service.InsuranceLinePremiumConfirmationService;
 import com.titanium.policy.application.orchestration.issuance.assembler.InsuranceLineAssembler;
 import com.titanium.policy.application.orchestration.issuance.assembler.PolicyProductAssembler;
 import com.titanium.policy.application.orchestration.issuance.assembler.ProposalLineAssembler;
