@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Optional;
 
 import com.titanium.metadata.enums.customer.CustomerEnum.InsuranceRole;
+import com.titanium.policy.query.result.PolicyClauseQueryResult;
 import com.titanium.policy.query.result.PolicyCollectionQueryResult;
 import com.titanium.policy.query.result.PolicyCoverageQueryResult;
 import com.titanium.policy.query.result.PolicyFullDetailQueryResult;
@@ -47,6 +48,18 @@ public interface PolicyLineQueryService {
      * @return 责任列表
      */
     List<PolicyCoverageQueryResult> findCoverages(String policyId, String tenantId);
+
+    /**
+     * 查询保单条款快照清单（跨险种段，签发即冻结）。
+     * <p>
+     * 下游（如 claim 域责任校验）凭条款ID穿透 clause 域取保险责任。
+     * </p>
+     *
+     * @param policyId 保单ID
+     * @param tenantId 租户ID
+     * @return 条款快照列表（无条款时为空列表）
+     */
+    List<PolicyClauseQueryResult> findClauses(String policyId, String tenantId);
 
     /**
      * 查询保单全部标的（跨险种段）。

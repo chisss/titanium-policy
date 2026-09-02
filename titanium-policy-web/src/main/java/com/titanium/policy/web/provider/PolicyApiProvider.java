@@ -16,6 +16,8 @@ import com.titanium.policy.api.request.CreatePolicyRequest;
 import com.titanium.policy.api.request.RecordPremiumCollectionRequest;
 import com.titanium.policy.api.request.maintenance.ApplyPolicyMaintenanceRequest;
 import com.titanium.policy.api.request.maintenance.PolicyMaintenanceRetroactiveEvidenceRequest;
+import com.titanium.policy.api.response.PolicyBeneficiaryResponse;
+import com.titanium.policy.api.response.PolicyClauseResponse;
 import com.titanium.policy.api.response.PolicyEndorsementResponse;
 import com.titanium.policy.api.response.PolicyMaintenanceSnapshotResponse;
 import com.titanium.policy.api.response.PolicyResponse;
@@ -26,6 +28,7 @@ import com.titanium.policy.api.response.maintenance.PolicyMaintenanceAppliedSnap
 import com.titanium.policy.api.response.maintenance.PolicyMaintenanceRetroactiveEvidenceResponse;
 import com.titanium.policy.application.command.PolicyApplicationService;
 import com.titanium.policy.application.query.PolicyAppQueryService;
+import com.titanium.policy.application.query.PolicyLineAppQueryService;
 import com.titanium.policy.command.ApplyPolicyMaintenanceCommand;
 import com.titanium.policy.command.CreatePolicyCommand;
 import com.titanium.policy.command.CreatePolicyDirectlyCommand;
@@ -56,6 +59,8 @@ public class PolicyApiProvider implements PolicyApi {
     private final PolicyApplicationService policyApplicationService;
 
     private final PolicyAppQueryService    policyAppQueryService;
+
+    private final PolicyLineAppQueryService policyLineAppQueryService;
 
     private final PolicyWebMapper          policyWebMapper;
 
@@ -166,6 +171,23 @@ public class PolicyApiProvider implements PolicyApi {
         policyApplicationService.updateAccountValue(policyId, dto.getAccountId(), dto.getAccountValue(),
                 dto.getCurrency(), tenantId);
         return ApiResponse.success();
+    }
+
+    @Override
+    public ApiResponse<List<PolicyClauseResponse>> getPolicyClauses(String policyId, String tenantId) {
+        List<PolicyClauseResponse> clauses = policyLineAppQueryService.findClauses(policyId, tenantId).stream()
+                .map(policyWebMapper::toClauseResponse)
+                .toList();
+        return ApiResponse.success(clauses);
+    }
+
+    @Override
+    public ApiResponse<List<PolicyBeneficiaryResponse>> getBeneficiaries(String policyId, String tenantId) {
+        List<PolicyBeneficiaryResponse> beneficiaries = policyAppQueryService.findBeneficiaries(policyId, tenantId)
+                .stream()
+                .map(policyWebMapper::toBeneficiaryResponse)
+                .toList();
+        return ApiResponse.success(beneficiaries);
     }
 
     private PolicyMaintenanceApplicationResponse toResponse(PolicyMaintenanceApplicationReceipt receipt) {

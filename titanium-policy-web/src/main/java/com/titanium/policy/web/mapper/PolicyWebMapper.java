@@ -12,6 +12,8 @@ import com.titanium.metadata.enums.CurrencyEnum;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.api.model.Amount;
 import com.titanium.policy.api.request.CreatePolicyRequest;
+import com.titanium.policy.api.response.PolicyBeneficiaryResponse;
+import com.titanium.policy.api.response.PolicyClauseResponse;
 import com.titanium.policy.api.response.PolicyMaintenanceSnapshotResponse;
 import com.titanium.policy.api.response.PolicyResponse;
 import com.titanium.policy.api.response.PolicySnapshotFieldValueResponse;
@@ -23,6 +25,8 @@ import com.titanium.policy.command.DistributeDividendCommand;
 import com.titanium.policy.command.MaturePolicyCommand;
 import com.titanium.policy.command.StartAnnuityPayoutCommand;
 import com.titanium.policy.command.WaivePremiumCommand;
+import com.titanium.policy.query.result.PolicyBeneficiaryQueryResult;
+import com.titanium.policy.query.result.PolicyClauseQueryResult;
 import com.titanium.policy.query.result.PolicyMaintenanceSnapshotQueryResult;
 import com.titanium.policy.query.result.PolicyMaintenanceSnapshotQueryResult.PolicySnapshotFieldValueQueryResult;
 import com.titanium.policy.query.result.PolicyQueryResult;
@@ -186,6 +190,22 @@ public interface PolicyWebMapper {
      */
     @Mapping(target = "status", expression = "java(result.getStatus() != null ? result.getStatus().name() : null)")
     PolicyStatusResponse toStatusResponse(PolicyQueryResult result);
+
+    /**
+     * 条款快照读模型 → Feign 契约（Provider 用，字段同名自动映射）
+     *
+     * @param result 条款快照查询结果
+     * @return 保单条款响应
+     */
+    PolicyClauseResponse toClauseResponse(PolicyClauseQueryResult result);
+
+    /**
+     * 受益人读模型 → Feign 契约（Provider 用，字段同名自动映射）
+     *
+     * @param result 受益人查询结果
+     * @return 保单受益人响应
+     */
+    PolicyBeneficiaryResponse toBeneficiaryResponse(PolicyBeneficiaryQueryResult result);
 
     /**
      * HTTP Request → 保费豁免命令（Controller 用）

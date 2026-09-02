@@ -23,6 +23,7 @@ import com.titanium.policy.query.repository.PolicyInsuredViewRepository;
 import com.titanium.policy.query.repository.PolicyProductViewRepository;
 import com.titanium.policy.query.repository.PolicySubjectViewRepository;
 import com.titanium.policy.query.repository.PolicyViewRepository;
+import com.titanium.policy.query.result.PolicyClauseQueryResult;
 import com.titanium.policy.query.result.PolicyCollectionQueryResult;
 import com.titanium.policy.query.result.PolicyCoverageQueryResult;
 import com.titanium.policy.query.result.PolicyFullDetailQueryResult;
@@ -123,6 +124,13 @@ public class PolicyLineQueryServiceImpl implements PolicyLineQueryService {
     public List<PolicyCoverageQueryResult> findCoverages(String policyId, String tenantId) {
         return policyCoverageViewRepository.findByPolicyIdAndTenantId(policyId, tenantId).stream()
                 .map(mapper::toCoverageResult)
+                .toList();
+    }
+
+    @Override
+    public List<PolicyClauseQueryResult> findClauses(String policyId, String tenantId) {
+        return policyClauseViewRepository.findByPolicyIdAndTenantId(policyId, tenantId).stream()
+                .map(mapper::toClauseResult)
                 .toList();
     }
 

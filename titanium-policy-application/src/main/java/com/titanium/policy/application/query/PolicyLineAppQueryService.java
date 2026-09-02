@@ -6,6 +6,7 @@ import java.util.Optional;
 import org.springframework.stereotype.Service;
 
 import com.titanium.metadata.enums.customer.CustomerEnum.InsuranceRole;
+import com.titanium.policy.query.result.PolicyClauseQueryResult;
 import com.titanium.policy.query.result.PolicyCoverageQueryResult;
 import com.titanium.policy.query.result.PolicyFullDetailQueryResult;
 import com.titanium.policy.query.result.PolicyProductQueryResult;
@@ -79,6 +80,17 @@ public class PolicyLineAppQueryService {
      */
     public List<PolicySubjectQueryResult> findSubjects(String policyId, String tenantId) {
         return policyLineQueryService.findSubjects(policyId, tenantId);
+    }
+
+    /**
+     * 查询保单条款快照清单（claim 域责任校验的条款定位来源）。
+     *
+     * @param policyId 保单ID
+     * @param tenantId 租户ID
+     * @return 条款快照列表
+     */
+    public List<PolicyClauseQueryResult> findClauses(String policyId, String tenantId) {
+        return policyLineQueryService.findClauses(policyId, tenantId);
     }
 
     /**

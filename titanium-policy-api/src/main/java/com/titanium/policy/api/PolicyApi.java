@@ -15,6 +15,8 @@ import com.titanium.policy.api.request.AccountValueWriteBackRequest;
 import com.titanium.policy.api.request.CreatePolicyRequest;
 import com.titanium.policy.api.request.RecordPremiumCollectionRequest;
 import com.titanium.policy.api.request.maintenance.ApplyPolicyMaintenanceRequest;
+import com.titanium.policy.api.response.PolicyBeneficiaryResponse;
+import com.titanium.policy.api.response.PolicyClauseResponse;
 import com.titanium.policy.api.response.PolicyEndorsementResponse;
 import com.titanium.policy.api.response.PolicyMaintenanceSnapshotResponse;
 import com.titanium.policy.api.response.PolicyResponse;
@@ -146,4 +148,26 @@ public interface PolicyApi {
     ApiResponse<Void> writeBackAccountValue(@PathVariable("policyId") String policyId,
                                             @RequestBody AccountValueWriteBackRequest dto,
                                             @RequestHeader("X-Tenant-Id") String tenantId);
+
+    /**
+     * 查询保单条款快照列表（claim 域责任校验 CLAIM-4 的条款定位来源）
+     *
+     * @param policyId 保单ID
+     * @param tenantId 租户ID
+     * @return 条款快照列表（无条款时为空列表）
+     */
+    @GetMapping("/{policyId}/clauses")
+    ApiResponse<List<PolicyClauseResponse>> getPolicyClauses(@PathVariable("policyId") String policyId,
+                                                             @RequestHeader("X-Tenant-Id") String tenantId);
+
+    /**
+     * 查询保单受益人主数据（claim 域身故给付 CLAIM-4 的受益人比对基准）
+     *
+     * @param policyId 保单ID
+     * @param tenantId 租户ID
+     * @return 受益人列表（按受益顺位升序，无受益人时为空列表）
+     */
+    @GetMapping("/{policyId}/beneficiaries")
+    ApiResponse<List<PolicyBeneficiaryResponse>> getBeneficiaries(@PathVariable("policyId") String policyId,
+                                                                  @RequestHeader("X-Tenant-Id") String tenantId);
 }
