@@ -29,6 +29,8 @@ public class PolicyResponse {
     private LocalDateTime           expiryDate;
     @Schema(description = "保费", example = "1000.00")
     private Amount               premium;
+    @Schema(description = "基本保额", example = "500000.00")
+    private Double               sumInsured;
     @Schema(description = "保单状态", example = "EFFECTIVE", exampleClasses = PolicyEnum.PolicyStatus.class)
     private PolicyEnum.PolicyStatus status;
     @Schema(description = "保单项列表")

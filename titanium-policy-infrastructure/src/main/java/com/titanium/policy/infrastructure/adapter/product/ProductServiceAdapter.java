@@ -20,15 +20,15 @@ import com.titanium.policy.valueobject.product.ProductClauseRef;
 import com.titanium.policy.valueobject.product.ProductIssueRules;
 import com.titanium.product.api.ProductApi;
 import com.titanium.product.api.ProductTemplateApi;
+import com.titanium.product.api.response.clause.ProductClauseResponse;
 import com.titanium.product.api.response.config.CoveragePeriodConfigResponse;
 import com.titanium.product.api.response.config.InsureConditionResponse;
 import com.titanium.product.api.response.config.IssuanceProcessConfigResponse;
 import com.titanium.product.api.response.config.PaymentConfigResponse;
 import com.titanium.product.api.response.config.PolicyFormConfigResponse;
-import com.titanium.product.api.response.clause.ProductClauseResponse;
+import com.titanium.product.api.response.config.UnderwritingConfigResponse;
 import com.titanium.product.api.response.product.ProductResponse;
 import com.titanium.product.api.response.product.ProductTemplateResponse;
-import com.titanium.product.api.response.config.UnderwritingConfigResponse;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

@@ -11,8 +11,6 @@ import com.titanium.metadata.enums.product.ProductEnum.IssuanceMode;
 import com.titanium.metadata.errorcode.PolicyErrorCode;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.application.exception.IssuanceOrchestrationException;
-import com.titanium.policy.application.orchestration.issuance.service.InsuranceLinePremiumConfirmationService;
-import com.titanium.policy.application.orchestration.issuance.service.InsuranceLinePremiumConfirmationService.ConfirmationSummary;
 import com.titanium.policy.application.orchestration.issuance.assembler.CreateInsuranceDirectlyCommandAssembler;
 import com.titanium.policy.application.orchestration.issuance.assembler.CreatePolicyDirectlyCommandAssembler;
 import com.titanium.policy.application.orchestration.issuance.assembler.CreateProposalCommandAssembler;
@@ -20,6 +18,8 @@ import com.titanium.policy.application.orchestration.issuance.assembler.Insuranc
 import com.titanium.policy.application.orchestration.issuance.assembler.PolicyProductAssembler;
 import com.titanium.policy.application.orchestration.issuance.assembler.ProposalLineAssembler;
 import com.titanium.policy.application.orchestration.issuance.executor.RiskAssessmentExecutor;
+import com.titanium.policy.application.orchestration.issuance.service.InsuranceLinePremiumConfirmationService;
+import com.titanium.policy.application.orchestration.issuance.service.InsuranceLinePremiumConfirmationService.ConfirmationSummary;
 import com.titanium.policy.command.ActivatePolicyCommand;
 import com.titanium.policy.command.SubmitProposalCommand;
 import com.titanium.policy.command.SubmitUnderwritingCommand;
