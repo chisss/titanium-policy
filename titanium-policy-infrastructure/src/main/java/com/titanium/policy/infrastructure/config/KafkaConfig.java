@@ -10,6 +10,7 @@ import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.kafka.annotation.EnableKafka;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.config.KafkaListenerContainerFactory;
 import org.springframework.kafka.core.ConsumerFactory;
@@ -21,8 +22,13 @@ import org.springframework.kafka.listener.ConcurrentMessageListenerContainer;
 
 /**
  * Kafka配置类
+ * <p>
+ * Spring Boot 4.0 不再自动注册 @KafkaListener 注解后处理器，须显式 @EnableKafka 激活
+ * （同 maintenance/customer 域先例），否则跨域入站监听器（身故给付结算等）静默不消费。
+ * </p>
  */
 @Configuration
+@EnableKafka
 public class KafkaConfig {
 
     @Value("${spring.kafka.bootstrap-servers}")

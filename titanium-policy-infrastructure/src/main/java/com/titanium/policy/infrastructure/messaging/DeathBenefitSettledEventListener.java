@@ -36,6 +36,9 @@ public class DeathBenefitSettledEventListener {
     /** 身故给付结算事件主题（与 claim 域 ClaimConstants.KafkaTopic.DEATH_BENEFIT_SETTLED 约定一致） */
     private static final String DEATH_BENEFIT_SETTLED_TOPIC = "claim-death-benefit-settled";
 
+    /** 终止描述文案常量（落库，红线 20 禁裸串） */
+    private static final String TERMINATION_DESCRIPTION = "身故给付后保单责任终止";
+
     private final DeathBenefitTerminationOrchestrator terminationOrchestrator;
 
     /**
@@ -57,7 +60,8 @@ public class DeathBenefitSettledEventListener {
 
         log.info("[身故给付-入站] 收到身故给付结算, policyId={}, 触发保单终止", policyId);
         try {
-            terminationOrchestrator.terminateOnDeathBenefit(policyId, operatorId, message.tenantId());
+            terminationOrchestrator.terminateOnBenefitSettled(policyId, operatorId, message.tenantId(),
+                    TERMINATION_DESCRIPTION);
         } catch (Exception e) {
             // 幂等保护：保单已达终态（重复投递）会抛业务异常，记录但不阻塞消费
             log.error("[身故给付-入站] 保单终止失败, policyId={}, 原因={}", policyId, e.getMessage());
