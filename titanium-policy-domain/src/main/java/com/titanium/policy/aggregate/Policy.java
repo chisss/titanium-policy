@@ -321,7 +321,7 @@ public class Policy extends BaseAggregate {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "Insurance period has not started yet");
         }
         AggregateLifecycle.apply(new PolicyActivatedEvent(this.policyId, this.insuranceId, this.bizNo,
-                LocalDateTime.now(), this.tenantId));
+                LocalDateTime.now(), this.tenantId, this.totalPremium));
     }
 
     /**

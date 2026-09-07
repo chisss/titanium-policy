@@ -44,6 +44,8 @@ public class RuleEngineServiceAdapter implements RuleEngineServicePort {
             case PASS -> RuleEngineDecision.PASS;
             case REJECT -> RuleEngineDecision.REJECT;
             case REFER -> RuleEngineDecision.REFER;
+            // G16 新增结论：加费承保不阻断出单风控门，按通过处理（加费参数由核保域消费）
+            case SURCHARGE -> RuleEngineDecision.PASS;
         };
     }
 
