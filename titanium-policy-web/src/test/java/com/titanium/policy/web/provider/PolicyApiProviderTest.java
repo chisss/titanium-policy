@@ -22,6 +22,7 @@ import com.titanium.policy.api.request.maintenance.PolicyMaintenanceFieldChangeR
 import com.titanium.policy.api.response.maintenance.PolicyMaintenanceApplicationResponse;
 import com.titanium.policy.application.command.PolicyApplicationService;
 import com.titanium.policy.application.query.PolicyAppQueryService;
+import com.titanium.policy.application.query.PolicyLineAppQueryService;
 import com.titanium.policy.command.ApplyPolicyMaintenanceCommand;
 import com.titanium.policy.command.RecordPremiumCollectionCommand;
 import com.titanium.policy.query.result.PolicyEndorsementQueryResult;
@@ -36,7 +37,8 @@ class PolicyApiProviderTest {
     void shouldMapPremiumCollectionToTenantScopedCommand() {
         PolicyApplicationService applicationService = mock(PolicyApplicationService.class);
         PolicyApiProvider provider = new PolicyApiProvider(
-                applicationService, mock(PolicyAppQueryService.class), mock(PolicyWebMapper.class));
+                applicationService, mock(PolicyAppQueryService.class), mock(PolicyLineAppQueryService.class),
+                mock(PolicyWebMapper.class));
         LocalDateTime collectedTime = LocalDateTime.of(2026, 8, 26, 16, 53);
         RecordPremiumCollectionRequest request = new RecordPremiumCollectionRequest(
                 "payment-1", "trade-1", new BigDecimal("121.20"), "CNY", "ANNUAL", collectedTime);
@@ -64,7 +66,8 @@ class PolicyApiProviderTest {
     void shouldExposeTenantScopedEndorsements() {
         PolicyAppQueryService queryService = mock(PolicyAppQueryService.class);
         PolicyApiProvider provider = new PolicyApiProvider(
-                mock(PolicyApplicationService.class), queryService, mock(PolicyWebMapper.class));
+                mock(PolicyApplicationService.class), queryService, mock(PolicyLineAppQueryService.class),
+                mock(PolicyWebMapper.class));
         PolicyEndorsementQueryResult endorsement = new PolicyEndorsementQueryResult();
         endorsement.setEndorsementNo("endorsement-1");
         endorsement.setPolicyId("policy-1");
@@ -90,7 +93,8 @@ class PolicyApiProviderTest {
     void shouldMapMaintenanceRequestAndReturnAuthoritativeReceipt() {
         PolicyApplicationService applicationService = mock(PolicyApplicationService.class);
         PolicyApiProvider provider = new PolicyApiProvider(
-                applicationService, mock(PolicyAppQueryService.class), mock(PolicyWebMapper.class));
+                applicationService, mock(PolicyAppQueryService.class), mock(PolicyLineAppQueryService.class),
+                mock(PolicyWebMapper.class));
         LocalDateTime effectiveAt = LocalDateTime.of(2026, 8, 25, 10, 30);
         LocalDateTime appliedAt = LocalDateTime.of(2026, 8, 25, 10, 31);
         OffsetDateTime capturedAt = OffsetDateTime.parse("2026-08-25T10:31:00+08:00");
