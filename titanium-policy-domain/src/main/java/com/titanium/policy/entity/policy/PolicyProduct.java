@@ -136,7 +136,7 @@ public record PolicyProduct(String policyProductId, int lineNo, ProductCategory 
     /**
      * 回写本段核保结论与对应承保状态。
      * <p>
-     * 结论到状态的映射内聚于此：通过/条件承保 → 已承保待生效；拒绝 → 已拒保；暂缓 → 仍核保中。
+     * 结论到状态的映射内聚于此：通过/条件承保（含除外承保） → 已承保待生效；拒绝 → 已拒保；暂缓 → 仍核保中。
      * </p>
      *
      * @param conclusion 核保结论
@@ -144,7 +144,7 @@ public record PolicyProduct(String policyProductId, int lineNo, ProductCategory 
      */
     public PolicyProduct withUnderwritingConclusion(ConclusionType conclusion) {
         PolicyLineStatus newStatus = conclusion == null ? lineStatus : switch (conclusion) {
-            case ACCEPT, MODIFY -> PolicyLineStatus.ACCEPTED;
+            case ACCEPT, MODIFY, EXCLUDED -> PolicyLineStatus.ACCEPTED;
             case REJECT -> PolicyLineStatus.REJECTED;
             case POSTPONE -> PolicyLineStatus.UNDERWRITING;
         };

@@ -223,7 +223,7 @@ public class PolicyProductAssembler {
             return PolicyLineStatus.ACCEPTED;
         }
         return switch (conclusion) {
-            case ACCEPT, MODIFY -> PolicyLineStatus.ACCEPTED;
+            case ACCEPT, MODIFY, EXCLUDED -> PolicyLineStatus.ACCEPTED;
             case REJECT -> PolicyLineStatus.REJECTED;
             case POSTPONE -> PolicyLineStatus.UNDERWRITING;
         };

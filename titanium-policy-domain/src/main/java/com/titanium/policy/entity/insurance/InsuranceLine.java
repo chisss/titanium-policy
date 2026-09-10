@@ -130,7 +130,7 @@ public record InsuranceLine(String lineId, int lineNo, ProductCategory productCa
      */
     public InsuranceLine withUnderwritingResult(ConclusionType conclusion, BigDecimal extraPremiumRatio) {
         PolicyLineStatus newStatus = conclusion == null ? lineStatus : switch (conclusion) {
-            case ACCEPT, MODIFY -> PolicyLineStatus.ACCEPTED;
+            case ACCEPT, MODIFY, EXCLUDED -> PolicyLineStatus.ACCEPTED;
             case REJECT -> PolicyLineStatus.REJECTED;
             case POSTPONE -> PolicyLineStatus.UNDERWRITING;
         };

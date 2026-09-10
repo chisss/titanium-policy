@@ -133,7 +133,7 @@ public class InsuranceProjectionEventHandler {
      */
     private InsuranceStatusCode mapUnderwritingStatus(ConclusionType resultCode) {
         return switch (resultCode) {
-            case ACCEPT, MODIFY -> InsuranceStatusCode.UNDERWRITING_APPROVED;
+            case ACCEPT, MODIFY, EXCLUDED -> InsuranceStatusCode.UNDERWRITING_APPROVED;
             case REJECT -> InsuranceStatusCode.UNDERWRITING_REJECTED;
             case POSTPONE -> InsuranceStatusCode.UNDERWRITING_SUSPENDED;
         };

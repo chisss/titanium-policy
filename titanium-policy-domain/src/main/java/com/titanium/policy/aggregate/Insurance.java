@@ -222,13 +222,14 @@ public class Insurance extends BaseAggregate {
                 event.extraPremiumRatio());
 
         InsuranceStatusCode newStatus = switch (resultCode) {
-            case ACCEPT, MODIFY -> InsuranceStatusCode.UNDERWRITING_APPROVED;
+            case ACCEPT, MODIFY, EXCLUDED -> InsuranceStatusCode.UNDERWRITING_APPROVED;
             case REJECT -> InsuranceStatusCode.UNDERWRITING_REJECTED;
             case POSTPONE -> InsuranceStatusCode.UNDERWRITING_SUSPENDED;
         };
         String changeReason = switch (resultCode) {
             case ACCEPT -> "核保通过";
             case MODIFY -> "核保通过（修改条件承保）";
+            case EXCLUDED -> "核保通过（除外承保）";
             case REJECT -> "核保拒绝";
             case POSTPONE -> "核保暂缓";
         };
