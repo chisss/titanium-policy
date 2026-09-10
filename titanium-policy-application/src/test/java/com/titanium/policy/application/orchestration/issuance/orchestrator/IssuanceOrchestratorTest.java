@@ -96,7 +96,7 @@ class IssuanceOrchestratorTest {
         orchestrator = new IssuanceOrchestrator(commandGateway, new TestPolicyNoGenerator(), riskAssessmentExecutor,
                 productServicePort, insuranceLineAssembler, policyProductAssembler, proposalLineAssembler, null, null, null,
                 new InsuranceLinePremiumConfirmationService(confirmedPremiumPricingPort,
-                        new com.titanium.policy.application.orchestration.issuance.ConfirmedPremiumRequestValidator(),
+                        new com.titanium.policy.application.orchestration.issuance.validator.ConfirmedPremiumRequestValidator(),
                         new com.titanium.policy.application.orchestration.issuance.assembler.ConfirmedPremiumRequestAssembler()),
                 premiumCollectionOrchestrator,
                 new PremiumScheduleOrchestrator(billingServicePort));
