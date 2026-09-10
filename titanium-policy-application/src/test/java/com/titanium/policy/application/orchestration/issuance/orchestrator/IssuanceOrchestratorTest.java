@@ -39,11 +39,16 @@ import com.titanium.metadata.enums.product.ProductEnum.SalesChannel;
 import com.titanium.metadata.errorcode.PolicyErrorCode;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.application.exception.IssuanceOrchestrationException;
+import com.titanium.policy.application.orchestration.issuance.assembler.ConfirmedPremiumRequestAssembler;
+import com.titanium.policy.application.orchestration.issuance.assembler.CreateInsuranceDirectlyCommandAssembler;
+import com.titanium.policy.application.orchestration.issuance.assembler.CreatePolicyDirectlyCommandAssembler;
+import com.titanium.policy.application.orchestration.issuance.assembler.CreateProposalCommandAssembler;
 import com.titanium.policy.application.orchestration.issuance.assembler.InsuranceLineAssembler;
 import com.titanium.policy.application.orchestration.issuance.assembler.PolicyProductAssembler;
 import com.titanium.policy.application.orchestration.issuance.assembler.ProposalLineAssembler;
 import com.titanium.policy.application.orchestration.issuance.executor.RiskAssessmentExecutor;
 import com.titanium.policy.application.orchestration.issuance.service.InsuranceLinePremiumConfirmationService;
+import com.titanium.policy.application.orchestration.issuance.validator.ConfirmedPremiumRequestValidator;
 import com.titanium.policy.application.support.TestPolicyNoGenerator;
 import com.titanium.policy.command.CreateInsuranceDirectlyCommand;
 import com.titanium.policy.command.CreatePolicyDirectlyCommand;
@@ -62,6 +67,7 @@ import com.titanium.policy.valueobject.IssuanceResult;
 import com.titanium.policy.valueobject.billing.PremiumScheduleRequest;
 import com.titanium.policy.valueobject.policy.CollectionResult;
 import com.titanium.policy.valueobject.pricing.ConfirmedPremiumResult;
+import com.titanium.policy.valueobject.product.ProductBasicInfo;
 import com.titanium.policy.valueobject.product.ProductIssueRules;
 
 /**
@@ -94,16 +100,16 @@ class IssuanceOrchestratorTest {
         PolicyProductAssembler policyProductAssembler = new PolicyProductAssembler(productServicePort, null,
                 insuranceLineAssembler);
         orchestrator = new IssuanceOrchestrator(commandGateway, new TestPolicyNoGenerator(), riskAssessmentExecutor,
-                productServicePort, insuranceLineAssembler, policyProductAssembler, proposalLineAssembler, null, null, null,
+                productServicePort, insuranceLineAssembler, policyProductAssembler, proposalLineAssembler,
+                new CreateProposalCommandAssembler(), new CreatePolicyDirectlyCommandAssembler(),
+                new CreateInsuranceDirectlyCommandAssembler(),
                 new InsuranceLinePremiumConfirmationService(confirmedPremiumPricingPort,
-                        new com.titanium.policy.application.orchestration.issuance.validator.ConfirmedPremiumRequestValidator(),
-                        new com.titanium.policy.application.orchestration.issuance.assembler.ConfirmedPremiumRequestAssembler()),
+                        new ConfirmedPremiumRequestValidator(), new ConfirmedPremiumRequestAssembler()),
                 premiumCollectionOrchestrator,
                 new PremiumScheduleOrchestrator(billingServicePort));
         when(riskAssessmentExecutor.execute(any(), any())).thenReturn(true);
         when(productServicePort.getProductBasicInfo(PRODUCT_ID, TENANT_ID))
-                .thenReturn(new com.titanium.policy.valueobject.product.ProductBasicInfo(PRODUCT_ID, "P001", "测试产品",
-                        "V1", null, "EFFECTIVE"));
+                .thenReturn(new ProductBasicInfo(PRODUCT_ID, "P001", "测试产品", "V1", null, "EFFECTIVE"));
         when(productServicePort.getIssueRules(PRODUCT_ID, TENANT_ID)).thenReturn(issueRules());
         when(confirmedPremiumPricingPort.confirm(any()))
                 .thenReturn(new ConfirmedPremiumResult(
@@ -136,8 +142,8 @@ class IssuanceOrchestratorTest {
     @Test
     void threeStepCreatesProposalThenImmediatelySubmitsProposal() {
         when(productServicePort.getProductBasicInfo(PRODUCT_ID, TENANT_ID))
-                .thenReturn(new com.titanium.policy.valueobject.product.ProductBasicInfo(PRODUCT_ID, "P001",
-                        "测试产品", "V1", InsuranceProductType.TERM_LIFE, "EFFECTIVE"));
+                .thenReturn(new ProductBasicInfo(PRODUCT_ID, "P001", "测试产品", "V1",
+                        InsuranceProductType.TERM_LIFE, "EFFECTIVE"));
 
         IssuanceResult result = orchestrator.orchestrate(IssuanceProcessConfig.threeStep(PRODUCT_ID), request());
 
