@@ -182,17 +182,17 @@ InsuranceIssuedEvent   --@EndSaga----> commandGateway.sendAndWait(CreatePolicyCo
 # 设定 JDK 21
 export JAVA_HOME=/Users/sunwei/Library/Java/JavaVirtualMachines/corretto-21.0.4/Contents/Home
 
-# 在项目根目录构建（保单域依赖 metadata/clause/underwriting/product/ruleengine 的 api 模块）
-cd /Users/sunwei/titanium-project
-mvn -pl titanium-policy/titanium-policy-bootstrap -am clean install -DskipTests
+# 构建保单域（域目录即 Maven reactor；依赖 metadata/clause/underwriting/product/ruleengine 的 api 须已在本地仓库）
+cd /Users/sunwei/titanium-project/titanium-policy
+mvn -pl titanium-policy-bootstrap -am clean install -DskipTests
 
 # 单独启动保单服务（端口 8080）
-cd titanium-policy/titanium-policy-bootstrap
+cd titanium-policy-bootstrap
 mvn spring-boot:run
 
 # 运行领域层单元测试（PolicyTest / ProposalTest）
-cd /Users/sunwei/titanium-project
-mvn -pl titanium-policy/titanium-policy-domain test
+cd /Users/sunwei/titanium-project/titanium-policy
+mvn -pl titanium-policy-domain test
 ```
 
 启动前置：MySQL（`policy_db`）、Kafka（9092）、Redis（6379）需就绪。`application.yml` 中 `axon.axonserver` 段配置了 AxonServer 集群/SSL/Token，本地若不连 AxonServer 需相应调整或走嵌入式 Event Store。
