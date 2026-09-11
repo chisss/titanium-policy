@@ -446,7 +446,7 @@ public class Policy extends BaseAggregate {
         }
 
         PolicyMaintenanceExecutionState beforeState =
-                new PolicyMaintenanceExecutionState(this.insuredPartyList, this.policyProducts);
+                new PolicyMaintenanceExecutionState(this.insuredPartyList, this.policyProducts, this.premiumPlan);
         PolicyMaintenanceFieldExecutorRegistry.ExecutionResult execution = command.changes().isEmpty()
                 ? new PolicyMaintenanceFieldExecutorRegistry.ExecutionResult(beforeState, List.of())
                 : executorRegistry.execute(this.policyId, beforeState, command.changes());
@@ -1511,6 +1511,9 @@ public class Policy extends BaseAggregate {
         if (executionState.policyProducts() != null) {
             this.policyProducts = List.copyOf(executionState.policyProducts());
             this.sumInsured = requireMainProductForMaintenance(this.policyProducts).sumInsured();
+        }
+        if (executionState.premiumPlan() != null) {
+            this.premiumPlan = executionState.premiumPlan();
         }
     }
 

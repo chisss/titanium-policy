@@ -78,7 +78,7 @@ public class BeneficiaryPolicyMaintenanceFieldExecutor implements PolicyMaintena
                 change.itemCode(), change.objectId(), change.fieldCode(), change.dataType(),
                 canonicalValue(updated, change.fieldCode()));
         return new PolicyMaintenanceFieldExecution(
-                new PolicyMaintenanceExecutionState(updatedParties, state.policyProducts()), applied);
+                state.withInsuredPartyList(updatedParties), applied);
     }
 
     private int findTargetIndex(

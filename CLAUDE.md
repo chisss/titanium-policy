@@ -230,6 +230,12 @@ mvn -pl titanium-policy-domain test
     🔴 **判据**：一条链路是否"待接"必须**两端同时核查**——处理器存在 ≠ 链路可达；「命令零发送方」（写侧）与「领域方法零调用」（值对象侧）是同一条断链的两半，**只扫命令清单会误判为"仅缺上游入口"**。
     **状态**：**当前不具备接通条件**（需先有团险/家庭单产品形态与出单入口），故仅登记不实施；已同步至 `docs/当前系统现状评估-2026-09.md` D19。
 
+14. 🟡 **保全字段执行面：可受理 ≠ 可生效（m2-907，2026-09-11）**：
+    - **本轮已补**：`policy.payment.method` 新增 `PaymentMethodPolicyMaintenanceFieldExecutor`（执行器 3 → 4 个，覆盖字段码 5 → 6 个）；`PolicyMaintenanceExecutionState` 纳入 `premiumPlan` 并**改用 wither**（原「构造器重建」写法会在每个旧执行器重建点把新加字段**静默置空**）；字段目录该项 `proposable` → `executable`，`STANDARD_VERSION` 升 `2026.09.11.1`；`PolicyMaintenanceApplicationTest` +3 例（缴费方式生效、非法取值拒绝、wither 保真回归）。
+    - **仍缺**：`POLICY_HOLDER_CHANGE` / `INSURED_INFO_CHANGE` 两类**整类必败**（受理放行 → 生效必败），根因是受理侧 `MaintenanceFieldProposalPlanner` 与配置发布侧 `MaintenanceConfigurationValidator` **均不校验 `executionSupported`**，唯一拦截点在生效环节 `MaintenanceEffectApplicationService` / `PolicyMaintenanceFieldExecutorRegistry`。
+    - 🔴 **铁律**：新增 `proposable` 字段必须**同时确认执行路径**，否则即制造「填完表单、走完流程、最后失败」。核查一条字段链路须**同时看三处**——目录 capability、planner 校验项、执行器注册表。
+    - 完整 19 项字段归因、23 类保全出口对照与 G1–G8 缺口清单见 [docs/技术文档/保全字段执行能力现状与缺口登记-2026-09.md](../docs/技术文档/保全字段执行能力现状与缺口登记-2026-09.md)。
+
 ---
 
 *改动聚合根/事件/命令前，请同步阅读 [AGENTS.md](./AGENTS.md) 的协作检查清单与文件锁定建议。*

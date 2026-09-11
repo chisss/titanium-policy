@@ -59,8 +59,7 @@ public class CoverageSumInsuredPolicyMaintenanceFieldExecutor implements PolicyM
         String canonicalValue = updatedAmount.value().stripTrailingZeros().toPlainString();
         PolicyMaintenanceAppliedField applied = new PolicyMaintenanceAppliedField(
                 change.itemCode(), change.objectId(), change.fieldCode(), change.dataType(), canonicalValue);
-        return new PolicyMaintenanceFieldExecution(
-                new PolicyMaintenanceExecutionState(state.insuredPartyList(), updatedProducts), applied);
+        return new PolicyMaintenanceFieldExecution(state.withPolicyProducts(updatedProducts), applied);
     }
 
     private BigDecimal parsePositiveAmount(String value) {

@@ -19,7 +19,7 @@ import com.titanium.metadata.enums.policy.fieldcatalog.PolicyFieldValueType;
 /** Policy 对外发布的不可变字段目录。 */
 public record PolicyFieldCatalog(String catalogVersion, String contentHash, List<PolicyFieldDescriptor> fields) {
 
-    public static final String STANDARD_VERSION = "2026.08.28.1";
+    public static final String STANDARD_VERSION = "2026.09.11.1";
 
     public PolicyFieldCatalog {
         if (catalogVersion == null || catalogVersion.isBlank()) {
@@ -104,7 +104,7 @@ public record PolicyFieldCatalog(String catalogVersion, String contentHash, List
                         executable("COVERAGE_AMOUNT_CHANGE", false, true), PolicyFieldSensitivityLevel.INTERNAL,
                         PolicyFieldMaskingPolicy.NONE),
                 scalar("policy.payment.method", PolicyFieldObjectType.POLICY, PolicyFieldValueType.ENUM,
-                        "policy.field.payment.method", proposal("PAYMENT_METHOD_CHANGE", false, false),
+                        "policy.field.payment.method", executable("PAYMENT_METHOD_CHANGE", false, false),
                         PolicyFieldSensitivityLevel.INTERNAL, PolicyFieldMaskingPolicy.NONE),
                 scalar("policy.payment.accountNumber", PolicyFieldObjectType.PAYMENT_ACCOUNT,
                         PolicyFieldValueType.TEXT, "policy.field.payment.accountNumber",

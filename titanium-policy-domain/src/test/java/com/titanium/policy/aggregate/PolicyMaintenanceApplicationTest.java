@@ -1,6 +1,7 @@
 package com.titanium.policy.aggregate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.math.BigDecimal;
@@ -22,6 +23,9 @@ import com.titanium.metadata.enums.product.ProductEnum.ProductCategory;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.command.ApplyPolicyMaintenanceCommand;
 import com.titanium.policy.common.enums.PolicyStatusCode;
+import com.titanium.policy.common.enums.PremiumPaymentCycle;
+import com.titanium.policy.common.enums.PremiumPaymentMethod;
+import com.titanium.policy.common.enums.PremiumPaymentStatus;
 import com.titanium.policy.entity.insurance.InsuredPartyList;
 import com.titanium.policy.entity.policy.PolicyProduct;
 import com.titanium.policy.event.PolicyActivatedEvent;
@@ -35,10 +39,12 @@ import com.titanium.policy.exception.PolicyBusinessRuleException;
 import com.titanium.policy.service.maintenance.BeneficiaryPolicyMaintenanceFieldExecutor;
 import com.titanium.policy.service.maintenance.CoverageSumInsuredPolicyMaintenanceFieldExecutor;
 import com.titanium.policy.service.maintenance.HolderMobilePolicyMaintenanceFieldExecutor;
+import com.titanium.policy.service.maintenance.PaymentMethodPolicyMaintenanceFieldExecutor;
 import com.titanium.policy.service.maintenance.PolicyMaintenanceFieldExecutorRegistry;
 import com.titanium.policy.service.maintenance.PolicyMaintenanceHashing;
 import com.titanium.policy.valueobject.PolicyNo;
 import com.titanium.policy.valueobject.PolicyStatus;
+import com.titanium.policy.valueobject.PremiumPlan;
 import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceApplicationReceipt;
 import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceAppliedField;
 import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceExecutionState;
@@ -61,7 +67,8 @@ class PolicyMaintenanceApplicationTest {
         registry = new PolicyMaintenanceFieldExecutorRegistry(
                 List.of(new HolderMobilePolicyMaintenanceFieldExecutor(),
                         new CoverageSumInsuredPolicyMaintenanceFieldExecutor(),
-                        new BeneficiaryPolicyMaintenanceFieldExecutor()));
+                        new BeneficiaryPolicyMaintenanceFieldExecutor(),
+                        new PaymentMethodPolicyMaintenanceFieldExecutor()));
         fixture = new AggregateTestFixture<>(Policy.class);
         fixture.registerInjectableResource(registry);
         fixture.setReportIllegalStateChange(false);
@@ -145,6 +152,61 @@ class PolicyMaintenanceApplicationTest {
                                     assertEquals(3, event.appliedFields().size());
                                     return true;
                                 }))));
+    }
+
+    @Test
+    void shouldApplyPaymentMethodIntoPolicyPremiumPlan() {
+        ApplyPolicyMaintenanceCommand command = paymentMethodCommand("SINGLE_PAYMENT");
+
+        fixture.given(createdEvent(), activatedEvent())
+                .when(command)
+                .expectSuccessfulHandlerExecution()
+                .expectEventsMatching(org.axonframework.test.matchers.Matchers.payloadsMatching(
+                        org.axonframework.test.matchers.Matchers.exactSequenceOf(
+                                org.axonframework.test.matchers.Matchers.predicate(payload -> {
+                                    PolicyMaintenanceAppliedEvent event = (PolicyMaintenanceAppliedEvent) payload;
+                                    assertEquals(
+                                            com.titanium.policy.common.enums.PolicyDataUpdateType.PAYMENT_METHOD_CHANGE,
+                                            event.updateType());
+                                    assertEquals("SINGLE_PAYMENT",
+                                            event.appliedFields().getFirst().canonicalValue());
+                                    assertEquals(PremiumPaymentMethod.SINGLE_PAYMENT,
+                                            event.executionStateAfter().premiumPlan().paymentMethod());
+                                    return true;
+                                }))))
+                .expectState(policy -> {
+                    assertEquals(PremiumPaymentMethod.SINGLE_PAYMENT,
+                            policy.getPremiumPlan().paymentMethod());
+                    // 缴费方式属字段级变更：金额/周期/到期日/缴费状态一律保留，不触发计划重算
+                    assertEquals(PremiumPaymentCycle.MONTHLY, policy.getPremiumPlan().paymentCycle());
+                    assertEquals(new BigDecimal("1000.00"),
+                            policy.getPremiumPlan().premiumAmount().value());
+                });
+    }
+
+    @Test
+    void shouldRejectUnknownPaymentMethodWithoutEvent() {
+        fixture.given(createdEvent(), activatedEvent())
+                .when(paymentMethodCommand("NOT_A_METHOD"))
+                .expectException(PolicyBusinessRuleException.class)
+                .expectNoEvents();
+    }
+
+    @Test
+    void shouldPreservePremiumPlanWhenOtherFieldApplied() {
+        fixture.given(createdEvent(), activatedEvent())
+                .when(command("13900000000"))
+                .expectSuccessfulHandlerExecution()
+                .expectEventsMatching(org.axonframework.test.matchers.Matchers.payloadsMatching(
+                        org.axonframework.test.matchers.Matchers.exactSequenceOf(
+                                org.axonframework.test.matchers.Matchers.predicate(payload -> {
+                                    PolicyMaintenanceAppliedEvent event = (PolicyMaintenanceAppliedEvent) payload;
+                                    assertNotNull(event.executionStateAfter().premiumPlan());
+                                    assertEquals(PremiumPaymentMethod.INSTALLMENT_PAYMENT,
+                                            event.executionStateAfter().premiumPlan().paymentMethod());
+                                    return true;
+                                }))))
+                .expectState(policy -> assertNotNull(policy.getPremiumPlan()));
     }
 
     @Test
@@ -381,6 +443,19 @@ class PolicyMaintenanceApplicationTest {
                 "IMMEDIATE", EFFECTIVE_AT, summary, changes, "operator-1", TENANT_ID);
     }
 
+    private ApplyPolicyMaintenanceCommand paymentMethodCommand(String methodCode) {
+        String requestId = REQUEST_ID + "-payment-method";
+        List<PolicyMaintenanceFieldChange> changes = List.of(new PolicyMaintenanceFieldChange(
+                "PAYMENT_METHOD_CHANGE", POLICY_ID, "policy.payment.method", "ENUM", methodCode));
+        String summary = "maintenance=maintenance-1;fields=policy.payment.method";
+        String hash = PolicyMaintenanceHashing.requestHash(
+                TENANT_ID, POLICY_ID, requestId, "maintenance-1", 0,
+                "a".repeat(64), "IMMEDIATE", EFFECTIVE_AT, summary, changes);
+        return new ApplyPolicyMaintenanceCommand(
+                POLICY_ID, requestId, "maintenance-1", 0, hash, "a".repeat(64),
+                "IMMEDIATE", EFFECTIVE_AT, summary, changes, "operator-1", TENANT_ID);
+    }
+
     private ApplyPolicyMaintenanceCommand retroactiveCommand() {
         List<PolicyMaintenanceFieldChange> changes = List.of(new PolicyMaintenanceFieldChange(
                 "POLICY_INFO_CHANGE", POLICY_ID, "policy.holder.mobile", "TEXT", "13900000000"));
@@ -428,7 +503,7 @@ class PolicyMaintenanceApplicationTest {
                 POLICY_ID, new PolicyNo("P202608250001"), PolicyForm.INDIVIDUAL, "product-1",
                 null, null, null, null, null,
                 PolicyPeriod.of(EFFECTIVE_AT.minusYears(1), EFFECTIVE_AT.plusYears(10), 0, 0),
-                amount, amount, amount, List.of(mainProduct), null, null, null, status,
+                amount, amount, amount, List.of(mainProduct), premiumPlan(), null, null, status,
                 parties("13800000000"), null, TENANT_ID);
     }
 
@@ -440,5 +515,12 @@ class PolicyMaintenanceApplicationTest {
         InsuredPartyList.HolderInfo holder = new InsuredPartyList.HolderInfo(
                 "customer-1", "holder-1", "张三", null, "ID-1", mobile);
         return new InsuredPartyList("parties-1", holder, List.of(), List.of());
+    }
+
+    /** 期缴保费计划：缴费方式变更执行器的写入目标，也是「变更参与方不得丢计划」回归的观测点 */
+    private PremiumPlan premiumPlan() {
+        return new PremiumPlan(Money.of(new BigDecimal("1000.00"), "CNY"),
+                PremiumPaymentMethod.INSTALLMENT_PAYMENT, PremiumPaymentCycle.MONTHLY,
+                EFFECTIVE_AT.minusDays(1), PremiumPaymentStatus.UNPAID);
     }
 }

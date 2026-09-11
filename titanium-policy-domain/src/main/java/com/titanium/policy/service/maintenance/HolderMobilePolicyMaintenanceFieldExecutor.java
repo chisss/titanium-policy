@@ -46,8 +46,7 @@ public class HolderMobilePolicyMaintenanceFieldExecutor implements PolicyMainten
                 parties.listId(), updatedHolder, parties.insuredList(), parties.beneficiaryList());
         PolicyMaintenanceAppliedField applied = new PolicyMaintenanceAppliedField(
                 change.itemCode(), change.objectId(), change.fieldCode(), change.dataType(), phone);
-        return new PolicyMaintenanceFieldExecution(
-                new PolicyMaintenanceExecutionState(updated, state.policyProducts()), applied);
+        return new PolicyMaintenanceFieldExecution(state.withInsuredPartyList(updated), applied);
     }
 
     private String normalize(String value) {
