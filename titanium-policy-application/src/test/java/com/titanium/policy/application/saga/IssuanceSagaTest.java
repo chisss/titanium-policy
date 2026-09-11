@@ -31,6 +31,7 @@ import com.titanium.policy.application.orchestration.issuance.assembler.PolicyPr
 import com.titanium.policy.application.orchestration.issuance.orchestrator.PremiumCollectionOrchestrator;
 import com.titanium.policy.application.orchestration.issuance.orchestrator.PremiumScheduleOrchestrator;
 import com.titanium.policy.application.orchestration.issuance.service.InsuranceLinePremiumConfirmationService;
+import com.titanium.policy.application.orchestration.issuance.validator.ConfirmedPremiumRequestValidator;
 import com.titanium.policy.application.support.TestPolicyNoGenerator;
 import com.titanium.policy.command.CreatePolicyCommand;
 import com.titanium.policy.command.ReceiveUnderwritingResultCommand;
@@ -96,7 +97,7 @@ public class IssuanceSagaTest {
         fixture.registerResource(new PolicyIssuanceDomainServiceImpl());
         confirmedPremiumPricingPort = new StubConfirmedPremiumPricingPort();
         fixture.registerResource(new InsuranceLinePremiumConfirmationService(confirmedPremiumPricingPort,
-                new com.titanium.policy.application.orchestration.issuance.validator.ConfirmedPremiumRequestValidator(),
+                new ConfirmedPremiumRequestValidator(),
                 new com.titanium.policy.application.orchestration.issuance.assembler.ConfirmedPremiumRequestAssembler()));
         // 险种段化后 Saga 新增依赖：产品配置（等待期/犹豫期）、条款责任装配、计费开单、投资开户
         StubProductServicePort productServicePort = new StubProductServicePort();
