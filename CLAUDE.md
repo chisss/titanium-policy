@@ -95,7 +95,9 @@ titanium-policy/
 | Insurance | `ConvertProposalToInsuranceCommand`、`CreateInsuranceDirectlyCommand`、`SubmitUnderwritingCommand`、`ReceiveUnderwritingResultCommand`、`TriggerIssuanceCommand` |
 | Policy | `CreatePolicyCommand`、`CreatePolicyDirectlyCommand`、`IssuePolicyCommand`、`ActivatePolicyCommand`、`SuspendPolicyCommand`、`ResumePolicyCommand`、`TerminatePolicyCommand`、`CancelPolicyCommand`、`LapsePolicyCommand`、`ReinstatePolicyCommand`、`MaturePolicyCommand`、`MatureDuePolicyCommand`、`ApplyPolicyEndorsementCommand`、`ApplyPolicyMaintenanceCommand`、`RecordPremiumCollectionCommand`、`AssociatePremiumBillingCommand`、`WaivePremiumCommand`、`DistributeDividendCommand`、`LinkInvestmentAccountCommand`、`UpdateAccountValueCommand`、`StartAnnuityPayoutCommand`、`PayAnnuityBenefitCommand`、`AddInsuredMemberCommand`、`RemoveInsuredMemberCommand`、`LinkSubPolicyCommand` |
 
-> ⚠️ **待接入口（3 个）**：`AddInsuredMemberCommand`/`RemoveInsuredMemberCommand`/`LinkSubPolicyCommand` 聚合处理器与单测齐备，但 application/web 层无派发方——正确触发源是**团险/家庭单成员增减批改**（保全域出口）与**主从保单建立**，加临时 web 端点会造出错误设计。待保全域补出口后接通。
+> ⚠️ **待接入口（3 个，m0-716 实读复核后的定论）**：三个命令的聚合处理器与单测齐备，但 application/web 层无派发方——**加临时 web 端点会造出错误设计**。
+> - ⚫ `AddInsuredMemberCommand`/`RemoveInsuredMemberCommand`：阻塞于上游**无语义出口**——保全域 `MaintenanceType` 23 项**无成员增删类型**，`PolicyMaintenanceAction` 仅 `NONE/SUSPEND/RESUME/REINSTATE/TERMINATE`，字段级回写通道表达不了成员增删语义，需先建团险/家庭单成员建模。
+> - 🔴 `LinkSubPolicyCommand`：**不是「待接入口」而是死链**（`t_policy_relation` 恒空、父子级联整链失效），详见 §七 第 13 条。
 
 ### 4.2 事件清单（35 个，均为 record）
 
@@ -220,6 +222,13 @@ mvn -pl titanium-policy-domain test
     - 🔴 **域内分工**：保单域是「保单要素」权威，product 域是「退保价值规则」权威，本域不含任何费率逻辑，仅做翻译编排；口径（保单年度）由本域独担，消费方不得自行推导。
     - 🔴 **降级语义**：保单不存在、三项要素（productId/totalPremium/startDate）任一缺失、或产品域无适用策略 → 返回业务码失败（`POLICY_NOT_EXIST` 20000000）且 `data` 为空，**不伪造金额**。
     - 🔴 **上下文测试同步**：`PolicyDeadLetterQueueContextTest` 以 `@MockitoBean(types=...)` 显式 mock 全部 Feign 客户端（本地无 `spring-cloud-starter-loadbalancer`，未被 mock 的客户端会因惰性解析失败而拖垮上下文），**新增 Feign 客户端契约时必须同步补入该列表**。
+13. 🔴 **团单/家庭单父子级联死链（m0-716 实读复核，2026-09-11）**：父子保单关系**两端同时缺失**——
+    - **子单侧**：`PolicyRelation.attachToParent(parentPolicyId, groupId)`（建立反向引用）**全仓零调用方**；
+    - **父单侧**：`LinkSubPolicyCommand`（在父单登记子单）**零发送方**（此前被登记为"待接入口"，属低估）。
+    **后果**：`SubPolicyLinkedEvent` 永不产生 → 其**唯一**投影写入方 `PolicyRelationProjectionEventHandler` 从不执行 → 读模型 `t_policy_relation` **恒为空表** → 依赖该表路由的 `PolicyRelationCascadeOrchestrator`（`@ProcessingGroup("policy-cascade-group")`，监听 `PolicyTerminatedEvent`/`PolicySuspendedEvent` 后向子保单派发级联命令）**查不到任何子单，整条父子级联静默失效**——父保单终止/暂停不会连带子保单。
+    **上游同样不存在**：`CreatePolicyCommand` 无 `parentPolicyId`/`groupId`，`InsuranceProductType` 无团体类型，「团险出单」入口本身缺失。
+    🔴 **判据**：一条链路是否"待接"必须**两端同时核查**——处理器存在 ≠ 链路可达；「命令零发送方」（写侧）与「领域方法零调用」（值对象侧）是同一条断链的两半，**只扫命令清单会误判为"仅缺上游入口"**。
+    **状态**：**当前不具备接通条件**（需先有团险/家庭单产品形态与出单入口），故仅登记不实施；已同步至 `docs/当前系统现状评估-2026-09.md` D19。
 
 ---
 
