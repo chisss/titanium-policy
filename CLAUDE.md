@@ -236,6 +236,11 @@ mvn -pl titanium-policy-domain test
     - 🔴 **铁律**：新增 `proposable` 字段必须**同时确认执行路径**，否则即制造「填完表单、走完流程、最后失败」。核查一条字段链路须**同时看三处**——目录 capability、planner 校验项、执行器注册表。
     - 完整 19 项字段归因、23 类保全出口对照与 G1–G8 缺口清单见 [docs/技术文档/保全字段执行能力现状与缺口登记-2026-09.md](../docs/技术文档/保全字段执行能力现状与缺口登记-2026-09.md)。
 
+15. ✅ **跨租户写入守护（m2-908，2026-09-11）**：本域三聚合（承保执行中枢）此前**全部 29 个 `@CommandHandler` 零同租户校验**——Axon 按聚合标识装载、事件流不按租户隔离，命令的 `tenantId` 取自调用方 `X-Tenant-Id`（可伪造），**持他租户 `policyId` 即可执行终止/退保/保费豁免等不可逆写入**（链路：`PolicyController` 透传调用方租户头 → `PolicyApplicationService` 直接 `sendAndWait` → 聚合无校验；全仓无 Axon 级租户拦截器，既有 `Tenant*Interceptor` 均为 MVC/Feign 的**上下文传播**，非命令级守卫）。
+    - **修法**：三聚合各加私有 `requireSameTenant(String commandTenantId)`，**每个 `@CommandHandler` 首条语句**调用（Policy 22 + Insurance 3 + Proposal 3 + 保全受理 1 = 29）。沿用 billing 既有范式——**失败关闭**（`null`/空白租户同样拒绝）+ **不泄漏资源是否存在**（抛 `PolicyErrorCode.XXX_NOT_EXIST` 而非 FORBIDDEN，避免侧信道）。`@CommandHandler` 标注的**创建构造器**（Policy 2 + Insurance 2 + Proposal 1）不适用：创建时尚无「聚合既有租户」可比对，其租户由创建事件落库、后续命令回放后即受守护。
+    - **测试**：`CrossTenantCommandGuardTest` 9 例，**双重判据**——① 行为：6 条代表性命令跨租户/空租户被拒且 `expectNoEvents()`（不得半提交），同租户不误伤；② **结构：扫描三聚合源，断言每个 `@CommandHandler` 首条语句即守护**，并断言 `inspected=29` / `constructors=5`——新增处理器漏写守护即失败，且计数断言防止扫描规则静默失效后"假绿"。
+    - 🔴 **铁律**：新增 `@CommandHandler` 必须把 `requireSameTenant(command.tenantId());` 作为**首条语句**，否则该结构测试直接失败。
+
 ---
 
 *改动聚合根/事件/命令前，请同步阅读 [AGENTS.md](./AGENTS.md) 的协作检查清单与文件锁定建议。*

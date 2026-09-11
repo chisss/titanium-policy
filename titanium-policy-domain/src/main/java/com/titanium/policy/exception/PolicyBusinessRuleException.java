@@ -1,5 +1,6 @@
 package com.titanium.policy.exception;
 
+import com.titanium.metadata.errorcode.BaseErrorCode;
 import com.titanium.metadata.exception.BusinessRuleViolationException;
 
 /**
@@ -19,6 +20,20 @@ import com.titanium.metadata.exception.BusinessRuleViolationException;
  */
 public class PolicyBusinessRuleException extends BusinessRuleViolationException {
 
+    /**
+     * 使用标准错误码枚举构造（🔴 新代码首选，见根规约 §3.4.12 红线 19）。
+     *
+     * @param errorCode 错误码枚举（code 取 8 位数字业务码）
+     * @param message   自定义错误消息（覆盖枚举默认文案）
+     */
+    public PolicyBusinessRuleException(BaseErrorCode errorCode, String message) {
+        super(errorCode, message);
+    }
+
+    /**
+     * @deprecated 裸字符串规则码无法国际化，请改用 {@link #PolicyBusinessRuleException(BaseErrorCode, String)}
+     */
+    @Deprecated
     public PolicyBusinessRuleException(String ruleCode, String ruleDescription) {
         super(ruleCode, ruleDescription);
     }

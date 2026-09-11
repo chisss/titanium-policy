@@ -17,6 +17,7 @@ import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.insurance.SubjectType;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.enums.product.ProductEnum.SalesChannel;
+import com.titanium.metadata.errorcode.PolicyErrorCode;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.command.ConvertProposalCommand;
 import com.titanium.policy.command.CreateProposalCommand;
@@ -104,6 +105,7 @@ public class Proposal extends BaseAggregate {
      */
     @CommandHandler
     public void handle(SubmitProposalCommand command) {
+        requireSameTenant(command.tenantId());
         validateRequiredFields();
         validateApplicants();
         validateSubjects();
@@ -116,6 +118,7 @@ public class Proposal extends BaseAggregate {
      */
     @CommandHandler
     public void handle(VoidProposalCommand command) {
+        requireSameTenant(command.tenantId());
         ProposalStatusCode currentStatus = this.status.statusCode();
         if (currentStatus != ProposalStatusCode.DRAFT && currentStatus != ProposalStatusCode.SUBMITTED) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION",
@@ -135,6 +138,7 @@ public class Proposal extends BaseAggregate {
      */
     @CommandHandler
     public void handle(ConvertProposalCommand command) {
+        requireSameTenant(command.tenantId());
         if (this.status.statusCode() != ProposalStatusCode.SUBMITTED) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION",
                     "Only submitted proposals can be converted to application");
@@ -364,4 +368,26 @@ public class Proposal extends BaseAggregate {
 
     protected Proposal() {
     }
+
+    /**
+     * 校验命令租户与聚合租户一致。
+     * <p>
+     * 🔴 <b>多租户写侧最后一道防线</b>：Axon 按聚合标识装载、事件流不按租户隔离，
+     * 聚合的租户归属只能由聚合自身守护。命令的 {@code tenantId} 来自调用方请求头
+     * （{@code X-Tenant-Id}），可被伪造——缺此校验时，持他租户的聚合ID即可跨租户写入。
+     * </p>
+     * <p>
+     * <b>失败关闭</b>：租户缺失或与聚合不一致一律拒绝，并以
+     * {@link PolicyErrorCode.PROPOSAL_NOT_EXIST} 对外（不泄漏「资源是否存在」这一侧信道）。
+     * </p>
+     *
+     * @param commandTenantId 命令携带的租户ID
+     */
+    private void requireSameTenant(String commandTenantId) {
+        if (commandTenantId == null || commandTenantId.isBlank()
+                || !commandTenantId.equals(this.tenantId)) {
+            throw new PolicyBusinessRuleException(PolicyErrorCode.PROPOSAL_NOT_EXIST, "投保意向单不存在");
+        }
+    }
+
 }

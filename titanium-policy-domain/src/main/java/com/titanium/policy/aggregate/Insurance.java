@@ -16,6 +16,7 @@ import com.titanium.metadata.enums.billing.PremiumCollectionMode;
 import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.enums.underwriting.UnderwritingEnum.ConclusionType;
+import com.titanium.metadata.errorcode.PolicyErrorCode;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.command.ConvertProposalToInsuranceCommand;
 import com.titanium.policy.command.CreateInsuranceDirectlyCommand;
@@ -129,6 +130,7 @@ public class Insurance extends BaseAggregate {
      */
     @CommandHandler
     public void handle(SubmitUnderwritingCommand command) {
+        requireSameTenant(command.tenantId());
         // 校验状态
         InsuranceStatusCode currentStatus = this.status.statusCode();
         if (currentStatus != InsuranceStatusCode.DRAFT && currentStatus != InsuranceStatusCode.SUBMITTED
@@ -155,6 +157,7 @@ public class Insurance extends BaseAggregate {
      */
     @CommandHandler
     public void handle(ReceiveUnderwritingResultCommand command) {
+        requireSameTenant(command.tenantId());
         if (this.status.statusCode() != InsuranceStatusCode.UNDERWRITING) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION",
                     "Only applications in underwriting can receive results");
@@ -170,6 +173,7 @@ public class Insurance extends BaseAggregate {
      */
     @CommandHandler
     public void handle(TriggerIssuanceCommand command) {
+        requireSameTenant(command.tenantId());
         if (this.status.statusCode() != InsuranceStatusCode.UNDERWRITING_APPROVED) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION",
                     "Only underwriting approved applications can trigger issuance");
@@ -407,4 +411,26 @@ public class Insurance extends BaseAggregate {
 
     protected Insurance() {
     }
+
+    /**
+     * 校验命令租户与聚合租户一致。
+     * <p>
+     * 🔴 <b>多租户写侧最后一道防线</b>：Axon 按聚合标识装载、事件流不按租户隔离，
+     * 聚合的租户归属只能由聚合自身守护。命令的 {@code tenantId} 来自调用方请求头
+     * （{@code X-Tenant-Id}），可被伪造——缺此校验时，持他租户的聚合ID即可跨租户写入。
+     * </p>
+     * <p>
+     * <b>失败关闭</b>：租户缺失或与聚合不一致一律拒绝，并以
+     * {@link PolicyErrorCode.INSURANCE_NOT_EXIST} 对外（不泄漏「资源是否存在」这一侧信道）。
+     * </p>
+     *
+     * @param commandTenantId 命令携带的租户ID
+     */
+    private void requireSameTenant(String commandTenantId) {
+        if (commandTenantId == null || commandTenantId.isBlank()
+                || !commandTenantId.equals(this.tenantId)) {
+            throw new PolicyBusinessRuleException(PolicyErrorCode.INSURANCE_NOT_EXIST, "投保单不存在");
+        }
+    }
+
 }

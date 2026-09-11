@@ -24,6 +24,7 @@ import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.maintenance.PolicyMaintenanceAction;
 import com.titanium.metadata.enums.policy.PolicyEnum;
 import com.titanium.metadata.enums.policy.PolicyForm;
+import com.titanium.metadata.errorcode.PolicyErrorCode;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.command.ActivatePolicyCommand;
 import com.titanium.policy.command.AddInsuredMemberCommand;
@@ -282,6 +283,7 @@ public class Policy extends BaseAggregate {
      */
     @CommandHandler
     public void handle(IssuePolicyCommand command) {
+        requireSameTenant(command.tenantId());
         if (this.status.statusCode() != PolicyStatusCode.NOT_EFFECTIVE) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "Only NOT_EFFECTIVE policies can be issued");
         }
@@ -302,6 +304,7 @@ public class Policy extends BaseAggregate {
      */
     @CommandHandler
     public void handle(ActivatePolicyCommand command) {
+        requireSameTenant(command.tenantId());
         if (this.status.statusCode() != PolicyStatusCode.NOT_EFFECTIVE) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION",
                     "Only NOT_EFFECTIVE policies can be activated");
@@ -327,6 +330,7 @@ public class Policy extends BaseAggregate {
      */
     @CommandHandler
     public void handle(SuspendPolicyCommand command) {
+        requireSameTenant(command.tenantId());
         if (this.status.statusCode() != PolicyStatusCode.EFFECTIVE) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "Only EFFECTIVE policies can be suspended");
         }
@@ -338,6 +342,7 @@ public class Policy extends BaseAggregate {
      */
     @CommandHandler
     public void handle(ResumePolicyCommand command) {
+        requireSameTenant(command.tenantId());
         if (this.status.statusCode() != PolicyStatusCode.SUSPENDED) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "Only SUSPENDED policies can be resumed");
         }
@@ -349,6 +354,7 @@ public class Policy extends BaseAggregate {
      */
     @CommandHandler
     public void handle(LapsePolicyCommand command) {
+        requireSameTenant(command.tenantId());
         if (this.status.statusCode() != PolicyStatusCode.EFFECTIVE) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "Only EFFECTIVE policies can lapse");
         }
@@ -361,6 +367,7 @@ public class Policy extends BaseAggregate {
      */
     @CommandHandler
     public void handle(ReinstatePolicyCommand command) {
+        requireSameTenant(command.tenantId());
         if (this.status.statusCode() != PolicyStatusCode.LAPSED) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "Only LAPSED policies can be reinstated");
         }
@@ -373,6 +380,7 @@ public class Policy extends BaseAggregate {
      */
     @CommandHandler
     public void handle(TerminatePolicyCommand command) {
+        requireSameTenant(command.tenantId());
         PolicyStatusCode currentStatus = this.status.statusCode();
         if (currentStatus != PolicyStatusCode.EFFECTIVE && currentStatus != PolicyStatusCode.SUSPENDED
                 && currentStatus != PolicyStatusCode.LAPSED) {
@@ -391,6 +399,7 @@ public class Policy extends BaseAggregate {
      */
     @CommandHandler
     public void handle(ApplyPolicyEndorsementCommand command) {
+        requireSameTenant(command.tenantId());
         if (this.status.statusCode() != PolicyStatusCode.EFFECTIVE) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "Only EFFECTIVE policies can be endorsed");
         }
@@ -419,6 +428,7 @@ public class Policy extends BaseAggregate {
     public PolicyMaintenanceApplicationReceipt handle(
             ApplyPolicyMaintenanceCommand command,
             PolicyMaintenanceFieldExecutorRegistry executorRegistry) {
+        requireSameTenant(command.tenantId());
         validateMaintenanceRequestIdentity(command);
         PolicyMaintenanceApplicationReceipt existing = findMaintenanceApplication(command.requestId());
         if (existing != null) {
@@ -506,6 +516,7 @@ public class Policy extends BaseAggregate {
      */
     @CommandHandler
     public void handle(RecordPremiumCollectionCommand command) {
+        requireSameTenant(command.tenantId());
         if (command.collectedAmount() == null || command.collectedAmount().value().signum() <= 0) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "实收金额必须大于零");
         }
@@ -534,6 +545,7 @@ public class Policy extends BaseAggregate {
      */
     @CommandHandler
     public void handle(AssociatePremiumBillingCommand command) {
+        requireSameTenant(command.tenantId());
         if (command.billId() == null || command.billId().isBlank()) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "账单ID不能为空");
         }
@@ -590,6 +602,7 @@ public class Policy extends BaseAggregate {
      */
     @CommandHandler
     public void handle(CancelPolicyCommand command) {
+        requireSameTenant(command.tenantId());
         if (this.status.statusCode() != PolicyStatusCode.NOT_EFFECTIVE) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION",
                     "Only NOT_EFFECTIVE policies can be cancelled");
@@ -935,6 +948,7 @@ public class Policy extends BaseAggregate {
      */
     @CommandHandler
     public void handle(LinkSubPolicyCommand command) {
+        requireSameTenant(command.tenantId());
         if (this.policyRelation != null && this.policyRelation.isChild()) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "子保单不可再挂载子保单");
         }
@@ -958,6 +972,7 @@ public class Policy extends BaseAggregate {
      */
     @CommandHandler
     public void handle(LinkInvestmentAccountCommand command) {
+        requireSameTenant(command.tenantId());
         ensureInvestmentLinked();
         if (this.investmentAccountId != null) {
             return;
@@ -980,6 +995,7 @@ public class Policy extends BaseAggregate {
      */
     @CommandHandler
     public void handle(UpdateAccountValueCommand command) {
+        requireSameTenant(command.tenantId());
         ensureInvestmentLinked();
         if (this.investmentAccountId == null) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "保单尚未挂接投资账户，不可回写账户价值");
@@ -1008,6 +1024,7 @@ public class Policy extends BaseAggregate {
      */
     @CommandHandler
     public void handle(AddInsuredMemberCommand command) {
+        requireSameTenant(command.tenantId());
         ensureMemberModifiable();
         if (command.member() == null) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "新增被保险人信息不能为空");
@@ -1038,6 +1055,7 @@ public class Policy extends BaseAggregate {
      */
     @CommandHandler
     public void handle(RemoveInsuredMemberCommand command) {
+        requireSameTenant(command.tenantId());
         ensureMemberModifiable();
         // 清单增删的不变量（存在性/非空）由 InsuredPartyList 守护，转译为业务异常
         try {
@@ -1067,6 +1085,7 @@ public class Policy extends BaseAggregate {
      */
     @CommandHandler
     public void handle(StartAnnuityPayoutCommand command) {
+        requireSameTenant(command.tenantId());
         if (this.status.statusCode() != PolicyStatusCode.EFFECTIVE) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "仅生效保单可启动年金给付");
         }
@@ -1096,6 +1115,7 @@ public class Policy extends BaseAggregate {
      */
     @CommandHandler
     public void handle(PayAnnuityBenefitCommand command) {
+        requireSameTenant(command.tenantId());
         if (this.annuityPayoutPlan == null) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "年金给付期未启动，不可给付");
         }
@@ -1127,6 +1147,7 @@ public class Policy extends BaseAggregate {
      */
     @CommandHandler
     public void handle(MaturePolicyCommand command) {
+        requireSameTenant(command.tenantId());
         if (this.status.statusCode() != PolicyStatusCode.EFFECTIVE) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "仅生效保单可满期给付");
         }
@@ -1152,6 +1173,7 @@ public class Policy extends BaseAggregate {
      */
     @CommandHandler
     public void handle(MatureDuePolicyCommand command) {
+        requireSameTenant(command.tenantId());
         if (this.status.statusCode() != PolicyStatusCode.EFFECTIVE) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "仅生效保单可满期给付");
         }
@@ -1180,6 +1202,7 @@ public class Policy extends BaseAggregate {
      */
     @CommandHandler
     public void handle(WaivePremiumCommand command) {
+        requireSameTenant(command.tenantId());
         if (this.status.statusCode() != PolicyStatusCode.EFFECTIVE) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "仅生效保单可办理保费豁免");
         }
@@ -1209,6 +1232,7 @@ public class Policy extends BaseAggregate {
      */
     @CommandHandler
     public void handle(DistributeDividendCommand command) {
+        requireSameTenant(command.tenantId());
         if (this.status.statusCode() != PolicyStatusCode.EFFECTIVE) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "仅生效保单可派发红利");
         }
@@ -1275,9 +1299,10 @@ public class Policy extends BaseAggregate {
     // ==================== 内部方法 ====================
 
     private void validateMaintenanceRequestIdentity(ApplyPolicyMaintenanceCommand command) {
-        if (!Objects.equals(this.policyId, command.policyId()) || !Objects.equals(this.tenantId, command.tenantId())) {
+        // 租户一致性已由 requireSameTenant 前置守护，此处只校验聚合标识与请求要素
+        if (!Objects.equals(this.policyId, command.policyId())) {
             throw new PolicyBusinessRuleException(
-                    "POLICY_MAINTENANCE_CONTEXT_INVALID", "Policy 保全请求的聚合或租户上下文不一致");
+                    "POLICY_MAINTENANCE_CONTEXT_INVALID", "Policy 保全请求的聚合上下文不一致");
         }
         if (isBlank(command.requestId()) || isBlank(command.sourceMaintenanceId()) || isBlank(command.operatorId())) {
             throw new PolicyBusinessRuleException(
@@ -1557,4 +1582,26 @@ public class Policy extends BaseAggregate {
 
     protected Policy() {
     }
+
+    /**
+     * 校验命令租户与聚合租户一致。
+     * <p>
+     * 🔴 <b>多租户写侧最后一道防线</b>：Axon 按聚合标识装载、事件流不按租户隔离，
+     * 聚合的租户归属只能由聚合自身守护。命令的 {@code tenantId} 来自调用方请求头
+     * （{@code X-Tenant-Id}），可被伪造——缺此校验时，持他租户的聚合ID即可跨租户写入。
+     * </p>
+     * <p>
+     * <b>失败关闭</b>：租户缺失或与聚合不一致一律拒绝，并以
+     * {@link PolicyErrorCode.POLICY_NOT_EXIST} 对外（不泄漏「资源是否存在」这一侧信道）。
+     * </p>
+     *
+     * @param commandTenantId 命令携带的租户ID
+     */
+    private void requireSameTenant(String commandTenantId) {
+        if (commandTenantId == null || commandTenantId.isBlank()
+                || !commandTenantId.equals(this.tenantId)) {
+            throw new PolicyBusinessRuleException(PolicyErrorCode.POLICY_NOT_EXIST, "保单不存在");
+        }
+    }
+
 }
