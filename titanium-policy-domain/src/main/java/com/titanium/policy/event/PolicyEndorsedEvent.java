@@ -6,7 +6,7 @@ import com.titanium.policy.common.enums.EndorsementCategory;
 import com.titanium.policy.common.enums.PolicyDataUpdateType;
 
 /**
- * 保单已批改事件（取代孤儿事件 PolicyDataUpdatedEvent）
+ * 保单已批改事件
  * <p>
  * 保单生效后数据/要素类批改落地事件。承载批单号、批改类型/分类、独立生效日、变更摘要、原值快照、
  * 来源保全案件ID。

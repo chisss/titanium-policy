@@ -49,7 +49,6 @@ import com.titanium.policy.command.StartAnnuityPayoutCommand;
 import com.titanium.policy.command.SuspendPolicyCommand;
 import com.titanium.policy.command.TerminatePolicyCommand;
 import com.titanium.policy.command.UpdateAccountValueCommand;
-import com.titanium.policy.command.UpdateLineUnderwritingResultCommand;
 import com.titanium.policy.command.WaivePremiumCommand;
 import com.titanium.policy.common.constant.PolicyConstants;
 import com.titanium.policy.common.enums.EndorsementCategory;
@@ -68,7 +67,6 @@ import com.titanium.policy.event.DividendDistributedEvent;
 import com.titanium.policy.event.InsuredMemberAddedEvent;
 import com.titanium.policy.event.InsuredMemberRemovedEvent;
 import com.titanium.policy.event.InvestmentAccountLinkedEvent;
-import com.titanium.policy.event.LineUnderwritingResultUpdatedEvent;
 import com.titanium.policy.event.PolicyActivatedEvent;
 import com.titanium.policy.event.PolicyCancelledEvent;
 import com.titanium.policy.event.PolicyCreatedEvent;
@@ -585,64 +583,6 @@ public class Policy extends BaseAggregate {
             this.premiumPlan = new PremiumPlan(this.premiumPlan.premiumAmount(), this.premiumPlan.paymentMethod(),
                     this.premiumPlan.paymentCycle(), this.premiumPlan.premiumDueDate(), PremiumPaymentStatus.PAID);
         }
-    }
-
-    /**
-     * 回写险种段核保结论（支撑主险通过 / 附加险拒保，事件溯源）
-     * <p>
-     * 拒保段的保费不计入保单总保费，故本命令会重算总保费并随事件携带，供读侧同步。
-     * </p>
-     */
-    @CommandHandler
-    public void handle(UpdateLineUnderwritingResultCommand command) {
-        PolicyProduct line = lineOf(command.policyProductId());
-        if (line == null) {
-            throw new PolicyBusinessRuleException("POLICY_LINE_NOT_FOUND",
-                    "险种段不存在: " + command.policyProductId());
-        }
-        if (command.conclusion() == null) {
-            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "核保结论不能为空");
-        }
-        PolicyProduct updated = line.withUnderwritingConclusion(command.conclusion());
-        Money totalAfter = totalPremiumExcluding(command.policyProductId(), updated.effectivePremium());
-        AggregateLifecycle.apply(new LineUnderwritingResultUpdatedEvent(this.policyId, command.policyProductId(),
-                command.conclusion(), updated.lineStatus(), command.underwritingId(), command.opinion(), totalAfter,
-                LocalDateTime.now(), command.operatorId(), this.tenantId));
-    }
-
-    @EventSourcingHandler
-    public void on(LineUnderwritingResultUpdatedEvent event) {
-        if (this.policyProducts == null) {
-            return;
-        }
-        for (int i = 0; i < this.policyProducts.size(); i++) {
-            PolicyProduct line = this.policyProducts.get(i);
-            if (event.policyProductId().equals(line.policyProductId())) {
-                this.policyProducts.set(i, line.withUnderwritingConclusion(event.conclusion()));
-                break;
-            }
-        }
-    }
-
-    /**
-     * 以指定段的新保费重算保单总保费（该段用新值，其余段用现值）。
-     */
-    private Money totalPremiumExcluding(String policyProductId, Money replacementPremium) {
-        Money total = replacementPremium;
-        if (this.policyProducts == null) {
-            return total;
-        }
-        for (PolicyProduct line : this.policyProducts) {
-            if (policyProductId.equals(line.policyProductId())) {
-                continue;
-            }
-            Money linePremium = line.effectivePremium();
-            if (linePremium == null) {
-                continue;
-            }
-            total = total == null ? linePremium : total.add(linePremium);
-        }
-        return total;
     }
 
     /**

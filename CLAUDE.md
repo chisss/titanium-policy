@@ -51,7 +51,7 @@ titanium-policy/
 │   ├── aggregate/                  # Proposal / Insurance / Policy 三个聚合根
 │   ├── command/                    # 16 个命令（record）
 │   ├── event/{,insurance,proposal} # 19 个领域事件（record）
-│   ├── entity/{,insurance,proposal}# 聚合内实体（PolicyItem、Subject、ProposalHolder…）
+│   ├── entity/{,insurance,policy,proposal}# 聚合内实体（PolicyProduct、InsuredSubject、ProposalHolder…）
 │   ├── valueobject/                # 值对象（PolicyStatus、Amount、PolicyNo、PremiumPlan…）
 │   ├── repository/                 # 仓储接口（PolicyRepository…）
 │   └── service/                    # 领域服务 + 端口接口（ClauseServicePort 等防腐端口）
@@ -87,21 +87,23 @@ titanium-policy/
 
 ## 四、核心领域模型
 
-### 4.1 命令清单（16 个，均为 record）
+### 4.1 命令清单（34 个，均为 record）
 
 | 聚合 | 命令 |
 |------|------|
-| Proposal | `CreateProposalCommand`、`SubmitProposalCommand`、`VoidProposalCommand` |
+| Proposal | `CreateProposalCommand`、`SubmitProposalCommand`、`VoidProposalCommand`、`ConvertProposalCommand` |
 | Insurance | `ConvertProposalToInsuranceCommand`、`CreateInsuranceDirectlyCommand`、`SubmitUnderwritingCommand`、`ReceiveUnderwritingResultCommand`、`TriggerIssuanceCommand` |
-| Policy | `CreatePolicyCommand`、`CreatePolicyDirectlyCommand`、`IssuePolicyCommand`、`ActivatePolicyCommand`、`SuspendPolicyCommand`、`ResumePolicyCommand`、`TerminatePolicyCommand`、`CancelPolicyCommand` |
+| Policy | `CreatePolicyCommand`、`CreatePolicyDirectlyCommand`、`IssuePolicyCommand`、`ActivatePolicyCommand`、`SuspendPolicyCommand`、`ResumePolicyCommand`、`TerminatePolicyCommand`、`CancelPolicyCommand`、`LapsePolicyCommand`、`ReinstatePolicyCommand`、`MaturePolicyCommand`、`MatureDuePolicyCommand`、`ApplyPolicyEndorsementCommand`、`ApplyPolicyMaintenanceCommand`、`RecordPremiumCollectionCommand`、`AssociatePremiumBillingCommand`、`WaivePremiumCommand`、`DistributeDividendCommand`、`LinkInvestmentAccountCommand`、`UpdateAccountValueCommand`、`StartAnnuityPayoutCommand`、`PayAnnuityBenefitCommand`、`AddInsuredMemberCommand`、`RemoveInsuredMemberCommand`、`LinkSubPolicyCommand` |
 
-### 4.2 事件清单（19 个，均为 record）
+> ⚠️ **待接入口（3 个）**：`AddInsuredMemberCommand`/`RemoveInsuredMemberCommand`/`LinkSubPolicyCommand` 聚合处理器与单测齐备，但 application/web 层无派发方——正确触发源是**团险/家庭单成员增减批改**（保全域出口）与**主从保单建立**，加临时 web 端点会造出错误设计。待保全域补出口后接通。
+
+### 4.2 事件清单（35 个，均为 record）
 
 | 聚合 | 事件 |
 |------|------|
 | Proposal | `ProposalCreatedEvent`、`ProposalSubmittedEvent`、`ProposalConvertedEvent`、`ProposalVoidedEvent` |
 | Insurance | `InsuranceCreatedEvent`、`InsuranceSubmittedForUnderwritingEvent`、`UnderwritingResultReceivedEvent`、`InsuranceIssuedEvent` |
-| Policy | `PolicyCreatedEvent`、`PolicyIssuedEvent`、`PolicyActivatedEvent`、`PolicySuspendedEvent`、`PolicyResumedEvent`、`PolicyTerminatedEvent`、`PolicyExpiredEvent`、`PolicyCancelledEvent`、`PolicyPaymentRecordedEvent`、`PolicyDataUpdatedEvent`、`PolicyRenewedEvent` |
+| Policy | `PolicyCreatedEvent`、`PolicyIssuedEvent`、`PolicyActivatedEvent`、`PolicySuspendedEvent`、`PolicyResumedEvent`、`PolicyLapsedEvent`、`PolicyReinstatedEvent`、`PolicyTerminatedEvent`、`PolicyExpiredEvent`、`PolicyCancelledEvent`、`PolicyMaturedEvent`、`PolicyPaymentRecordedEvent`、`PolicyEndorsedEvent`、`PolicyMaintenanceAppliedEvent`、`PolicyMaintenanceStateAppliedEvent`、`PolicyMaintenanceRetroactiveEvidenceRecordedEvent`、`PremiumCollectedEvent`、`PremiumWaivedEvent`、`PremiumBillingAssociatedEvent`、`SubPolicyLinkedEvent`、`InsuredMemberAddedEvent`、`InsuredMemberRemovedEvent`、`DividendDistributedEvent`、`InvestmentAccountLinkedEvent`、`AccountValueUpdatedEvent`、`AnnuityPayoutStartedEvent`、`AnnuityBenefitPaidEvent` |
 
 ### 4.3 查询清单（6 个）
 
@@ -206,7 +208,7 @@ mvn -pl titanium-policy-domain test
 1. ✅ **Controller 查询已接读模型**：`PolicyController.getPolicy`、`InsuranceController.getInsurance`、`ProposalController.getProposal` 已经 `*AppQueryService` 走 `QueryGateway` 查读模型 View。⚠️ 仅 `PolicyController.getPoliciesByCustomerId/getPoliciesByStatus/getAllPolicies` 因 `PolicyApi` 契约缺 tenantId/分页参数暂未接通（已注释标注待 API 补齐）。
 2. ✅ **Insurance/Proposal 读模型投影已补齐**：`InsuranceProjectionEventHandler`/`ProposalProjectionEventHandler`（query 层）以 `@EventHandler` 投影到 `t_insurance_view`/`t_proposal_view`，`*AppQueryService` 走 QueryGateway 查读模型，实现真正读写分离（原直查写侧 JPA 的 `InsuranceProjection`/`ProposalProjection` 脏类已删除）。
 3. ⚠️ **Kafka 仅发布 2 个事件**：`KafkaEventPublisher` 只外发 `PolicyCreatedEvent`、`PolicyActivatedEvent`，其余事件不出域。下游若依赖保单状态需补充发布。
-4. ⚠️ **孤儿事件**：`PolicyDataUpdatedEvent`、`PolicyRenewedEvent` 已定义但无任何命令产生、无 handler 消费（续保/数据变更链路未实现）。
+4. ✅ **孤儿事件已清理（m0-705，2026-09-11）**：`PolicyDataUpdatedEvent`、`PolicyRenewedEvent`（无产生者无消费者）与 `LineUnderwritingResultUpdatedEvent` + `UpdateLineUnderwritingResultCommand`（核保域 `UnderwritingDecidedEvent` 载荷不含分段结论字段，上游不存在）已删除；注释中「待核保域支持分段核保」的能力缺口已在 `Insurance.on(UnderwritingResultReceivedEvent)` 保留说明。同期删除被 `PolicyProduct`/`InsuredSubject` 取代的 5 个旧实体：`entity/Subject`、`entity/Coverage`、`entity/InsuranceProduct`、`entity/PolicyItem`、`entity/insurance/InsuranceProduct`（互引孤岛、零外部引用）。
 5. ✅ **ProposalConvertedEvent 写侧已补齐**：新增 `ConvertProposalCommand` + `Proposal.handle(ConvertProposalCommand)`（仅 SUBMITTED 可转，发布 `ProposalConvertedEvent`）。读模型 `ProposalProjectionEventHandler` 投影已就绪，转换命令触发后自动生效。纯对象方法 `convertToApplication` 保留供非事件溯源构建。
 6. ✅ **表现层不再依赖领域命令**：`PolicyController` 等三个 Controller 的命令构造已下沉至 `*ApplicationService`（表现层只传 Request/api-DTO，不持有 domain command），并以 ArchUnit `webShouldNotDependOnDomainCommandsOrAggregates` 固化。
 7. ⚠️ **核保回流未异步化**：Saga 注释说明核保结果跨服务回流依赖消息总线基础设施，尚未落地，当前为同步调用。

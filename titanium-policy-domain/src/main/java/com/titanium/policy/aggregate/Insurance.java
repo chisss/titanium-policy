@@ -234,8 +234,8 @@ public class Insurance extends BaseAggregate {
             case POSTPONE -> "核保暂缓";
         };
         this.status = this.status.transitionStatus(newStatus, changeReason);
-        // 整单结论下发到各险种段：核保域当前出具单据级结论，段级差异化结论（主险通过/附加险拒保）
-        // 待核保域支持分段核保后由 UpdateLineUnderwritingResultCommand 逐段覆盖。
+        // 整单结论下发到各险种段：核保域当前只出具单据级结论，段级差异化结论（主险通过/附加险拒保）
+        // 尚无上游支撑——核保域 UnderwritingDecidedEvent 载荷不含分段结论字段。
         if (this.insuranceLines != null) {
             for (int i = 0; i < this.insuranceLines.size(); i++) {
                 this.insuranceLines.set(i,

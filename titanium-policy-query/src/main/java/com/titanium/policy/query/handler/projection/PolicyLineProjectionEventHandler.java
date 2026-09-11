@@ -16,7 +16,6 @@ import com.titanium.metadata.enums.BaseEnum;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.entity.policy.InsuredSubject;
 import com.titanium.policy.entity.policy.PolicyProduct;
-import com.titanium.policy.event.LineUnderwritingResultUpdatedEvent;
 import com.titanium.policy.event.PolicyCreatedEvent;
 import com.titanium.policy.query.repository.PolicyClauseViewRepository;
 import com.titanium.policy.query.repository.PolicyCoverageViewRepository;
@@ -79,24 +78,6 @@ public class PolicyLineProjectionEventHandler {
             saveSubjects(event.policyId(), event.tenantId(), line);
             saveCoverages(event.policyId(), event.tenantId(), line);
         }
-    }
-
-    /**
-     * 投影段级核保结论回写：仅更新该段的结论与承保状态两列。
-     */
-    @EventHandler
-    @Transactional
-    public void on(LineUnderwritingResultUpdatedEvent event) {
-        String id = lineRowId(event.policyId(), event.policyProductId());
-        policyProductViewRepository.findById(id).ifPresentOrElse(view -> {
-            view.setUnderwritingConclusion(code(event.conclusion()));
-            view.setLineStatus(code(event.lineStatus()));
-            stampAuditTime(view);
-            policyProductViewRepository.save(view);
-            log.info("[险种段投影] 核保结论回写: policyId={}, 段={}, 结论={}, 段状态={}", event.policyId(),
-                    event.policyProductId(), event.conclusion(), event.lineStatus());
-        }, () -> log.warn("[险种段投影] 核保结论回写未找到段行（可能投影延迟）: policyId={}, 段={}",
-                event.policyId(), event.policyProductId()));
     }
 
     /**
