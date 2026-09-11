@@ -233,13 +233,21 @@ mvn -pl titanium-policy-domain test
 14. 🟡 **保全字段执行面：可受理 ≠ 可生效（m2-907，2026-09-11）**：
     - **本轮已补**：`policy.payment.method` 新增 `PaymentMethodPolicyMaintenanceFieldExecutor`（执行器 3 → 4 个，覆盖字段码 5 → 6 个）；`PolicyMaintenanceExecutionState` 纳入 `premiumPlan` 并**改用 wither**（原「构造器重建」写法会在每个旧执行器重建点把新加字段**静默置空**）；字段目录该项 `proposable` → `executable`，`STANDARD_VERSION` 升 `2026.09.11.1`；`PolicyMaintenanceApplicationTest` +3 例（缴费方式生效、非法取值拒绝、wither 保真回归）。
     - **仍缺**：`POLICY_HOLDER_CHANGE` / `INSURED_INFO_CHANGE` 两类**整类必败**（受理放行 → 生效必败），根因是受理侧 `MaintenanceFieldProposalPlanner` 与配置发布侧 `MaintenanceConfigurationValidator` **均不校验 `executionSupported`**，唯一拦截点在生效环节 `MaintenanceEffectApplicationService` / `PolicyMaintenanceFieldExecutorRegistry`。
-    - 🔴 **铁律**：新增 `proposable` 字段必须**同时确认执行路径**，否则即制造「填完表单、走完流程、最后失败」。核查一条字段链路须**同时看三处**——目录 capability、planner 校验项、执行器注册表。
+      - ⚠️ **部分已解**：受理侧的「放行」已由 **m3-901** 在 maintenance 域闭合（`MaintenanceFieldDraftApplicationService` 走实时目录预检，派发提案命令前即拒），见 [titanium-maintenance/CLAUDE.md](../titanium-maintenance/CLAUDE.md)。**配置发布侧（G2）与受理快照（G3）仍在逃**。
+    - 🔴 **铁律**：新增 `proposable` 字段必须**同时确认执行路径**，否则即制造「填完表单、走完流程、最后失败」。核查一条字段链路须**同时看四处**——目录 capability、planner 校验项、执行器注册表、**读模型列 + 投影分支**（后两处缺失即「写通读不通」，见第 16 条）。
     - 完整 19 项字段归因、23 类保全出口对照与 G1–G8 缺口清单见 [docs/技术文档/保全字段执行能力现状与缺口登记-2026-09.md](../docs/技术文档/保全字段执行能力现状与缺口登记-2026-09.md)。
 
 15. ✅ **跨租户写入守护（m2-908，2026-09-11）**：本域三聚合（承保执行中枢）此前**全部 29 个 `@CommandHandler` 零同租户校验**——Axon 按聚合标识装载、事件流不按租户隔离，命令的 `tenantId` 取自调用方 `X-Tenant-Id`（可伪造），**持他租户 `policyId` 即可执行终止/退保/保费豁免等不可逆写入**（链路：`PolicyController` 透传调用方租户头 → `PolicyApplicationService` 直接 `sendAndWait` → 聚合无校验；全仓无 Axon 级租户拦截器，既有 `Tenant*Interceptor` 均为 MVC/Feign 的**上下文传播**，非命令级守卫）。
     - **修法**：三聚合各加私有 `requireSameTenant(String commandTenantId)`，**每个 `@CommandHandler` 首条语句**调用（Policy 22 + Insurance 3 + Proposal 3 + 保全受理 1 = 29）。沿用 billing 既有范式——**失败关闭**（`null`/空白租户同样拒绝）+ **不泄漏资源是否存在**（抛 `PolicyErrorCode.XXX_NOT_EXIST` 而非 FORBIDDEN，避免侧信道）。`@CommandHandler` 标注的**创建构造器**（Policy 2 + Insurance 2 + Proposal 1）不适用：创建时尚无「聚合既有租户」可比对，其租户由创建事件落库、后续命令回放后即受守护。
     - **测试**：`CrossTenantCommandGuardTest` 9 例，**双重判据**——① 行为：6 条代表性命令跨租户/空租户被拒且 `expectNoEvents()`（不得半提交），同租户不误伤；② **结构：扫描三聚合源，断言每个 `@CommandHandler` 首条语句即守护**，并断言 `inspected=29` / `constructors=5`——新增处理器漏写守护即失败，且计数断言防止扫描规则静默失效后"假绿"。
     - 🔴 **铁律**：新增 `@CommandHandler` 必须把 `requireSameTenant(command.tenantId());` 作为**首条语句**，否则该结构测试直接失败。
+
+16. ✅ **缴费方式写读闭环（m3-902，2026-09-11）**：m2-907 补上 `PaymentMethodPolicyMaintenanceFieldExecutor` 后 `policy.payment.method` 已能真实写入 `Policy` 聚合（**写通**），但读侧无落点（**读不通**）——保全改完缴费方式，查保单看不出变化。两条独立成因：① `EndorsementProjectionEventHandler.applyExecutionState` 无 `premiumPlan` 分支；② `PolicyView`/`PolicyQueryResult`/`PolicyDetailVO` 三层均无该列。
+    - **修法**：`t_policy_view` 加 `payment_method` 列（Liquibase `policy_payment_method_202609111900_weisun_ddl.sql`，`AFTER collection_mode`）；`applyExecutionState` 补 `premiumPlan` 分支；出单链路 `PolicyViewMapper.applyCreated` 补 `premiumPlan.paymentMethod → paymentMethod`（`enumCode`）映射；读侧三层贯通。
+    - 🔴 **分支位置即语义**：`premiumPlan` 分支**必须置于 `policyProducts` 的早返回之前**——「仅改缴费方式」的保全**不带险种段变更**（`policyProducts == null`），放在早返回之后会被整体跳过、读模型永不更新。**这正是 G7 的成因**。改投影方法时新增分支必须先核对早返回路径是否吞掉该事件形态。
+    - 🔴 **维度区分**：`paymentMethod`（**缴费方式**：趸缴/期缴）与相邻列 `collectionMode`（**收费方式**：线下/线上/免费/先用后付/代扣）是**两个正交维度**——前者说「保费怎么缴」，后者说「钱怎么收进来」。字段注释与 `@Schema` 均已标注，勿混用。
+    - **测试 +4**：`EndorsementProjectionEventHandlerTest` +1（无险种段变更时缴费方式仍入读模型，以 `verifyNoInteractions(productRepository)` **锁死分支顺序**）；`PolicyViewMapperTest` +3（新建，直接断言生成实现 `PolicyViewMapperImpl`）。
+    - 🔴 **可复用判据**：**映射器 `unmappedTargetPolicy = IGNORE` 时，映射源写错只会静默漏字段、不报编译错**——「新增读模型列」必须**直接测生成实现**，只测处理器（mock 掉 mapper）覆盖不到。同理，一条字段链路的闭环须**四处齐备**：目录 `executable`、领域模型有落脚点、写侧有执行器、**读侧有列 + 投影有分支**。
 
 ---
 
