@@ -34,6 +34,7 @@ import com.titanium.policy.application.saga.ProposalIssuanceSaga;
 import com.titanium.policy.bootstrap.PolicyApplication;
 import com.titanium.product.api.ProductApi;
 import com.titanium.product.api.ProductPremiumCalculationApi;
+import com.titanium.product.api.ProductSurrenderValueApi;
 import com.titanium.product.api.ProductTemplateApi;
 import com.titanium.ruleengine.api.RuleEngineApi;
 import com.titanium.underwriting.api.UnderwritingApi;
@@ -61,6 +62,7 @@ import jakarta.persistence.EntityManagerFactory;
         PaymentApi.class,
         ProductApi.class,
         ProductPremiumCalculationApi.class,
+        ProductSurrenderValueApi.class,
         ProductTemplateApi.class,
         RuleEngineApi.class,
         UnderwritingApi.class

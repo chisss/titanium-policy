@@ -216,6 +216,10 @@ mvn -pl titanium-policy-domain test
 9. ✅ **Kafka 入站监听已修复（2026-09-02，dev-014 验收）**：Spring Boot 4.0 不再自动注册 `@KafkaListener` 注解后处理器，`KafkaConfig` 已补显式 `@EnableKafka`（同 maintenance/customer 先例），四个入站监听器（身故给付/全残给付/保全回写/核保决定/失效力）容器注册正常，`policy-group` 消费组恢复消费。
 10. ✅ **全残给付保单终止断链已修复（2026-09-02，dev-014d）**：原 `DeathBenefitSettledEventListener` 仅覆盖身故，全残给付（CLAIM-6 同身故须终止保单）在 policy 侧无入站监听器。已新增 `DisabilityBenefitSettledEventListener`（topic `claim-disability-benefit-settled`）+ 防腐入站 record `DisabilityBenefitSettledMessage`，与身故共用 `DeathBenefitTerminationOrchestrator.terminateOnBenefitSettled(policyId, operatorId, tenantId, terminationDescription)`（终止描述文案由监听器常量传入，红线 20 常量化）。
 11. ⚠️ **存量测试编译问题**：`IssuanceSagaTest`/`IssuanceOrchestratorTest` 引用已不存在的 `ConfirmedPremiumRequestValidator`，本地构建需 `-Dmaven.test.skip=true`（与 Docker 镜像构建路径一致），待补齐该类或清理测试。
+12. ✅ **保单现金价值只读查询能力（m0-717，2026-09-11）**：新增对外契约 `PolicyCashValueApi`（`GET /api/v1/policies/{policyId}/cash-value`，`contextId=policyCashValueApi`），调用方（计费域垫缴判定）只需保单号。链路：`PolicyCashValueApiProvider` → `PolicyCashValueQueryAppService`（application/query，读 `PolicyView` 取 productId/totalPremium/startDate，保单年度 = 生效日至估值日年差 + 1）→ `PolicyCashValuePort`（`port/product`）→ `PolicyCashValueAdapter`（infrastructure/adapter/product）→ product 域只读现金价值端点。
+    - 🔴 **域内分工**：保单域是「保单要素」权威，product 域是「退保价值规则」权威，本域不含任何费率逻辑，仅做翻译编排；口径（保单年度）由本域独担，消费方不得自行推导。
+    - 🔴 **降级语义**：保单不存在、三项要素（productId/totalPremium/startDate）任一缺失、或产品域无适用策略 → 返回业务码失败（`POLICY_NOT_EXIST` 20000000）且 `data` 为空，**不伪造金额**。
+    - 🔴 **上下文测试同步**：`PolicyDeadLetterQueueContextTest` 以 `@MockitoBean(types=...)` 显式 mock 全部 Feign 客户端（本地无 `spring-cloud-starter-loadbalancer`，未被 mock 的客户端会因惰性解析失败而拖垮上下文），**新增 Feign 客户端契约时必须同步补入该列表**。
 
 ---
 
