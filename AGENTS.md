@@ -30,7 +30,7 @@
 - **Kafka 事件**（`PolicyConstants.KafkaTopic`，仅这 2 个事件实际外发）：
   - `titanium.policy.created`（POLICY_CREATED） ← `PolicyCreatedEvent`
   - `titanium.policy.activated`（POLICY_ACTIVATED） ← `PolicyActivatedEvent`
-  - 已声明未使用的 topic：`titanium.policy.expired`、`titanium.policy.cancelled`、`titanium.policy.events`。
+  - 原 `titanium.policy.expired` / `titanium.policy.cancelled` / `titanium.policy.events` 三个孤儿常量已于 m5-903 删除（声明起从无发布点）。
 
 ### 2.2 本模块依赖（主动调用，application/service 层）
 

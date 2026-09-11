@@ -17,11 +17,12 @@ public class PolicyConstants {
      * 消息队列主题常量
      */
     public static class KafkaTopic {
-        public static final String POLICY_EVENTS = "titanium.policy.events"; // 保单事件主题
         public static final String POLICY_CREATED = "titanium.policy.created"; // 保单创建事件主题
         public static final String POLICY_ACTIVATED = "titanium.policy.activated"; // 保单激活事件主题
         public static final String POLICY_ISSUED = "titanium.policy.issued"; // 保单签发事件主题（供监管采集/自动分保消费）
-        public static final String POLICY_EXPIRED = "titanium.policy.expired"; // 保单过期事件主题
-        public static final String POLICY_CANCELLED = "titanium.policy.cancelled"; // 保单取消事件主题
+        // 原 POLICY_EVENTS（titanium.policy.events，主题命名空间常量而非具体主题）与
+        // POLICY_EXPIRED / POLICY_CANCELLED 自声明起从无发布点，已删除（m5-903）。
+        // 本域实际外发仅上列三个主题（见 KafkaEventPublisher）；保单满期/注销事件不出域，
+        // 若未来确需外发，须与消费端**成对建设**后重新登记进跨域事件目录，勿单侧新增孤儿主题。
     }
 }
