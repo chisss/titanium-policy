@@ -451,6 +451,7 @@ public class PolicyQueryServiceImpl implements PolicyQueryService {
         result.setWaitingPeriodEndDate(view.getWaitingPeriodEndDate());
         result.setHesitationPeriodEndDate(view.getHesitationPeriodEndDate());
         result.setCollectionMode(view.getCollectionMode());
+        result.setPaymentMethod(view.getPaymentMethod());
         result.setCollectionStatus(view.getCollectionStatus());
         result.setCollectedAmount(view.getCollectedAmount());
         result.setChannelId(view.getChannelId());

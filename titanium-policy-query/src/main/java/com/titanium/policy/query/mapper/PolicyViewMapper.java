@@ -58,6 +58,7 @@ public interface PolicyViewMapper {
     @Mapping(target = "collectionMode", source = "collectionInfo.collectionMode", qualifiedByName = "enumCode")
     @Mapping(target = "collectionStatus", source = "collectionInfo.collectionStatus", qualifiedByName = "enumCode")
     @Mapping(target = "collectedAmount", source = "collectionInfo.collectedAmount", qualifiedByName = "moneyValue")
+    @Mapping(target = "paymentMethod", source = "premiumPlan.paymentMethod", qualifiedByName = "enumCode")
     @Mapping(target = "channelId", source = "channelInfo.channelId")
     @Mapping(target = "salesChannel", source = "channelInfo.salesChannel", qualifiedByName = "enumCode")
     @Mapping(target = "agentId", source = "channelInfo.agentId")

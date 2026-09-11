@@ -95,6 +95,9 @@ public class PolicyDetailVO {
     @Schema(description = "收费方式码")
     private String                  collectionMode;
 
+    @Schema(description = "缴费方式码（SINGLE_PAYMENT 趸缴 / INSTALLMENT_PAYMENT 期缴）")
+    private String                  paymentMethod;
+
     @Schema(description = "收讫状态码")
     private String                  collectionStatus;
 

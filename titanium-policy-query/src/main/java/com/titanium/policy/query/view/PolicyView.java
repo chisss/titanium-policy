@@ -183,6 +183,21 @@ public class PolicyView extends BaseView {
     @Column(name = "collection_mode", length = 32)
     private String        collectionMode;
 
+    /**
+     * 缴费方式码（SINGLE_PAYMENT 趸缴 / INSTALLMENT_PAYMENT 期缴，非缴费周期）。
+     * <p>
+     * 取自 {@code PremiumPlan.paymentMethod}：出单时由 {@code PolicyCreatedEvent} 首落，此后由
+     * {@code policy.payment.method} 保全字段执行器改写并经 {@code PolicyMaintenanceAppliedEvent}
+     * 的 {@code executionStateAfter} 回投影。
+     * </p>
+     * <p>
+     * 🔴 与上一列 {@code collectionMode}（<b>收费方式</b>：线下/线上/免费/先用后付/代扣）是<b>两个维度</b>，
+     * 勿混用：缴费方式说的是「保费怎么缴」（一次缴清还是分期缴），收费方式说的是「钱怎么收进来」。
+     * </p>
+     */
+    @Column(name = "payment_method", length = 32)
+    private String        paymentMethod;
+
     /** 收讫状态码（UNCOLLECTED/PARTIALLY_COLLECTED/COLLECTED/DEFERRED/OVERDUE） */
     @Column(name = "collection_status", length = 32)
     private String        collectionStatus;

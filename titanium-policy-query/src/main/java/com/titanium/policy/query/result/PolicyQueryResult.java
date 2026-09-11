@@ -152,6 +152,9 @@ public class PolicyQueryResult {
     /** 收费方式码（OFFLINE/ONLINE/FREE/PAY_AFTER_USE/WITHHOLD） */
     private String                      collectionMode;
 
+    /** 缴费方式码（SINGLE_PAYMENT 趸缴 / INSTALLMENT_PAYMENT 期缴；🔴 与 collectionMode 是两个维度） */
+    private String                      paymentMethod;
+
     /** 收讫状态码 */
     private String                      collectionStatus;
 

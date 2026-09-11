@@ -154,6 +154,13 @@ public class EndorsementProjectionEventHandler {
         if (executionState.insuredPartyList() != null) {
             replaceBeneficiaries(policyId, tenantId, executionState.insuredPartyList().beneficiaryList());
         }
+        // 缴费方式（趸缴/期缴）：字段执行器改写 PremiumPlan 后经执行状态快照回投影。
+        // 🔴 必须置于下方 policyProducts 的早返回之前——仅改缴费方式的保全不带险种段变更，
+        // 放在早返回之后会被整体跳过，读模型永不更新（缺口登记 G7 的成因）。
+        if (executionState.premiumPlan() != null
+                && executionState.premiumPlan().paymentMethod() != null) {
+            policy.setPaymentMethod(executionState.premiumPlan().paymentMethod().getCode());
+        }
         if (executionState.policyProducts() == null) {
             return;
         }

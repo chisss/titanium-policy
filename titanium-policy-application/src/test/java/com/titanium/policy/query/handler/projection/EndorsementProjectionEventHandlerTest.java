@@ -3,6 +3,7 @@ package com.titanium.policy.query.handler.projection;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
@@ -20,6 +21,9 @@ import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.common.enums.EndorsementCategory;
 import com.titanium.policy.common.enums.PolicyDataUpdateType;
 import com.titanium.policy.common.enums.PolicyStatusCode;
+import com.titanium.policy.common.enums.PremiumPaymentCycle;
+import com.titanium.policy.common.enums.PremiumPaymentMethod;
+import com.titanium.policy.common.enums.PremiumPaymentStatus;
 import com.titanium.policy.entity.insurance.InsuredPartyList;
 import com.titanium.policy.entity.policy.PolicyProduct;
 import com.titanium.policy.event.PolicyMaintenanceAppliedEvent;
@@ -33,6 +37,7 @@ import com.titanium.policy.query.view.PolicyBeneficiaryView;
 import com.titanium.policy.query.view.PolicyEndorsementView;
 import com.titanium.policy.query.view.PolicyProductView;
 import com.titanium.policy.query.view.PolicyView;
+import com.titanium.policy.valueobject.PremiumPlan;
 import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceExecutionState;
 
 class EndorsementProjectionEventHandlerTest {
@@ -120,6 +125,31 @@ class EndorsementProjectionEventHandlerTest {
         assertEquals("TENANT_001", beneficiary.getValue().getTenantId());
     }
 
+    @Test
+    void projectsPaymentMethodIntoPolicyViewEvenWithoutProductChanges() {
+        PolicyEndorsementViewRepository endorsementRepository = mock(PolicyEndorsementViewRepository.class);
+        PolicyViewRepository policyRepository = mock(PolicyViewRepository.class);
+        PolicyProductViewRepository productRepository = mock(PolicyProductViewRepository.class);
+        PolicyBeneficiaryViewRepository beneficiaryRepository = mock(PolicyBeneficiaryViewRepository.class);
+        PolicyView policy = new PolicyView();
+        policy.setPaymentMethod(PremiumPaymentMethod.SINGLE_PAYMENT.getCode());
+        when(endorsementRepository.findById("END_PAYMENT_001")).thenReturn(Optional.empty());
+        when(policyRepository.findByPolicyIdAndTenantId("POLICY_001", "TENANT_001"))
+                .thenReturn(Optional.of(policy));
+
+        new EndorsementProjectionEventHandler(
+                endorsementRepository, policyRepository, productRepository, mock(PolicyViewMapper.class),
+                beneficiaryRepository)
+                .on(paymentMethodEvent());
+
+        // 🔴 本事件的执行状态不带险种段（policyProducts 为 null）。premiumPlan 分支必须位于
+        // applyExecutionState 中 policyProducts 的早返回之前，否则「仅改缴费方式」的保全读模型永不更新
+        // ——这正是缺口 G7 的成因，本断言即为该顺序的回归锁。
+        assertEquals(PremiumPaymentMethod.INSTALLMENT_PAYMENT.getCode(), policy.getPaymentMethod());
+        verify(policyRepository).save(policy);
+        verifyNoInteractions(productRepository);
+    }
+
     private PolicyMaintenanceStateAppliedEvent stateEvent() {
         LocalDateTime appliedAt = LocalDateTime.parse("2026-08-25T16:00:00");
         return new PolicyMaintenanceStateAppliedEvent(
@@ -161,6 +191,23 @@ class EndorsementProjectionEventHandlerTest {
                 "b".repeat(64), "c".repeat(64), "axon-event://policy/POLICY_001/8",
                 "d".repeat(64), "e".repeat(64), List.of(),
                 new PolicyMaintenanceExecutionState(parties, null),
+                appliedAt, "operator-1", "TENANT_001");
+    }
+
+    /** 缴费方式变更保全：执行状态只带保费计划，不带险种段与参与方。 */
+    private PolicyMaintenanceAppliedEvent paymentMethodEvent() {
+        LocalDateTime appliedAt = LocalDateTime.parse("2026-08-29T10:00:00");
+        PremiumPlan plan = new PremiumPlan(
+                Money.of(new BigDecimal("1000"), "CNY"), PremiumPaymentMethod.INSTALLMENT_PAYMENT,
+                PremiumPaymentCycle.MONTHLY, LocalDateTime.parse("2026-09-01T00:00:00"),
+                PremiumPaymentStatus.UNPAID);
+        return new PolicyMaintenanceAppliedEvent(
+                "POLICY_001", "REQUEST_PAYMENT_001", "a".repeat(64), "MAINTENANCE_PAYMENT_001",
+                "END_PAYMENT_001", PolicyDataUpdateType.PAYMENT_METHOD_CHANGE,
+                EndorsementCategory.PREMIUM_TERMS, 7, 8, appliedAt, "缴费方式变更",
+                "b".repeat(64), "c".repeat(64), "axon-event://policy/POLICY_001/8",
+                "d".repeat(64), "e".repeat(64), List.of(),
+                new PolicyMaintenanceExecutionState(null, null, plan),
                 appliedAt, "operator-1", "TENANT_001");
     }
 }
