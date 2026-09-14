@@ -82,6 +82,20 @@ axon:
         # 首个handler失败标记tx回滚但后续event的insert已入Hibernate队列，commit时撞主键。
         # 改为1保证每事件独立tx，delete+flush+insert原子化，幂等重放不再重复键冲突。
         batchSize: 1
+      # 跨域外发处理组：保单事件推送 Kafka，供监管采集承保数据、再保自动分保等下游消费。
+      # 🔴 必须 tracking：Axon 的 DLQ 仅支持流式处理器，subscribing 拿不到重投能力。
+      # 首启位点由 titanium.axon.outbound-relay 登记为「事件流末端」，防止全新部署时
+      # 把本域全部历史事件重放给下游（tracking 组令牌缺失时默认从头部起算）。
+      policy-kafka-group:
+        mode: tracking
+        dlq:
+          enabled: true
+          max-size: 1000
+          cache:
+            enabled: true
+            size: 2048
+        # 出站按事件独立确认：一条失败只 DLQ 该条序列，不牵连同批。
+        batchSize: 1
   eventstore:
     jpa:
       entity-manager-provider: default
@@ -179,3 +193,13 @@ management:
   metrics:
     tags:
       application: ${spring.application.name}
+
+# 跨域出站中继（事件存储即 Outbox）配置
+titanium:
+  axon:
+    outbound-relay:
+      # 以 Kafka 外发为职责的处理组：首启位点取「事件流末端」，避免全新部署时重放全量历史事件。
+      # 🔴 新增出站发布器（带 @ProcessingGroup 的 Kafka 发布器）必须同步登记于此，否则该组在
+      # 首次部署时会从事件流头部起算，把本域全部历史事件重发给下游。
+      groups:
+        - policy-kafka-group
