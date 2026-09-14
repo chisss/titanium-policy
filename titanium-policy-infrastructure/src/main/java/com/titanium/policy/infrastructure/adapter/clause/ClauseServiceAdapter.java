@@ -6,8 +6,8 @@ import java.util.List;
 import org.springframework.stereotype.Component;
 
 import com.titanium.clause.api.ClauseApi;
-import com.titanium.clause.api.response.ClauseResponse;
-import com.titanium.clause.api.response.CoverageResponse;
+import com.titanium.clause.api.response.clause.ClauseResponse;
+import com.titanium.clause.api.response.clause.CoverageResponse;
 import com.titanium.metadata.enums.CurrencyEnum;
 import com.titanium.metadata.enums.clause.DeductibleType;
 import com.titanium.metadata.valueobject.Money;
