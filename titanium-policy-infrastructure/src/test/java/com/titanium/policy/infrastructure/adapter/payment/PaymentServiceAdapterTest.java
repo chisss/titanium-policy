@@ -17,8 +17,8 @@ import com.titanium.metadata.enums.billing.PremiumCollectionMode;
 import com.titanium.metadata.response.ApiResponse;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.payment.api.PaymentApi;
-import com.titanium.payment.api.request.CreatePaymentOrderRequest;
-import com.titanium.payment.api.response.PaymentOrderResponse;
+import com.titanium.payment.api.request.payment.CreatePaymentOrderRequest;
+import com.titanium.payment.api.response.payment.PaymentOrderResponse;
 import com.titanium.policy.valueobject.payment.PremiumPaymentRequest;
 
 class PaymentServiceAdapterTest {
