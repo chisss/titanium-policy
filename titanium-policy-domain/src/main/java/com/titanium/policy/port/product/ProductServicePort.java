@@ -24,6 +24,14 @@ import com.titanium.policy.valueobject.product.ProductIssueRules;
  * （{@code IssuanceEligibilityDomainService}）的入参，内嵌会让领域服务被迫 import Port 包，
  * 触发 ArchUnit「领域服务不得依赖 Port」断言。详见 {@link ProductIssueRules} 的包位置说明。
  * </p>
+ * <p>
+ * 🔴 <b>本端口即 policy 与 product 的全部协作面，不订阅 product 主题（2026-09-14 m6-907 判定）</b>：
+ * policy 对产品的取用是<b>业务时点的同步实时查询</b>（出单装配/投保受理），产品状态变更无需异步通知——
+ * 在售校验由出单必经的 CONFIRM 试算同步强校验（product 侧对非 {@code EFFECTIVE} 抛
+ * {@code PRICING_PLAN_NOT_EFFECTIVE} 阻断出单），已出保单为产品快照、产品下架不回溯。
+ * 故 {@code titanium.product.created/audited/invalidated} 三主题<b>均不接</b>入 policy，
+ * 判定依据见 {@code docs/技术文档/跨域事件目录-2026-09.md} §六.15。
+ * </p>
  */
 public interface ProductServicePort {
 
