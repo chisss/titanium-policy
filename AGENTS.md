@@ -44,6 +44,24 @@
 > 说明：依赖采用「Service 客户端 + 领域端口 + Adapter」的防腐层模式，领域层只依赖 `*ServicePort` 接口。
 > **客户域 customer 无 Feign 依赖**：`customerId` 仅作为数据字段存储于 `ProposalBasicInfo`/`InsuranceBasicInfo`，不发起远程调用。
 
+### 2.3 本模块消费（被动接收，`infrastructure/messaging` 入站适配器，共 7 个）
+
+全部 `groupId = "${spring.kafka.consumer.group-id}"`，各配一个 `messaging/inbound` 防腐入站 record：
+
+| 监听器 | 主题（`CrossDomainTopics`） | 消费后动作 |
+|--------|---------------------------|-----------|
+| `UnderwritingDecidedEventListener` | `UNDERWRITING_DECIDED` | → `UnderwritingResultReceivedOrchestrator`（核保结论回写承保） |
+| `PaymentPaidListener` | `PAYMENT_ORDER_PAID` | → `PremiumCollectionResultOrchestrator.onPaymentSucceeded`（实收回写 + 尝试生效） |
+| `PremiumCollectionFailedListener` | `PAYMENT_ORDER_FAILED` | **仅结构化日志**（保单停待生效即正确，补偿靠定时激活 + billing 逾期链路） |
+| `MaintenanceExecutedEventListener` | `MAINTENANCE_EXECUTED` | → 保全回写策略族编排器 |
+| `DeathBenefitSettledEventListener` | `CLAIM_DEATH_BENEFIT_SETTLED` | → `DeathBenefitTerminationOrchestrator`（身故终止保单） |
+| `DisabilityBenefitSettledEventListener` | `CLAIM_DISABILITY_BENEFIT_SETTLED` | 同上（全残同身故） |
+| `BillingLapseNotificationListener` | `BILLING_LAPSE_NOTIFICATION` | → 保单失效相关用例 |
+
+- 🔴 **`PAYMENT_ORDER_PAID` / `PAYMENT_ORDER_FAILED` 是全业务域共用出口**（支付域面向保单/理赔/保全统一发布），消费侧**必须**按 `businessType` 过滤本域消息，否则会把赔款/退费记成保费。过滤基准用 `BusinessDomainType.POLICY.getCode()`（对端 `JSON.toJSONString` 序列化为枚举常量名，与 `getCode()` 同值）。
+- 🔴 **异常一律吞掉不重抛**（解析失败记 warn 后 return）：该主题由多域共用，抛出会卡住消费位点、连带阻塞他域。⚠️ 当前全域入站链路**均无 DLQ**。
+- 🔴 **新增入站监听器**：topic 常量入 `CrossDomainTopics`（勿在本域另定义字面量）、配 `messaging/inbound` 防腐 record（不依赖对端域类）、按需过滤 `businessType`，并同步上表。⚠️ 同时检查 `PolicyDeadLetterQueueContextTest`（`@MockitoBean(types=...)` 显式 mock Feign 客户端）是否需同步。
+
 ---
 
 ## 三、文件锁定建议（高频冲突区）

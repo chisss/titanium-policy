@@ -281,6 +281,15 @@ mvn -pl titanium-policy-domain test
     - **测试 +4**（`PolicyActivationSchedulerTest`，本域 `application/scheduled` 首个测试类）：跨租户各自携带 tenantId / 取数口径锁定 `PENDING_EFFECTIVE` 且基准日为当下（**并断言不得混用写侧 `NOT_EFFECTIVE`**，二者是有意映射）/ 单条失败不中断批次 / 空结果不空转。
     - 🔴 **可复用判据**：**javadoc 承诺的机制必须与实际代码对齐**——「由 XX 定时任务补齐」「待 YY 通道驱动」这类措辞若指向一个不存在的组件，则链路在该分支上是**静默断裂**的（异常被 catch 吞掉、只留 info 日志，编译与测试全绿）。排查断链时须把**注释里的承诺**当作待验证项，反向搜索其指代物是否存在。
 
+21. ✅ **支付失败主题的入站可观测接入（m12-1502，2026-09-14）**：支付域 `payment-order-failed` 主题（载荷由 `PaymentFailedEvent` 渠道失败与 `PaymentCancelledEvent` 人工取消两事件装配）在本域**零消费者**——全仓唯一消费者是 claim 域 `PaymentResultConsumer`。后果：保单因支付失败停在待生效时，本域**完全无感**，「哪张保单因支付失败卡住」在保单侧无从检索（成功侧有 `PaymentPaidListener`，失败侧此前无对应物，链路不对称）。
+    - **修法**：新增防腐入站 record `PaymentOrderFailedMessage`（`messaging/inbound`，7 字段与对端逐一对齐，对端枚举字段一律以 `String` 承接）+ `PremiumCollectionFailedListener`（topic 取 `CrossDomainTopics.PAYMENT_ORDER_FAILED`，按 `businessType=POLICY` 过滤，结构化 log 记录 policyId/paymentNo/tenantId/原因）。
+    - 🔴 **最小接入，有意不改动状态**：保单停在待生效即**正确的领域状态**（钱没到，不生效是对的），本域无任何命令需补发；补偿由既有两条通道承担——m12-1501 的 `PolicyActivationScheduler`（到账+起期到）与 billing 逾期失效链路。本类职责**仅为可观测性**，是「保单卡在待生效」的唯一检索入口。
+    - 🔴 **必须按 `businessType` 过滤**：该主题是支付域对**所有**业务域出款未成功的统一出口（赔付、退费同样发布到此），不过滤会把赔款失败误报为保费收取失败——与 `PaymentPaidListener` 同一红线。
+    - 🔴 **过滤基准须核验对端序列化形态（本次实测）**：出站走 `JSON.toJSONString(message)`，枚举字段序列化为**枚举常量名**（`"POLICY"`/`"FAILED"`/`"CANCELLED"`），与对端 `getCode()` 取值一致，故消费侧用字符串常量比对成立。**新增跨域枚举字段消费前必须实读对端序列化点**，凭 `enumCode`（数字 1/4/6）或猜测比对会静默失配（过滤恒 false → 消息全被跳过、无任何报错）。
+    - **异常策略与成功侧一致**：解析失败/字段缺失记 warn 后 return，**不抛出**——该主题由多域共用，本监听器抛出会卡住消费位点、连带阻塞理赔与保全域对失败通知的感知。⚠️ 无 DLQ。
+    - **测试 +9**：`PaymentOrderFailedMessageTest` 4 例（锁死字段逐一对齐 / 取消与失败成因可辨 / 对端新增字段前向兼容 / 缺字段容忍）+ `PremiumCollectionFailedListenerTest` 5 例（本域失败、取消、他域、字段缺失、空串与字面量 `null` 报文均不得抛出）。
+    - 🔴 **可复用判据（纯日志型组件的可测性）**：当组件**有意不改动任何状态**（无依赖、无命令、无返回值）时，用例应锁两条——① **防腐 record 的字段对齐**（字段名漂移不报错、只静默丢字段，最易无声失效）；② **「任何形态报文都不得抛出」的消费不阻塞契约**。前者单独成类（`inbound` 包内），后者断言 `assertDoesNotThrow`。
+
 ---
 
 *改动聚合根/事件/命令前，请同步阅读 [AGENTS.md](./AGENTS.md) 的协作检查清单与文件锁定建议。*
