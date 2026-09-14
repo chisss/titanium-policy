@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import com.titanium.metadata.response.ApiResponse;
-import com.titanium.policy.api.response.PolicyCashValueResponse;
+import com.titanium.policy.api.response.policy.PolicyCashValueResponse;
 
 /**
  * 保单现金价值只读远程契约。

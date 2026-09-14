@@ -9,7 +9,7 @@ import com.alibaba.fastjson2.JSONObject;
 
 import com.titanium.metadata.enums.underwriting.UnderwritingEnum.ConclusionType;
 import com.titanium.metadata.topic.CrossDomainTopics;
-import com.titanium.policy.application.command.InsuranceApplicationService;
+import com.titanium.policy.application.command.insurance.InsuranceApplicationService;
 import com.titanium.policy.infrastructure.messaging.inbound.UnderwritingDecidedMessage;
 import com.titanium.policy.valueobject.insurance.UnderwritingResult;
 

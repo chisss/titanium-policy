@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.titanium.metadata.errorcode.PolicyErrorCode;
 import com.titanium.metadata.response.ApiResponse;
 import com.titanium.policy.api.PolicyCashValueApi;
-import com.titanium.policy.api.response.PolicyCashValueResponse;
+import com.titanium.policy.api.response.policy.PolicyCashValueResponse;
 import com.titanium.policy.application.query.PolicyCashValueQueryAppService;
 import com.titanium.policy.valueobject.product.PolicyCashValue;
 

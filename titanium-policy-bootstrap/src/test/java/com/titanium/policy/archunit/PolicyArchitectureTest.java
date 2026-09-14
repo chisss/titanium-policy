@@ -136,6 +136,118 @@ class PolicyArchitectureTest extends AbstractArchitectureGuardTest {
         super.adapterShouldNotContainFlatClasses();
     }
 
+    /**
+     * 启用「api.request 按业务主题拆子包、顶层清零」（分包规则·批次 2）。
+     * <p>
+     * 保单域 api.request 6 类归位：{@code request.issuance}（意向单转投保单 / 创建保单 / 创建投保意向单 /
+     * 提交出单，出单承保主链）4 类；保全回写类 2 类并入既有 {@code request.maintenance}
+     * （{@code ApplyPolicyMaintenanceRequest} 等 3 类 → 5 类），顶层零类。
+     * </p>
+     * <p>
+     * 🔴 <b>跨域引用面</b>：{@code request.issuance} / {@code request.maintenance} 的多个契约被
+     * <b>maintenance</b>（{@code PolicyServiceAdapter} / {@code PolicyServiceClient} /
+     * {@code PolicyMaintenanceSnapshotAdapter}）、<b>claim</b>（{@code PolicyServiceAdapter}）、
+     * <b>billing</b>（{@code PolicyCashValueAdapter}）、<b>admin</b>（{@code PolicyServiceClient} /
+     * {@code BusinessProxyService} / {@code DashboardController}）import，须先 install 本域 api 再编译下游。
+     * </p>
+     */
+    @Test
+    @Override
+    protected void apiRequestShouldNotContainFlatClasses() {
+        super.apiRequestShouldNotContainFlatClasses();
+    }
+
+    /**
+     * 启用「api.response 按业务主题拆子包、顶层清零」（分包规则·批次 2）。
+     * <p>
+     * 保单域 api.response 12 类四分归位：{@code response.issuance}（投保单 / 出单 / 投保意向单）3 类；
+     * {@code response.policy}（保单主体 / 受益人 / 现金价值 / 条款快照 / 统计 / 状态）6 类；
+     * 保全类 2 类并入既有 {@code response.maintenance}（4 类 → 6 类）；快照字段值类并入既有
+     * {@code response.fieldcatalog}（3 类 → 4 类），顶层零类。
+     * </p>
+     * <p>
+     * 🔴 <b>需补 import 的跨子包引用</b>：{@code PolicyMaintenanceSnapshotResponse}（maintenance）引用
+     * {@code PolicySnapshotFieldValueResponse}（fieldcatalog），二者原为同包免 import，拆入不同子包后
+     * 必须显式 import——**这是拆包的又一易漏点：同包类被分到不同子包时，原有免 import 引用必须补齐**。
+     * </p>
+     */
+    @Test
+    @Override
+    protected void apiResponseShouldNotContainFlatClasses() {
+        super.apiResponseShouldNotContainFlatClasses();
+    }
+
+    /**
+     * 启用「application.command 按业务主题拆子包、顶层清零」（分包规则·批次 2）。
+     * <p>
+     * 保单域 application.command 5 类四分：{@code command.insurance}（投保单应用服务）、
+     * {@code command.issuance}（出单应用服务 + 出单进度基线写入器）、{@code command.policy}（保单应用服务）、
+     * {@code command.proposal}（投保意向单应用服务），顶层零类。
+     * </p>
+     * <p>
+     * <b>测试目录同迁</b>：{@code IssuanceProgressBaselineWriterTest} 与
+     * {@code PolicyIssuanceApplicationServiceTest} 原与源码同包（同包免 import），已随迁至
+     * {@code application.command.issuance} 测试包——保持同包关系，免去补 import 且结构镜像。
+     * （注：ArchUnit 基类导入用 {@code DO_NOT_INCLUDE_TESTS}，测试类不参与断言判定，同迁动因是**编译**而非断言。）
+     * </p>
+     */
+    @Test
+    @Override
+    protected void applicationCommandShouldNotContainFlatClasses() {
+        super.applicationCommandShouldNotContainFlatClasses();
+    }
+
+    /**
+     * 启用「web.controller 按业务主题拆子包、顶层清零」（分包规则·批次 2）。
+     * <p>
+     * 保单域 web.controller 5 类四分：{@code controller.policy}（保单控制器 + 保单详情控制器）、
+     * {@code controller.insurance}（投保单控制器）、{@code controller.issuance}（出单流程控制器）、
+     * {@code controller.proposal}（投保意向单控制器），顶层零类。
+     * </p>
+     * <p>
+     * <b>跨主题测试类不迁</b>：{@code RootPaginationControllerTest} 同时构造 policy / insurance / proposal
+     * 三个控制器（测分页通用行为），无法归入任一单主题子包，故留在 {@code web.controller} 测试包并补 3 处
+     * import——**「同迁」只适用于单主题测试，跨主题测试应补 import 而非硬塞**。
+     * </p>
+     */
+    @Test
+    @Override
+    protected void webControllerShouldNotContainFlatClasses() {
+        super.webControllerShouldNotContainFlatClasses();
+    }
+
+    /**
+     * 启用「web.dto 按业务主题拆子包、顶层清零」（分包规则·批次 2）。
+     * <p>
+     * 保单域 web.dto 10 类三分：{@code dto.issuance}（转投保单 / 创建保单 / 创建投保意向单）3 类；
+     * {@code dto.maintenance}（批改 / 红利派发 / 满期给付 / 年金给付 / 退保 / 保费豁免）6 类；
+     * {@code dto.policy}（保单状态变更通用原因载体 {@code PolicyReasonDTO}）1 类，顶层零类。
+     * </p>
+     * <p>
+     * {@code PolicyReasonDTO} 经全仓引用核查仅被 {@code PolicyController} 使用 3 处，故归 {@code dto.policy}
+     * 而非 maintenance——**归位以实际引用方为准，不按名称臆测**。
+     * </p>
+     */
+    @Test
+    @Override
+    protected void webDtoShouldNotContainFlatClasses() {
+        super.webDtoShouldNotContainFlatClasses();
+    }
+
+    /**
+     * 启用「web.response 按业务主题拆子包、顶层清零」（分包规则·批次 2）。
+     * <p>
+     * 保单域 web.response 3 类即三个资源主题，各成单类子包：{@code response.insurance}（投保单 VO）、
+     * {@code response.policy}（保单详情 VO）、{@code response.proposal}（投保意向单 VO），顶层零类。
+     * 主题命名与 {@code web.controller} / {@code application.command} 的同名子包一致，域内不出现多套划分。
+     * </p>
+     */
+    @Test
+    @Override
+    protected void webResponseShouldNotContainFlatClasses() {
+        super.webResponseShouldNotContainFlatClasses();
+    }
+
     // 注：早期严格隔离断言 webShouldNotDependOnDomainCommandsOrAggregates 不再启用。
     // 现行 api/web 规范改为 web 直接构造 domain Command / 读侧 FindXxxQuery 作 application 门面入参
     // （主流 Axon/CQRS 做法），web 允许依赖 command/query（但不碰 aggregate），故回退为基类默认 @Disabled。

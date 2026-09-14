@@ -9,8 +9,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 
 import com.titanium.metadata.response.ApiResponse;
-import com.titanium.policy.api.request.CreateProposalRequest;
-import com.titanium.policy.api.response.ProposalResponse;
+import com.titanium.policy.api.request.issuance.CreateProposalRequest;
+import com.titanium.policy.api.response.issuance.ProposalResponse;
 
 /**
  * 投保意向单聚合对外契约（Feign）

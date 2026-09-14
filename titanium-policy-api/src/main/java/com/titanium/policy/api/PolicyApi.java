@@ -11,17 +11,17 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 
 import com.titanium.metadata.response.ApiResponse;
-import com.titanium.policy.api.request.AccountValueWriteBackRequest;
-import com.titanium.policy.api.request.CreatePolicyRequest;
-import com.titanium.policy.api.request.RecordPremiumCollectionRequest;
+import com.titanium.policy.api.request.issuance.CreatePolicyRequest;
+import com.titanium.policy.api.request.maintenance.AccountValueWriteBackRequest;
 import com.titanium.policy.api.request.maintenance.ApplyPolicyMaintenanceRequest;
-import com.titanium.policy.api.response.PolicyBeneficiaryResponse;
-import com.titanium.policy.api.response.PolicyClauseResponse;
-import com.titanium.policy.api.response.PolicyEndorsementResponse;
-import com.titanium.policy.api.response.PolicyMaintenanceSnapshotResponse;
-import com.titanium.policy.api.response.PolicyResponse;
-import com.titanium.policy.api.response.PolicyStatusResponse;
+import com.titanium.policy.api.request.maintenance.RecordPremiumCollectionRequest;
+import com.titanium.policy.api.response.maintenance.PolicyEndorsementResponse;
 import com.titanium.policy.api.response.maintenance.PolicyMaintenanceApplicationResponse;
+import com.titanium.policy.api.response.maintenance.PolicyMaintenanceSnapshotResponse;
+import com.titanium.policy.api.response.policy.PolicyBeneficiaryResponse;
+import com.titanium.policy.api.response.policy.PolicyClauseResponse;
+import com.titanium.policy.api.response.policy.PolicyResponse;
+import com.titanium.policy.api.response.policy.PolicyStatusResponse;
 
 import jakarta.validation.Valid;
 

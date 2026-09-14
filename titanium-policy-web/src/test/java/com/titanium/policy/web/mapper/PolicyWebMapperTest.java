@@ -8,9 +8,9 @@ import java.time.LocalDateTime;
 import org.junit.jupiter.api.Test;
 import org.mapstruct.factory.Mappers;
 
-import com.titanium.policy.api.response.PolicyResponse;
+import com.titanium.policy.api.response.policy.PolicyResponse;
 import com.titanium.policy.query.result.PolicyQueryResult;
-import com.titanium.policy.web.response.PolicyDetailVO;
+import com.titanium.policy.web.response.policy.PolicyDetailVO;
 
 class PolicyWebMapperTest {
 

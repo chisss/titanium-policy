@@ -9,7 +9,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-import com.titanium.policy.application.command.PolicyApplicationService;
+import com.titanium.policy.application.command.policy.PolicyApplicationService;
 import com.titanium.policy.command.PayAnnuityBenefitCommand;
 import com.titanium.policy.common.constant.PolicyConstants;
 import com.titanium.policy.common.enums.AnnuityPayoutStatus;

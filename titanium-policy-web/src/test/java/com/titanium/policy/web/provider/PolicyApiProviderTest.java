@@ -16,11 +16,11 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 import com.titanium.metadata.response.ApiResponse;
-import com.titanium.policy.api.request.RecordPremiumCollectionRequest;
 import com.titanium.policy.api.request.maintenance.ApplyPolicyMaintenanceRequest;
 import com.titanium.policy.api.request.maintenance.PolicyMaintenanceFieldChangeRequest;
+import com.titanium.policy.api.request.maintenance.RecordPremiumCollectionRequest;
 import com.titanium.policy.api.response.maintenance.PolicyMaintenanceApplicationResponse;
-import com.titanium.policy.application.command.PolicyApplicationService;
+import com.titanium.policy.application.command.policy.PolicyApplicationService;
 import com.titanium.policy.application.query.PolicyAppQueryService;
 import com.titanium.policy.application.query.PolicyLineAppQueryService;
 import com.titanium.policy.command.ApplyPolicyMaintenanceCommand;

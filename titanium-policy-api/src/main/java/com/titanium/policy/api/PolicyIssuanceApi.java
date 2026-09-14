@@ -8,8 +8,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 
 import com.titanium.metadata.response.ApiResponse;
-import com.titanium.policy.api.request.SubmitIssuanceRequest;
-import com.titanium.policy.api.response.IssuanceResponse;
+import com.titanium.policy.api.request.issuance.SubmitIssuanceRequest;
+import com.titanium.policy.api.response.issuance.IssuanceResponse;
 
 /**
  * 出单流程对外契约（Feign）

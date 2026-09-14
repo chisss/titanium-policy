@@ -2,7 +2,7 @@ package com.titanium.policy.web.mapper;
 
 import org.mapstruct.Mapper;
 
-import com.titanium.policy.api.response.PolicyStatisticsResponse;
+import com.titanium.policy.api.response.policy.PolicyStatisticsResponse;
 import com.titanium.policy.query.result.PolicyStatisticsResult;
 
 /**

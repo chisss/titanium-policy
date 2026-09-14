@@ -9,8 +9,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 
 import com.titanium.metadata.response.ApiResponse;
-import com.titanium.policy.api.request.ConvertToInsuranceRequest;
-import com.titanium.policy.api.response.InsuranceResponse;
+import com.titanium.policy.api.request.issuance.ConvertToInsuranceRequest;
+import com.titanium.policy.api.response.issuance.InsuranceResponse;
 
 /**
  * 投保单聚合对外契约（Feign）

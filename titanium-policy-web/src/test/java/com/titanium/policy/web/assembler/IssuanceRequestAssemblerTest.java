@@ -8,7 +8,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 import com.titanium.metadata.enums.customer.CustomerEnum.CustomerGender;
-import com.titanium.policy.api.request.SubmitIssuanceRequest;
+import com.titanium.policy.api.request.issuance.SubmitIssuanceRequest;
 import com.titanium.policy.entity.insurance.InsuredPartyList;
 import com.titanium.policy.valueobject.issuance.IssuanceRequest;
 

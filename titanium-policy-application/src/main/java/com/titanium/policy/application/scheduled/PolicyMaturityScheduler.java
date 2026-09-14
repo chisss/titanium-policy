@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 
 import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.policy.PolicyEnum;
-import com.titanium.policy.application.command.PolicyApplicationService;
+import com.titanium.policy.application.command.policy.PolicyApplicationService;
 import com.titanium.policy.command.MatureDuePolicyCommand;
 import com.titanium.policy.common.constant.PolicyConstants;
 import com.titanium.policy.query.repository.PolicyViewRepository;

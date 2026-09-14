@@ -7,12 +7,12 @@ import org.mapstruct.Mapping;
 
 import com.titanium.metadata.enums.CurrencyEnum;
 import com.titanium.metadata.valueobject.Money;
-import com.titanium.policy.api.request.ConvertToInsuranceRequest;
-import com.titanium.policy.api.response.InsuranceResponse;
+import com.titanium.policy.api.request.issuance.ConvertToInsuranceRequest;
+import com.titanium.policy.api.response.issuance.InsuranceResponse;
 import com.titanium.policy.command.ConvertProposalToInsuranceCommand;
 import com.titanium.policy.query.result.InsuranceQueryResult;
-import com.titanium.policy.web.dto.ConvertToInsuranceDTO;
-import com.titanium.policy.web.response.InsuranceVO;
+import com.titanium.policy.web.dto.issuance.ConvertToInsuranceDTO;
+import com.titanium.policy.web.response.insurance.InsuranceVO;
 
 /**
  * 投保单 Web 层对象映射器（MapStruct）

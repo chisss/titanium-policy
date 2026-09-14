@@ -13,22 +13,25 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 
-import com.titanium.policy.application.command.InsuranceApplicationService;
-import com.titanium.policy.application.command.PolicyApplicationService;
-import com.titanium.policy.application.command.ProposalApplicationService;
+import com.titanium.policy.application.command.insurance.InsuranceApplicationService;
+import com.titanium.policy.application.command.policy.PolicyApplicationService;
+import com.titanium.policy.application.command.proposal.ProposalApplicationService;
 import com.titanium.policy.application.query.InsuranceAppQueryService;
 import com.titanium.policy.application.query.PolicyAppQueryService;
 import com.titanium.policy.application.query.ProposalAppQueryService;
 import com.titanium.policy.query.result.InsuranceQueryResult;
 import com.titanium.policy.query.result.PolicyQueryResult;
 import com.titanium.policy.query.result.ProposalQueryResult;
+import com.titanium.policy.web.controller.insurance.InsuranceController;
+import com.titanium.policy.web.controller.policy.PolicyController;
+import com.titanium.policy.web.controller.proposal.ProposalController;
 import com.titanium.policy.web.mapper.InsuranceWebMapper;
 import com.titanium.policy.web.mapper.PolicyStatisticsWebMapper;
 import com.titanium.policy.web.mapper.PolicyWebMapper;
 import com.titanium.policy.web.mapper.ProposalWebMapper;
-import com.titanium.policy.web.response.InsuranceVO;
-import com.titanium.policy.web.response.PolicyDetailVO;
-import com.titanium.policy.web.response.ProposalVO;
+import com.titanium.policy.web.response.insurance.InsuranceVO;
+import com.titanium.policy.web.response.policy.PolicyDetailVO;
+import com.titanium.policy.web.response.proposal.ProposalVO;
 
 class RootPaginationControllerTest {
 
