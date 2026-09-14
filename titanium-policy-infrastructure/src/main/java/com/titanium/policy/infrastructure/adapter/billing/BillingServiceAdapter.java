@@ -1,4 +1,4 @@
-package com.titanium.policy.infrastructure.adapter;
+package com.titanium.policy.infrastructure.adapter.billing;
 
 import org.springframework.stereotype.Component;
 

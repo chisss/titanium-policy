@@ -11,8 +11,8 @@ import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.policy.command.CreateProposalCommand;
 import com.titanium.policy.entity.proposal.ProposalLine;
 import com.titanium.policy.entity.proposal.ProposalSubject;
-import com.titanium.policy.valueobject.IssuancePlanLine;
-import com.titanium.policy.valueobject.IssuanceRequest;
+import com.titanium.policy.valueobject.issuance.IssuancePlanLine;
+import com.titanium.policy.valueobject.issuance.IssuanceRequest;
 import com.titanium.policy.valueobject.policy.ChannelInfo;
 
 /**

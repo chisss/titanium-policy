@@ -1,4 +1,4 @@
-package com.titanium.policy.infrastructure.adapter;
+package com.titanium.policy.infrastructure.adapter.product;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;

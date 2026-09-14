@@ -1,4 +1,4 @@
-package com.titanium.policy.valueobject;
+package com.titanium.policy.valueobject.issuance;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;

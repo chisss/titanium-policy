@@ -34,9 +34,9 @@ import com.titanium.policy.entity.insurance.InsuredPartyList;
 import com.titanium.policy.port.ruleengine.RuleEngineServicePort;
 import com.titanium.policy.service.RiskAssessmentDomainService;
 import com.titanium.policy.service.impl.RiskAssessmentDomainServiceImpl;
-import com.titanium.policy.valueobject.IssuancePlanLine;
-import com.titanium.policy.valueobject.IssuanceRequest;
 import com.titanium.policy.valueobject.RiskAssessmentDecision;
+import com.titanium.policy.valueobject.issuance.IssuancePlanLine;
+import com.titanium.policy.valueobject.issuance.IssuanceRequest;
 
 class RiskAssessmentExecutorTest {
 

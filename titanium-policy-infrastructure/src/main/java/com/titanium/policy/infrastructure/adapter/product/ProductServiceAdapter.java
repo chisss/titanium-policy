@@ -1,4 +1,4 @@
-package com.titanium.policy.infrastructure.adapter;
+package com.titanium.policy.infrastructure.adapter.product;
 
 import java.util.ArrayList;
 import java.util.List;

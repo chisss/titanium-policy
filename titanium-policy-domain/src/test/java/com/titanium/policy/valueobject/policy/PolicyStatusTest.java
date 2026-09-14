@@ -1,4 +1,4 @@
-package com.titanium.policy.valueobject;
+package com.titanium.policy.valueobject.policy;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;

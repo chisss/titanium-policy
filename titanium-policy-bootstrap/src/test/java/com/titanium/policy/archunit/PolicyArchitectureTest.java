@@ -116,6 +116,26 @@ class PolicyArchitectureTest extends AbstractArchitectureGuardTest {
         super.portShouldNotContainFlatClasses();
     }
 
+    /**
+     * 启用「infrastructure/adapter 顶层不得平铺类（按对端域拆子包）」（根规约 §3.4.13，m6-911）。
+     * <p>
+     * 与 m6-910 的 {@code domain/port} 同源缺陷：11 个 main + 7 个 test 适配器**目录已按对端域拆好**，
+     * 但 {@code package} 声明仍是扁平的 {@code com.titanium.policy.infrastructure.adapter}。ArchUnit 断言
+     * 基于**字节码包名**而非目录树，故规则长期形同虚设。本次已把这 18 处 {@code package} 声明归位
+     * （{@code billing}/{@code clause}/{@code customer}/{@code investment}/{@code payment}/{@code product}/
+     * {@code ruleengine}/{@code underwriting}），故启用本断言固化。
+     * </p>
+     * <p>
+     * 实测 adapter 侧**无跨包 import 引用**（全仓 {@code import ...infrastructure.adapter.XxxAdapter;} 计数为 0）：
+     * 适配器由组件扫描装配、测试与被测类同子包，故本次改动仅 18 处 package 声明、零 import 改写。
+     * </p>
+     */
+    @Test
+    @Override
+    protected void adapterShouldNotContainFlatClasses() {
+        super.adapterShouldNotContainFlatClasses();
+    }
+
     // 注：早期严格隔离断言 webShouldNotDependOnDomainCommandsOrAggregates 不再启用。
     // 现行 api/web 规范改为 web 直接构造 domain Command / 读侧 FindXxxQuery 作 application 门面入参
     // （主流 Axon/CQRS 做法），web 允许依赖 command/query（但不碰 aggregate），故回退为基类默认 @Disabled。

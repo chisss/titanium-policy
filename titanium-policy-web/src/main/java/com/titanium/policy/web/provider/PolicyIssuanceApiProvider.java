@@ -9,8 +9,8 @@ import com.titanium.policy.api.PolicyIssuanceApi;
 import com.titanium.policy.api.request.SubmitIssuanceRequest;
 import com.titanium.policy.api.response.IssuanceResponse;
 import com.titanium.policy.application.command.PolicyIssuanceApplicationService;
-import com.titanium.policy.valueobject.IssuanceRequest;
-import com.titanium.policy.valueobject.IssuanceResult;
+import com.titanium.policy.valueobject.issuance.IssuanceRequest;
+import com.titanium.policy.valueobject.issuance.IssuanceResult;
 import com.titanium.policy.web.assembler.IssuanceRequestAssembler;
 
 import lombok.RequiredArgsConstructor;

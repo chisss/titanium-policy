@@ -1,4 +1,4 @@
-package com.titanium.policy.valueobject;
+package com.titanium.policy.valueobject.issuance;
 
 import java.util.ArrayList;
 import java.util.List;

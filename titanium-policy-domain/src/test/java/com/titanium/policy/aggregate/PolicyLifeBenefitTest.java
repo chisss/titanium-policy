@@ -27,9 +27,9 @@ import com.titanium.policy.event.PolicyCreatedEvent;
 import com.titanium.policy.event.PolicyMaturedEvent;
 import com.titanium.policy.event.PremiumWaivedEvent;
 import com.titanium.policy.exception.PolicyBusinessRuleException;
-import com.titanium.policy.valueobject.PolicyNo;
-import com.titanium.policy.valueobject.PolicyStatus;
+import com.titanium.policy.valueobject.policy.PolicyNo;
 import com.titanium.policy.valueobject.policy.PolicyPeriod;
+import com.titanium.policy.valueobject.policy.PolicyStatus;
 
 /**
  * 保单聚合根·寿险给付生命周期测试（满期给付 / 保费豁免 / 红利派发）

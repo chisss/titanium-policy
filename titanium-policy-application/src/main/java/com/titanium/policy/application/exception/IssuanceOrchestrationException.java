@@ -1,7 +1,7 @@
 package com.titanium.policy.application.exception;
 
 import com.titanium.metadata.errorcode.BaseErrorCode;
-import com.titanium.policy.valueobject.IssuanceResult;
+import com.titanium.policy.valueobject.issuance.IssuanceResult;
 
 /**
  * 出单编排异常。

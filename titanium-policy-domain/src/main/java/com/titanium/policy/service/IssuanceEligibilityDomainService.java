@@ -2,8 +2,8 @@ package com.titanium.policy.service;
 
 import java.util.Map;
 
-import com.titanium.policy.valueobject.IssuanceRequest;
 import com.titanium.policy.valueobject.RuleDecision;
+import com.titanium.policy.valueobject.issuance.IssuanceRequest;
 import com.titanium.policy.valueobject.product.ProductIssueRules;
 
 /**

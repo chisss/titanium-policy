@@ -42,15 +42,15 @@ import com.titanium.policy.service.maintenance.HolderMobilePolicyMaintenanceFiel
 import com.titanium.policy.service.maintenance.PaymentMethodPolicyMaintenanceFieldExecutor;
 import com.titanium.policy.service.maintenance.PolicyMaintenanceFieldExecutorRegistry;
 import com.titanium.policy.service.maintenance.PolicyMaintenanceHashing;
-import com.titanium.policy.valueobject.PolicyNo;
-import com.titanium.policy.valueobject.PolicyStatus;
 import com.titanium.policy.valueobject.PremiumPlan;
 import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceApplicationReceipt;
 import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceAppliedField;
 import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceExecutionState;
 import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceFieldChange;
 import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceRetroactiveEvidence;
+import com.titanium.policy.valueobject.policy.PolicyNo;
 import com.titanium.policy.valueobject.policy.PolicyPeriod;
+import com.titanium.policy.valueobject.policy.PolicyStatus;
 
 class PolicyMaintenanceApplicationTest {
 

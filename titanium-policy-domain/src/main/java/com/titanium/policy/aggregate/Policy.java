@@ -94,10 +94,6 @@ import com.titanium.policy.service.maintenance.BeneficiaryPolicyMaintenanceField
 import com.titanium.policy.service.maintenance.PolicyMaintenanceFieldExecutorRegistry;
 import com.titanium.policy.service.maintenance.PolicyMaintenanceHashing;
 import com.titanium.policy.valueobject.AnnuityPayoutPlan;
-import com.titanium.policy.valueobject.PolicyDocument;
-import com.titanium.policy.valueobject.PolicyNo;
-import com.titanium.policy.valueobject.PolicyRelation;
-import com.titanium.policy.valueobject.PolicyStatus;
 import com.titanium.policy.valueobject.PremiumPlan;
 import com.titanium.policy.valueobject.RuleDecision;
 import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceApplicationReceipt;
@@ -108,7 +104,11 @@ import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceSnapshotFiel
 import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceSnapshotReference;
 import com.titanium.policy.valueobject.policy.ChannelInfo;
 import com.titanium.policy.valueobject.policy.CollectionInfo;
+import com.titanium.policy.valueobject.policy.PolicyDocument;
+import com.titanium.policy.valueobject.policy.PolicyNo;
 import com.titanium.policy.valueobject.policy.PolicyPeriod;
+import com.titanium.policy.valueobject.policy.PolicyRelation;
+import com.titanium.policy.valueobject.policy.PolicyStatus;
 
 import lombok.Getter;
 import lombok.experimental.SuperBuilder;

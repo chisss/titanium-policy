@@ -7,12 +7,12 @@ import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.entity.insurance.InsuredPartyList;
 import com.titanium.policy.entity.policy.PolicyProduct;
-import com.titanium.policy.valueobject.PolicyNo;
-import com.titanium.policy.valueobject.PolicyStatus;
 import com.titanium.policy.valueobject.PremiumPlan;
 import com.titanium.policy.valueobject.policy.ChannelInfo;
 import com.titanium.policy.valueobject.policy.CollectionInfo;
+import com.titanium.policy.valueobject.policy.PolicyNo;
 import com.titanium.policy.valueobject.policy.PolicyPeriod;
+import com.titanium.policy.valueobject.policy.PolicyStatus;
 
 /**
  * 保单创建事件

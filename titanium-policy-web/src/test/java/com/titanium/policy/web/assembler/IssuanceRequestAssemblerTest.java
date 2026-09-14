@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 import com.titanium.metadata.enums.customer.CustomerEnum.CustomerGender;
 import com.titanium.policy.api.request.SubmitIssuanceRequest;
 import com.titanium.policy.entity.insurance.InsuredPartyList;
-import com.titanium.policy.valueobject.IssuanceRequest;
+import com.titanium.policy.valueobject.issuance.IssuanceRequest;
 
 class IssuanceRequestAssemblerTest {
 

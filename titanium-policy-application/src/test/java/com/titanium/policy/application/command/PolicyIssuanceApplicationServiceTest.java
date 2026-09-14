@@ -48,11 +48,11 @@ import com.titanium.policy.query.view.IssuanceProgressView;
 import com.titanium.policy.query.view.PolicyView;
 import com.titanium.policy.query.view.ProposalView;
 import com.titanium.policy.service.IssuanceEligibilityDomainService;
-import com.titanium.policy.valueobject.IssuancePlanLine;
-import com.titanium.policy.valueobject.IssuanceProcessConfig;
-import com.titanium.policy.valueobject.IssuanceRequest;
-import com.titanium.policy.valueobject.IssuanceResult;
 import com.titanium.policy.valueobject.RuleDecision;
+import com.titanium.policy.valueobject.issuance.IssuancePlanLine;
+import com.titanium.policy.valueobject.issuance.IssuanceProcessConfig;
+import com.titanium.policy.valueobject.issuance.IssuanceRequest;
+import com.titanium.policy.valueobject.issuance.IssuanceResult;
 import com.titanium.policy.valueobject.product.ProductIssueRules;
 
 class PolicyIssuanceApplicationServiceTest {

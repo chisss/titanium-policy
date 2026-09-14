@@ -7,8 +7,8 @@ import org.springframework.stereotype.Component;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.policy.command.CreateInsuranceDirectlyCommand;
 import com.titanium.policy.entity.insurance.InsuranceLine;
-import com.titanium.policy.valueobject.IssuancePlanLine;
-import com.titanium.policy.valueobject.IssuanceRequest;
+import com.titanium.policy.valueobject.issuance.IssuancePlanLine;
+import com.titanium.policy.valueobject.issuance.IssuanceRequest;
 import com.titanium.policy.valueobject.policy.ChannelInfo;
 
 /**

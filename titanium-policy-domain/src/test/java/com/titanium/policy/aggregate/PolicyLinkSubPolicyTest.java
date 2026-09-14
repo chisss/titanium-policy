@@ -14,9 +14,9 @@ import com.titanium.policy.command.LinkSubPolicyCommand;
 import com.titanium.policy.common.enums.PolicyStatusCode;
 import com.titanium.policy.event.PolicyCreatedEvent;
 import com.titanium.policy.event.SubPolicyLinkedEvent;
-import com.titanium.policy.valueobject.PolicyNo;
-import com.titanium.policy.valueobject.PolicyStatus;
+import com.titanium.policy.valueobject.policy.PolicyNo;
 import com.titanium.policy.valueobject.policy.PolicyPeriod;
+import com.titanium.policy.valueobject.policy.PolicyStatus;
 
 /**
  * 保单聚合根·团单主子联动测试

@@ -19,9 +19,9 @@ import com.titanium.metadata.errorcode.PolicyErrorCode;
 import com.titanium.policy.common.enums.IssuanceStage;
 import com.titanium.policy.query.repository.IssuanceProgressViewRepository;
 import com.titanium.policy.query.view.IssuanceProgressView;
-import com.titanium.policy.valueobject.IssuanceRequest;
-import com.titanium.policy.valueobject.IssuanceResult;
 import com.titanium.policy.valueobject.RuleDecision;
+import com.titanium.policy.valueobject.issuance.IssuanceRequest;
+import com.titanium.policy.valueobject.issuance.IssuanceResult;
 
 class IssuanceProgressBaselineWriterTest {
 

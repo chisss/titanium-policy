@@ -22,10 +22,10 @@ import com.titanium.policy.common.enums.PremiumCollectionStatus;
 import com.titanium.policy.event.PolicyCreatedEvent;
 import com.titanium.policy.event.PremiumBillingAssociatedEvent;
 import com.titanium.policy.exception.PolicyBusinessRuleException;
-import com.titanium.policy.valueobject.PolicyNo;
-import com.titanium.policy.valueobject.PolicyStatus;
 import com.titanium.policy.valueobject.policy.CollectionInfo;
+import com.titanium.policy.valueobject.policy.PolicyNo;
 import com.titanium.policy.valueobject.policy.PolicyPeriod;
+import com.titanium.policy.valueobject.policy.PolicyStatus;
 
 /**
  * 保单收费单据关联的事件溯源测试。

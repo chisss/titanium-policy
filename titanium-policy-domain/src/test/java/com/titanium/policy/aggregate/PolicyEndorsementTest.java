@@ -17,9 +17,9 @@ import com.titanium.policy.event.PolicyActivatedEvent;
 import com.titanium.policy.event.PolicyCreatedEvent;
 import com.titanium.policy.event.PolicyEndorsedEvent;
 import com.titanium.policy.exception.PolicyBusinessRuleException;
-import com.titanium.policy.valueobject.PolicyNo;
-import com.titanium.policy.valueobject.PolicyStatus;
+import com.titanium.policy.valueobject.policy.PolicyNo;
 import com.titanium.policy.valueobject.policy.PolicyPeriod;
+import com.titanium.policy.valueobject.policy.PolicyStatus;
 
 /**
  * 保单聚合根·批改回写测试

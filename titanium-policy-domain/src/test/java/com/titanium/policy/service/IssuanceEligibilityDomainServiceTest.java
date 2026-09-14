@@ -20,9 +20,9 @@ import com.titanium.metadata.errorcode.PolicyErrorCode;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.entity.insurance.InsuredPartyList;
 import com.titanium.policy.service.impl.IssuanceEligibilityDomainServiceImpl;
-import com.titanium.policy.valueobject.IssuancePlanLine;
-import com.titanium.policy.valueobject.IssuanceRequest;
 import com.titanium.policy.valueobject.RuleDecision;
+import com.titanium.policy.valueobject.issuance.IssuancePlanLine;
+import com.titanium.policy.valueobject.issuance.IssuanceRequest;
 import com.titanium.policy.valueobject.product.ProductIssueRules;
 
 /**

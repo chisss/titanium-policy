@@ -26,9 +26,9 @@ import com.titanium.policy.command.SuspendPolicyCommand;
 import com.titanium.policy.command.TerminatePolicyCommand;
 import com.titanium.policy.command.UpdateAccountValueCommand;
 import com.titanium.policy.command.WaivePremiumCommand;
-import com.titanium.policy.valueobject.IssuanceProcessConfig;
-import com.titanium.policy.valueobject.IssuanceRequest;
-import com.titanium.policy.valueobject.IssuanceResult;
+import com.titanium.policy.valueobject.issuance.IssuanceProcessConfig;
+import com.titanium.policy.valueobject.issuance.IssuanceRequest;
+import com.titanium.policy.valueobject.issuance.IssuanceResult;
 import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceApplicationReceipt;
 
 import lombok.RequiredArgsConstructor;

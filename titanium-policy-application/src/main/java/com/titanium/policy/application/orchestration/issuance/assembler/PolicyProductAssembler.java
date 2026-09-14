@@ -18,7 +18,7 @@ import com.titanium.policy.entity.policy.InsuredSubject;
 import com.titanium.policy.entity.policy.PolicyProduct;
 import com.titanium.policy.port.clause.ClauseServicePort;
 import com.titanium.policy.port.product.ProductServicePort;
-import com.titanium.policy.valueobject.IssuanceRequest;
+import com.titanium.policy.valueobject.issuance.IssuanceRequest;
 import com.titanium.policy.valueobject.policy.ClauseSnapshot;
 import com.titanium.policy.valueobject.policy.CoverageSnapshot;
 import com.titanium.policy.valueobject.pricing.PremiumCalculationReference;

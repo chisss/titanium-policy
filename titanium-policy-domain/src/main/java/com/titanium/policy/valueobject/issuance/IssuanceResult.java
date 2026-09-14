@@ -1,4 +1,4 @@
-package com.titanium.policy.valueobject;
+package com.titanium.policy.valueobject.issuance;
 
 import java.util.List;
 
@@ -7,6 +7,7 @@ import com.titanium.metadata.enums.product.ProductEnum.IssuanceMode;
 import com.titanium.metadata.errorcode.BaseErrorCode;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.common.enums.IssuanceStage;
+import com.titanium.policy.valueobject.RuleDecision;
 import com.titanium.policy.valueobject.policy.CollectionResult;
 
 /**

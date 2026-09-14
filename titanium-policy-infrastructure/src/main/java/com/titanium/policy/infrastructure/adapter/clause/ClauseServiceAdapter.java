@@ -1,4 +1,4 @@
-package com.titanium.policy.infrastructure.adapter;
+package com.titanium.policy.infrastructure.adapter.clause;
 
 import java.math.BigDecimal;
 import java.util.List;

@@ -10,8 +10,8 @@ import com.titanium.metadata.enums.BaseEnum;
 import com.titanium.policy.common.enums.IssuanceStage;
 import com.titanium.policy.query.repository.IssuanceProgressViewRepository;
 import com.titanium.policy.query.view.IssuanceProgressView;
-import com.titanium.policy.valueobject.IssuanceRequest;
-import com.titanium.policy.valueobject.IssuanceResult;
+import com.titanium.policy.valueobject.issuance.IssuanceRequest;
+import com.titanium.policy.valueobject.issuance.IssuanceResult;
 
 import lombok.RequiredArgsConstructor;
 

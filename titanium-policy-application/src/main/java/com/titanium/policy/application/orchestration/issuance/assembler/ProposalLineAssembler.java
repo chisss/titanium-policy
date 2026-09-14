@@ -8,8 +8,8 @@ import org.springframework.stereotype.Service;
 
 import com.titanium.policy.entity.proposal.ProposalLine;
 import com.titanium.policy.port.product.ProductServicePort;
-import com.titanium.policy.valueobject.IssuancePlanLine;
-import com.titanium.policy.valueobject.IssuanceRequest;
+import com.titanium.policy.valueobject.issuance.IssuancePlanLine;
+import com.titanium.policy.valueobject.issuance.IssuanceRequest;
 import com.titanium.policy.valueobject.product.ProductBasicInfo;
 
 import lombok.RequiredArgsConstructor;

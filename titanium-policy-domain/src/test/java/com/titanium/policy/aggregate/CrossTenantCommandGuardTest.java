@@ -33,9 +33,9 @@ import com.titanium.policy.common.enums.PolicyStatusCode;
 import com.titanium.policy.common.enums.PremiumWaiverReason;
 import com.titanium.policy.event.PolicyCreatedEvent;
 import com.titanium.policy.exception.PolicyBusinessRuleException;
-import com.titanium.policy.valueobject.PolicyNo;
-import com.titanium.policy.valueobject.PolicyStatus;
+import com.titanium.policy.valueobject.policy.PolicyNo;
 import com.titanium.policy.valueobject.policy.PolicyPeriod;
+import com.titanium.policy.valueobject.policy.PolicyStatus;
 
 /**
  * 跨租户写入拒绝守护测试（C-02 残留）。

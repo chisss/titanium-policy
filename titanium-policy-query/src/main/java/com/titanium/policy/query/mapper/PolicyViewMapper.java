@@ -18,7 +18,7 @@ import com.titanium.policy.event.PolicyEndorsedEvent;
 import com.titanium.policy.query.view.AnnuityPayoutPlanView;
 import com.titanium.policy.query.view.PolicyEndorsementView;
 import com.titanium.policy.query.view.PolicyView;
-import com.titanium.policy.valueobject.PolicyNo;
+import com.titanium.policy.valueobject.policy.PolicyNo;
 
 /**
  * 保单聚合族读模型投影映射器（MapStruct，事件 → 读模型字段拷贝）
