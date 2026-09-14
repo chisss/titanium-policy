@@ -259,6 +259,7 @@ mvn -pl titanium-policy-domain test
     - **整改**：11 处 `package` 声明按所在子目录归位；全域 **33 个引用文件、48 处 import** 同步改写（`application` 13 + `application/test` 11 + `infrastructure` 12 = 36 个引用方，其中 3 个仅引用本就合规的 `PolicyCashValuePort`，无需改动）；`InvestmentAccountPort` 的 javadoc 包路径同步更新。改写前已先扫描「同包简单名引用」——命中 6 处 **均为 javadoc `{@code}` 文本提及**（非代码引用），故无需补 import。
     - **验收**：`PolicyArchitectureTest` `@Override` 启用 `portShouldNotContainFlatClasses`（本域第 7 条启用的断言），架构测试 **43 例 0 失败（12 跳过）**、policy 域 **392 例 0 失败**；并做**反向验证**——向 `com.titanium.policy.port` 顶层注入探针类后断言立即 RED（失败信息精确指向 `com.titanium.policy.port.FlatProbePort`），证明断言有牙而非空转，探针已清理。
     - 🔴 **可复用判据**：「**目录重构 ≠ 包重构**」——凡以 ArchUnit 断言包结构的规约，**必须核对 `package` 声明而非目录树**；批量分包后须全仓 `grep "port\.[A-Z]"` 校验残留（扁平引用特征是子包位置紧跟大写字母）。
+    - ⚠️ **同类缺陷仍在两处（m6-910 全域扫描发现，已立 harness 任务 m6-911 承接）**：`infrastructure/adapter/**` **18 个文件**（11 main + 7 test，目录已按对端域拆分但 `package` 仍为扁平的 `com.titanium.policy.infrastructure.adapter`，对应基类断言 `adapterShouldNotContainFlatClasses`）、`valueobject/{issuance,policy}/**` **10 个文件**（8 main + 2 test，`package` 仍为扁平的 `com.titanium.policy.valueobject`）。判定方法：比对「文件所在目录（相对 `src/main/java`）」与「`package` 声明」是否一致，不一致即命中。
 
 ---
 
