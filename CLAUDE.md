@@ -264,6 +264,10 @@ mvn -pl titanium-policy-domain test
     - 🔴 **两点实测结论（m6-911）**：① **adapter 侧无跨包 import 引用**——全仓 `import ...infrastructure.adapter.XxxAdapter;` 计数为 **0**（适配器靠组件扫描装配、测试与被测类同子包），故这类拆分可能只改 18 处 `package` 声明、**零 import 改写**，与 port 侧的 48 处 import 形成鲜明对比；② **核心值对象包拆分前必须检查「本包顶层是否仍有类」**——`valueobject` 顶层尚存 `RuleDecision`/`PremiumPlan`/`RiskAssessmentDecision`/`AnnuityPayoutPlan` 四个类，子包化后同包可见性断裂，本次命中 1 处（`IssuanceResult` 引用 `RuleDecision`）需补 import。
     - 🔴 **判定方法（可脚本化，适用全仓）**：比对「文件所在目录（相对 `src/main/java` 或 `src/test/java`）」与文件 `package` 声明是否一致，不一致即命中；本次该法一次性定位全部 28 处，整改后复扫归零。
 
+18. ✅ **规则引擎执行审计的业务上下文透传（m8-1104，2026-09-14）**：`RuleEngineServicePort.executeRule`/`validateRule` 末参追加 `businessId`，`RiskAssessmentExecutor` 透传 `request.bizNo()`（出单业务流水号），`RuleEngineServiceAdapter` 以常量 `BUSINESS_TYPE = BusinessDomainType.POLICY.getCode()` 上报业务域类型。规则引擎侧 `t_rule_execution_log` 由「business_id/business_type 恒空」变为可按**出单流水号**反查风控步骤的执行轨迹。
+    - 🔴 **契约走可选请求头** `X-Business-Id`/`X-Business-Type`（与既有 `X-Tenant-Id` 同构），**不进请求体**——规则执行入口的 body 是裸 `Map<String,Object>` 规则变量，塞业务字段会污染规则变量命名空间。
+    - 🔴 `businessType` 是**端口归属**（adapter 常量），不是调用方逐次传入的入参；`businessId` 一律**追加为最后一个参数**，最小化既有参数语义扰动。新增规则集调用点时**勿再走无 businessId 的签名**。
+
 ---
 
 *改动聚合根/事件/命令前，请同步阅读 [AGENTS.md](./AGENTS.md) 的协作检查清单与文件锁定建议。*

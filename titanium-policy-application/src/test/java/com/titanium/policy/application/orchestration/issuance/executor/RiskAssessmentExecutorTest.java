@@ -42,6 +42,9 @@ class RiskAssessmentExecutorTest {
 
     private static final String TENANT_ID = "TENANT_001";
 
+    /** 出单业务流水号（IssuanceRequest.bizNo），透传规则引擎作执行审计的业务上下文 */
+    private static final String BIZ_NO     = "BIZ_001";
+
     private RuleEngineServicePort ruleEngineServicePort;
 
     private RiskAssessmentDomainService riskAssessmentDomainService;
@@ -63,7 +66,7 @@ class RiskAssessmentExecutorTest {
     void usesExplicitRuleEngineRejectionInsteadOfCallSuccess() {
         RiskAssessmentStep step = RiskAssessmentStep.BASIC_UNDERWRITING;
         when(riskAssessmentDomainService.requiresRuleEngine(step)).thenReturn(true);
-        when(ruleEngineServicePort.executeRule(eq(step.getCode()), anyMap(), eq(TENANT_ID)))
+        when(ruleEngineServicePort.executeRule(eq(step.getCode()), anyMap(), eq(TENANT_ID), eq(BIZ_NO)))
                 .thenReturn(RuleEngineDecision.REJECT);
         stubRuleEngineDecision(step);
 
@@ -75,7 +78,7 @@ class RiskAssessmentExecutorTest {
         RiskAssessmentStep step = RiskAssessmentStep.BASIC_UNDERWRITING;
         RiskAssessmentDomainService domainService = new RiskAssessmentDomainServiceImpl();
         executor = new RiskAssessmentExecutor(ruleEngineServicePort, domainService);
-        when(ruleEngineServicePort.executeRule(eq(step.getCode()), anyMap(), eq(TENANT_ID)))
+        when(ruleEngineServicePort.executeRule(eq(step.getCode()), anyMap(), eq(TENANT_ID), eq(BIZ_NO)))
                 .thenReturn(RuleEngineDecision.REFER);
 
         assertTrue(executor.execute(step, request));
@@ -86,7 +89,7 @@ class RiskAssessmentExecutorTest {
         RiskAssessmentStep step = RiskAssessmentStep.BASIC_UNDERWRITING;
         request = requestWithAmounts();
         when(riskAssessmentDomainService.requiresRuleEngine(step)).thenReturn(true);
-        when(ruleEngineServicePort.executeRule(eq(step.getCode()), anyMap(), eq(TENANT_ID)))
+        when(ruleEngineServicePort.executeRule(eq(step.getCode()), anyMap(), eq(TENANT_ID), eq(BIZ_NO)))
                 .thenReturn(RuleEngineDecision.PASS);
         when(riskAssessmentDomainService.judge(step, RuleEngineDecision.PASS))
                 .thenReturn(RiskAssessmentDecision.pass(step));
@@ -95,7 +98,8 @@ class RiskAssessmentExecutorTest {
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> variables = ArgumentCaptor.forClass(Map.class);
-        verify(ruleEngineServicePort).executeRule(eq(step.getCode()), variables.capture(), eq(TENANT_ID));
+        verify(ruleEngineServicePort).executeRule(eq(step.getCode()), variables.capture(), eq(TENANT_ID),
+                eq(BIZ_NO));
         assertEquals(0, new BigDecimal("500000").compareTo((BigDecimal) variables.getValue().get("sumInsured")));
         assertEquals(0, new BigDecimal("1000").compareTo((BigDecimal) variables.getValue().get("quotedPremium")));
         assertEquals(List.of(35), variables.getValue().get("insuredAges"));
@@ -106,7 +110,7 @@ class RiskAssessmentExecutorTest {
         RiskAssessmentStep step = RiskAssessmentStep.BASIC_UNDERWRITING;
         IllegalStateException failure = new IllegalStateException("RULE_SET_NOT_FOUND");
         when(riskAssessmentDomainService.requiresRuleEngine(step)).thenReturn(true);
-        when(ruleEngineServicePort.executeRule(eq(step.getCode()), anyMap(), eq(TENANT_ID))).thenThrow(failure);
+        when(ruleEngineServicePort.executeRule(eq(step.getCode()), anyMap(), eq(TENANT_ID), eq(BIZ_NO))).thenThrow(failure);
         stubRuleEngineDecision(step);
 
         IllegalStateException actual = assertThrows(IllegalStateException.class,

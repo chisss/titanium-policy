@@ -77,8 +77,9 @@ public class RiskAssessmentExecutor {
         variables.put("insuredAges", request.insuredAges());
         variables.put("lineCount", request.planLines() != null ? request.planLines().size() : 0);
 
+        // 透传出单业务流水号作业务上下文，供规则引擎执行审计按业务单反查
         RuleEngineDecision decision = ruleEngineServicePort.executeRule(step.getCode(), variables,
-                request.tenantId());
+                request.tenantId(), request.bizNo());
         log.info("规则引擎裁决完成: 步骤={}, 结果={}", step.getName(), decision);
         return decision;
     }
