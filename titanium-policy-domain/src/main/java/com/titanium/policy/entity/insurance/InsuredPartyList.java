@@ -1,5 +1,6 @@
 package com.titanium.policy.entity.insurance;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -184,7 +185,28 @@ public record InsuredPartyList(
                              /*
                               * 联系方式
                               */
-                             String phone) {
+                             String phone,
+                             /*
+                              * 性别（出单快照；保全可批改，参与费率依据）
+                              */
+                             CustomerGender gender,
+                             /*
+                              * 出生日期（出单快照；保全可批改，参与年龄与费率推导）
+                              */
+                             LocalDate birthDate) {
+
+        /**
+         * 兼容旧事件与旧调用方：历史与存量代码的投保人快照未携带性别与出生日期。
+         * <p>
+         * 🔴 新增组件一律追加在末尾并保留本窄构造器——{@code HolderInfo} 随 {@code PolicyCreatedEvent}、
+         * {@code PolicyMaintenanceAppliedEvent} 落事件存储，Jackson 回放走规范构造器、缺失字段传 null，
+         * 窄构造器供代码与测试重建（同 {@code PolicyMaintenanceExecutionState} 的兼容约定）。
+         * </p>
+         */
+        public HolderInfo(String customerId, String holderId, String name, IdCardType certType, String certNo,
+                          String phone) {
+            this(customerId, holderId, name, certType, certNo, phone, null, null);
+        }
     }
 
     /**

@@ -7,6 +7,7 @@ import static org.mockito.Mockito.when;
 
 import java.lang.reflect.Method;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -54,6 +55,10 @@ class PolicyQueryServiceImplTest {
         view.setChannelId("channel-1");
         view.setSalesChannel("AGENT");
         view.setAgentId("agent-1");
+        view.setPolicyHolderIdType("CHINA_ID_CARD");
+        view.setPolicyHolderIdNo("ID-1");
+        view.setPolicyHolderGender("FEMALE");
+        view.setPolicyHolderBirthDate(LocalDate.of(1990, 5, 20));
 
         PolicyQueryResult result = invokeToQueryResult(view);
 
@@ -72,6 +77,11 @@ class PolicyQueryServiceImplTest {
         assertEquals("channel-1", result.getChannelId());
         assertEquals("AGENT", result.getSalesChannel());
         assertEquals("agent-1", result.getAgentId());
+        // 投保人身份要素必须由读模型透传到查询结果，否则 web 层拿不到（读侧三层贯通）
+        assertEquals("CHINA_ID_CARD", result.getPolicyHolderIdType());
+        assertEquals("ID-1", result.getPolicyHolderIdNo());
+        assertEquals("FEMALE", result.getPolicyHolderGender());
+        assertEquals(LocalDate.of(1990, 5, 20), result.getPolicyHolderBirthDate());
     }
 
     @Test
@@ -136,6 +146,14 @@ class PolicyQueryServiceImplTest {
         assertEquals(first.snapshotContentHash(), second.snapshotContentHash());
         assertEquals(64, first.snapshotContentHash().length());
         assertNotNull(first.fieldValues().get("policy.holder.mobile"));
+        // 投保人身份要素（m15-1803 起可批改）：快照必须发布这四项，否则维护侧无法对它们做受理前预检与冲突比对
+        assertEquals("CHINA_ID_CARD",
+                first.fieldValues().get("policy.holder.documentType").canonicalValue());
+        assertEquals("ID-1", first.fieldValues().get("policy.holder.documentNumber").canonicalValue());
+        assertEquals("FEMALE", first.fieldValues().get("policy.holder.gender").canonicalValue());
+        assertEquals("1990-05-20",
+                first.fieldValues().get("policy.holder.birthDate").canonicalValue());
+        assertEquals("DATE", first.fieldValues().get("policy.holder.birthDate").dataType());
         assertEquals("policy-product-1",
                 first.fieldValues().get("policy.coverage.sumInsured").objectId());
         assertEquals("beneficiary-1",
@@ -170,7 +188,11 @@ class PolicyQueryServiceImplTest {
         view.setPolicyNo("P202608240001");
         view.setPolicyHolderId("customer-1");
         view.setPolicyHolderName("张三");
+        view.setPolicyHolderIdType("CHINA_ID_CARD");
+        view.setPolicyHolderIdNo("ID-1");
         view.setPolicyHolderPhone("13800000000");
+        view.setPolicyHolderGender("FEMALE");
+        view.setPolicyHolderBirthDate(LocalDate.of(1990, 5, 20));
         view.setPolicyStatus(PolicyStatus.EFFECTIVE);
         view.setCurrentVersion(7);
         view.setStartDate(LocalDateTime.of(2026, 8, 1, 0, 0));

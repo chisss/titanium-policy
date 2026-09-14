@@ -1,6 +1,7 @@
 package com.titanium.policy.query.result;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -51,6 +52,26 @@ public class PolicyQueryResult {
      * 投保人姓名
      */
     private String                      policyHolderName;
+
+    /**
+     * 投保人证件类型码
+     */
+    private String                      policyHolderIdType;
+
+    /**
+     * 投保人证件号码
+     */
+    private String                      policyHolderIdNo;
+
+    /**
+     * 投保人性别码
+     */
+    private String                      policyHolderGender;
+
+    /**
+     * 投保人出生日期
+     */
+    private LocalDate                   policyHolderBirthDate;
 
     /**
      * 被保险人ID

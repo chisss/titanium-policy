@@ -125,8 +125,16 @@ public enum PolicyDataUpdateType implements BaseEnum {
      * 返回 null（这些走 4A/4B 状态机，不属批改）。投保人变更 maintenance 码为 POLICY_HOLDER_CHANGE，
      * 在此对齐到 HOLDER_CHANGE。
      * </p>
+     * <p>
+     * 🔴 入参是<b>保全项编码</b>，取自保单字段目录 {@code PolicyFieldCapability.changeTypeCode}——
+     * maintenance 侧建案/立案时以「保全项编码 == 目录 changeTypeCode」校验（见
+     * {@code MaintenanceFieldDraftApplicationService} 的目录快照过滤），并非直接传 metadata 的
+     * {@code MaintenanceType} 枚举名。二者对多数类型同名，唯独投保人变更目录码为
+     * {@code HOLDER_CHANGE}、metadata 枚举名为 {@code POLICY_HOLDER_CHANGE}，故两个字面量都接受——
+     * 只留后者会让投保人变更落到兜底 {@code POLICY_INFO_CHANGE}，批单类别由 PARTY 错置为 INFO。
+     * </p>
      *
-     * @param maintenanceTypeName maintenance 域 MaintenanceType 枚举名
+     * @param maintenanceTypeName maintenance 域保全项编码（目录 changeTypeCode），或 MaintenanceType 枚举名
      * @return 对应批改类型；状态类或未知返回 null
      */
     public static PolicyDataUpdateType byMaintenanceType(String maintenanceTypeName) {
@@ -134,7 +142,7 @@ public enum PolicyDataUpdateType implements BaseEnum {
             return null;
         }
         return switch (maintenanceTypeName) {
-            case "POLICY_HOLDER_CHANGE" -> HOLDER_CHANGE;
+            case "HOLDER_CHANGE", "POLICY_HOLDER_CHANGE" -> HOLDER_CHANGE;
             case "BENEFICIARY_CHANGE" -> BENEFICIARY_CHANGE;
             case "PAYMENT_METHOD_CHANGE" -> PAYMENT_METHOD_CHANGE;
             case "ADDITIONAL_PAYMENT" -> ADDITIONAL_PAYMENT;

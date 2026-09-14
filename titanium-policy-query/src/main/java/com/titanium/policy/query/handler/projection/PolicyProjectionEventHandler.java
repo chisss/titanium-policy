@@ -104,6 +104,8 @@ public class PolicyProjectionEventHandler {
                 view.setPolicyHolderIdType(holder.certType() != null ? holder.certType().getCode() : null);
                 view.setPolicyHolderIdNo(holder.certNo());
                 view.setPolicyHolderPhone(holder.phone());
+                view.setPolicyHolderGender(holder.gender() != null ? holder.gender().getCode() : null);
+                view.setPolicyHolderBirthDate(holder.birthDate());
             }
             List<InsuredPartyList.InsuredInfo> insuredList = event.insuredPartyList().insuredList();
             if (insuredList != null && !insuredList.isEmpty()) {

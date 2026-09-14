@@ -1,6 +1,7 @@
 package com.titanium.policy.web.response.policy;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 import com.titanium.metadata.enums.policy.PolicyEnum;
@@ -34,6 +35,18 @@ public class PolicyDetailVO {
 
     @Schema(description = "投保人姓名")
     private String                  policyHolderName;
+
+    @Schema(description = "投保人证件类型码")
+    private String                  policyHolderIdType;
+
+    @Schema(description = "投保人证件号码")
+    private String                  policyHolderIdNo;
+
+    @Schema(description = "投保人性别码")
+    private String                  policyHolderGender;
+
+    @Schema(description = "投保人出生日期")
+    private LocalDate               policyHolderBirthDate;
 
     @Schema(description = "被保险人ID")
     private String                  insuredId;

@@ -19,7 +19,7 @@ import com.titanium.metadata.enums.policy.fieldcatalog.PolicyFieldValueType;
 /** Policy 对外发布的不可变字段目录。 */
 public record PolicyFieldCatalog(String catalogVersion, String contentHash, List<PolicyFieldDescriptor> fields) {
 
-    public static final String STANDARD_VERSION = "2026.09.11.1";
+    public static final String STANDARD_VERSION = "2026.09.14.1";
 
     public PolicyFieldCatalog {
         if (catalogVersion == null || catalogVersion.isBlank()) {
@@ -57,19 +57,19 @@ public record PolicyFieldCatalog(String catalogVersion, String contentHash, List
     private static List<PolicyFieldDescriptor> standardFields() {
         return List.of(
                 scalar("policy.holder.name", PolicyFieldObjectType.POLICY_HOLDER, PolicyFieldValueType.TEXT,
-                        "policy.field.holder.name", proposal("HOLDER_CHANGE", false, false),
+                        "policy.field.holder.name", executable("HOLDER_CHANGE", false, false),
                         PolicyFieldSensitivityLevel.SENSITIVE, PolicyFieldMaskingPolicy.NAME),
                 scalar("policy.holder.gender", PolicyFieldObjectType.POLICY_HOLDER, PolicyFieldValueType.ENUM,
-                        "policy.field.holder.gender", proposal("HOLDER_CHANGE", false, false),
+                        "policy.field.holder.gender", executable("HOLDER_CHANGE", false, false),
                         PolicyFieldSensitivityLevel.SENSITIVE, PolicyFieldMaskingPolicy.PARTIAL_TEXT),
                 scalar("policy.holder.birthDate", PolicyFieldObjectType.POLICY_HOLDER, PolicyFieldValueType.DATE,
-                        "policy.field.holder.birthDate", proposal("HOLDER_CHANGE", false, false),
+                        "policy.field.holder.birthDate", executable("HOLDER_CHANGE", false, false),
                         PolicyFieldSensitivityLevel.SENSITIVE, PolicyFieldMaskingPolicy.DATE),
                 scalar("policy.holder.documentType", PolicyFieldObjectType.POLICY_HOLDER, PolicyFieldValueType.ENUM,
-                        "policy.field.holder.documentType", proposal("HOLDER_CHANGE", false, false),
+                        "policy.field.holder.documentType", executable("HOLDER_CHANGE", false, false),
                         PolicyFieldSensitivityLevel.INTERNAL, PolicyFieldMaskingPolicy.NONE),
                 scalar("policy.holder.documentNumber", PolicyFieldObjectType.POLICY_HOLDER, PolicyFieldValueType.TEXT,
-                        "policy.field.holder.documentNumber", proposal("HOLDER_CHANGE", false, false),
+                        "policy.field.holder.documentNumber", executable("HOLDER_CHANGE", false, false),
                         PolicyFieldSensitivityLevel.RESTRICTED, PolicyFieldMaskingPolicy.ID_NUMBER),
                 scalar("policy.holder.mobile", PolicyFieldObjectType.POLICY_HOLDER, PolicyFieldValueType.TEXT,
                         "policy.field.holder.mobile", executable("POLICY_INFO_CHANGE", true, false),

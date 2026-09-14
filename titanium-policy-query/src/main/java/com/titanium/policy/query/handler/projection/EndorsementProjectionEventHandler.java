@@ -149,7 +149,16 @@ public class EndorsementProjectionEventHandler {
         }
         if (executionState.insuredPartyList() != null
                 && executionState.insuredPartyList().holderInfo() != null) {
-            policy.setPolicyHolderPhone(executionState.insuredPartyList().holderInfo().phone());
+            // 投保人合同要素（姓名/证件/性别/出生日期/联系方式）：执行状态快照是保全生效后的权威合同快照，
+            // 六项一次性回写，避免只回写其中一项造成读模型半新半旧。
+            // 🔴 本分支必须留在下方 policyProducts 早返回之前——「仅改投保人字段」的保全不带险种段变更。
+            InsuredPartyList.HolderInfo holder = executionState.insuredPartyList().holderInfo();
+            policy.setPolicyHolderName(holder.name());
+            policy.setPolicyHolderIdType(holder.certType() == null ? null : holder.certType().getCode());
+            policy.setPolicyHolderIdNo(holder.certNo());
+            policy.setPolicyHolderPhone(holder.phone());
+            policy.setPolicyHolderGender(holder.gender() == null ? null : holder.gender().getCode());
+            policy.setPolicyHolderBirthDate(holder.birthDate());
         }
         if (executionState.insuredPartyList() != null) {
             replaceBeneficiaries(policyId, tenantId, executionState.insuredPartyList().beneficiaryList());

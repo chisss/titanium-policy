@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -15,6 +16,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import com.titanium.metadata.enums.customer.CustomerEnum.CustomerGender;
+import com.titanium.metadata.enums.customer.CustomerEnum.IdCardType;
 import com.titanium.metadata.enums.maintenance.PolicyMaintenanceAction;
 import com.titanium.metadata.enums.policy.BeneficiaryType;
 import com.titanium.metadata.enums.policy.PolicyEnum.TerminationReason;
@@ -22,6 +25,7 @@ import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.enums.product.ProductEnum.ProductCategory;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.command.ApplyPolicyMaintenanceCommand;
+import com.titanium.policy.common.enums.PolicyDataUpdateType;
 import com.titanium.policy.common.enums.PolicyStatusCode;
 import com.titanium.policy.common.enums.PremiumPaymentCycle;
 import com.titanium.policy.common.enums.PremiumPaymentMethod;
@@ -39,6 +43,7 @@ import com.titanium.policy.exception.PolicyBusinessRuleException;
 import com.titanium.policy.service.maintenance.BeneficiaryPolicyMaintenanceFieldExecutor;
 import com.titanium.policy.service.maintenance.CoverageSumInsuredPolicyMaintenanceFieldExecutor;
 import com.titanium.policy.service.maintenance.HolderMobilePolicyMaintenanceFieldExecutor;
+import com.titanium.policy.service.maintenance.HolderPolicyMaintenanceFieldExecutor;
 import com.titanium.policy.service.maintenance.PaymentMethodPolicyMaintenanceFieldExecutor;
 import com.titanium.policy.service.maintenance.PolicyMaintenanceFieldExecutorRegistry;
 import com.titanium.policy.service.maintenance.PolicyMaintenanceHashing;
@@ -66,6 +71,7 @@ class PolicyMaintenanceApplicationTest {
     void setUp() {
         registry = new PolicyMaintenanceFieldExecutorRegistry(
                 List.of(new HolderMobilePolicyMaintenanceFieldExecutor(),
+                        new HolderPolicyMaintenanceFieldExecutor(),
                         new CoverageSumInsuredPolicyMaintenanceFieldExecutor(),
                         new BeneficiaryPolicyMaintenanceFieldExecutor(),
                         new PaymentMethodPolicyMaintenanceFieldExecutor()));
@@ -188,6 +194,104 @@ class PolicyMaintenanceApplicationTest {
     void shouldRejectUnknownPaymentMethodWithoutEvent() {
         fixture.given(createdEvent(), activatedEvent())
                 .when(paymentMethodCommand("NOT_A_METHOD"))
+                .expectException(PolicyBusinessRuleException.class)
+                .expectNoEvents();
+    }
+
+    @Test
+    void shouldApplyHolderIdentityFieldsIntoContractSnapshot() {
+        ApplyPolicyMaintenanceCommand command = holderCommand(
+                holderChange("policy.holder.name", "TEXT", "李四"),
+                holderChange("policy.holder.gender", "ENUM", "FEMALE"),
+                holderChange("policy.holder.birthDate", "DATE", "1990-05-20"),
+                holderChange("policy.holder.documentType", "ENUM", "CHINA_ID_CARD"),
+                holderChange("policy.holder.documentNumber", "TEXT", "ID-9"));
+
+        fixture.given(createdEvent(), activatedEvent())
+                .when(command)
+                .expectSuccessfulHandlerExecution()
+                .expectEventsMatching(org.axonframework.test.matchers.Matchers.payloadsMatching(
+                        org.axonframework.test.matchers.Matchers.exactSequenceOf(
+                                org.axonframework.test.matchers.Matchers.predicate(payload -> {
+                                    PolicyMaintenanceAppliedEvent event =
+                                            (PolicyMaintenanceAppliedEvent) payload;
+                                    assertEquals(PolicyDataUpdateType.HOLDER_CHANGE, event.updateType());
+                                    InsuredPartyList.HolderInfo holder =
+                                            event.executionStateAfter().insuredPartyList().holderInfo();
+                                    assertEquals("李四", holder.name());
+                                    assertEquals(CustomerGender.FEMALE, holder.gender());
+                                    assertEquals(LocalDate.of(1990, 5, 20), holder.birthDate());
+                                    assertEquals(IdCardType.CHINA_ID_CARD, holder.certType());
+                                    assertEquals("ID-9", holder.certNo());
+                                    // 联系方式属 POLICY_INFO_CHANGE（另一执行器），不得被身份要素批改波及
+                                    assertEquals("13800000000", holder.phone());
+                                    // 规范化回执口径：ENUM 取 code、DATE 取 ISO-8601，与字段目录发布类型逐字对应
+                                    assertEquals(
+                                            List.of("李四", "FEMALE", "1990-05-20", "CHINA_ID_CARD", "ID-9"),
+                                            event.appliedFields().stream()
+                                                    .map(PolicyMaintenanceAppliedField::canonicalValue)
+                                                    .toList());
+                                    return true;
+                                }))))
+                .expectState(policy -> {
+                    InsuredPartyList.HolderInfo holder = policy.getInsuredPartyList().holderInfo();
+                    assertEquals(CustomerGender.FEMALE, holder.gender());
+                    assertEquals(LocalDate.of(1990, 5, 20), holder.birthDate());
+                    assertEquals(IdCardType.CHINA_ID_CARD, holder.certType());
+                    assertEquals("ID-9", holder.certNo());
+                });
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"M", "1", "男"})
+    void shouldRejectHolderGenderOutsideCustomerEnumWithoutEvent(String gender) {
+        fixture.given(createdEvent(), activatedEvent())
+                .when(holderCommand(holderChange("policy.holder.gender", "ENUM", gender)))
+                .expectException(PolicyBusinessRuleException.class)
+                .expectNoEvents();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"1990/05/20", "not-a-date", ""})
+    void shouldRejectHolderBirthDateNotIsoDateWithoutEvent(String birthDate) {
+        fixture.given(createdEvent(), activatedEvent())
+                .when(holderCommand(holderChange("policy.holder.birthDate", "DATE", birthDate)))
+                .expectException(PolicyBusinessRuleException.class)
+                .expectNoEvents();
+    }
+
+    @Test
+    void shouldRejectFutureHolderBirthDateWithoutEvent() {
+        fixture.given(createdEvent(), activatedEvent())
+                .when(holderCommand(holderChange(
+                        "policy.holder.birthDate", "DATE", LocalDate.now().plusDays(1).toString())))
+                .expectException(PolicyBusinessRuleException.class)
+                .expectNoEvents();
+    }
+
+    @Test
+    void shouldRejectHolderDocumentTypeOutsideCustomerEnumWithoutEvent() {
+        fixture.given(createdEvent(), activatedEvent())
+                .when(holderCommand(holderChange(
+                        "policy.holder.documentType", "ENUM", "NOT_A_DOCUMENT_TYPE")))
+                .expectException(PolicyBusinessRuleException.class)
+                .expectNoEvents();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "   "})
+    void shouldRejectBlankHolderNameWithoutEvent(String name) {
+        fixture.given(createdEvent(), activatedEvent())
+                .when(holderCommand(holderChange("policy.holder.name", "TEXT", name)))
+                .expectException(PolicyBusinessRuleException.class)
+                .expectNoEvents();
+    }
+
+    @Test
+    void shouldRejectHolderFieldWithMismatchedDataTypeWithoutEvent() {
+        // 字段目录声明 policy.holder.gender 为 ENUM，按 TEXT 提交即数据类型不符
+        fixture.given(createdEvent(), activatedEvent())
+                .when(holderCommand(holderChange("policy.holder.gender", "TEXT", "FEMALE")))
                 .expectException(PolicyBusinessRuleException.class)
                 .expectNoEvents();
     }
@@ -441,6 +545,25 @@ class PolicyMaintenanceApplicationTest {
         return new ApplyPolicyMaintenanceCommand(
                 POLICY_ID, requestId, "maintenance-1", 0, hash, "a".repeat(64),
                 "IMMEDIATE", EFFECTIVE_AT, summary, changes, "operator-1", TENANT_ID);
+    }
+
+    /**
+     * 投保人身份要素变更（HOLDER_CHANGE 类）：作用对象为保单本身，故 objectId 即保单ID。
+     */
+    private PolicyMaintenanceFieldChange holderChange(String fieldCode, String dataType, String value) {
+        return new PolicyMaintenanceFieldChange("HOLDER_CHANGE", POLICY_ID, fieldCode, dataType, value);
+    }
+
+    private ApplyPolicyMaintenanceCommand holderCommand(PolicyMaintenanceFieldChange... changes) {
+        String requestId = REQUEST_ID + "-holder";
+        List<PolicyMaintenanceFieldChange> changeList = List.of(changes);
+        String summary = "maintenance=maintenance-1;fields=policy.holder";
+        String hash = PolicyMaintenanceHashing.requestHash(
+                TENANT_ID, POLICY_ID, requestId, "maintenance-1", 0,
+                "a".repeat(64), "IMMEDIATE", EFFECTIVE_AT, summary, changeList);
+        return new ApplyPolicyMaintenanceCommand(
+                POLICY_ID, requestId, "maintenance-1", 0, hash, "a".repeat(64),
+                "IMMEDIATE", EFFECTIVE_AT, summary, changeList, "operator-1", TENANT_ID);
     }
 
     private ApplyPolicyMaintenanceCommand paymentMethodCommand(String methodCode) {

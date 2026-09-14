@@ -1,6 +1,7 @@
 package com.titanium.policy.query.view;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 import com.titanium.common.jpa.BaseView;
@@ -100,6 +101,14 @@ public class PolicyView extends BaseView {
     /** 投保人手机号快照 */
     @Column(name = "policy_holder_phone", length = 32)
     private String        policyHolderPhone;
+
+    /** 投保人性别码快照（保全可批改，参与费率依据） */
+    @Column(name = "policy_holder_gender", length = 16)
+    private String        policyHolderGender;
+
+    /** 投保人出生日期快照（保全可批改，参与年龄与费率推导） */
+    @Column(name = "policy_holder_birth_date")
+    private LocalDate     policyHolderBirthDate;
 
     /** 被保险人姓名（事件暂未携带，预留） */
     @Column(name = "insured_name", length = 128)

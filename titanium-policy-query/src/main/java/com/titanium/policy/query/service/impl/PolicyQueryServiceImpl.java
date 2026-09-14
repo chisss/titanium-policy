@@ -179,6 +179,10 @@ public class PolicyQueryServiceImpl implements PolicyQueryService {
         fields.put("policy.coverage.sumInsured",
                 decimalField(product.getSumInsured(), product.getPolicyProductId()));
         fields.put("policy.currency", enumField(product.getCurrency()));
+        fields.put("policy.holder.birthDate", dateField(policy.getPolicyHolderBirthDate()));
+        fields.put("policy.holder.documentNumber", textField(policy.getPolicyHolderIdNo()));
+        fields.put("policy.holder.documentType", enumField(policy.getPolicyHolderIdType()));
+        fields.put("policy.holder.gender", enumField(policy.getPolicyHolderGender()));
         fields.put("policy.holder.id", textField(policy.getPolicyHolderId()));
         fields.put("policy.holder.mobile", textField(policy.getPolicyHolderPhone()));
         fields.put("policy.holder.name", textField(policy.getPolicyHolderName()));
@@ -234,6 +238,11 @@ public class PolicyQueryServiceImpl implements PolicyQueryService {
     private PolicySnapshotFieldValueQueryResult dateTimeField(LocalDateTime value) {
         String canonical = value == null ? null : value.atOffset(ZoneOffset.ofHours(8)).toString();
         return new PolicySnapshotFieldValueQueryResult("DATETIME", canonical);
+    }
+
+    /** 纯日期字段（如出生日期）：按 ISO-8601 日期（yyyy-MM-dd）发布，与字段目录 DATE 类型对应。 */
+    private PolicySnapshotFieldValueQueryResult dateField(LocalDate value) {
+        return new PolicySnapshotFieldValueQueryResult("DATE", value == null ? null : value.toString());
     }
 
     private String snapshotHash(
@@ -426,6 +435,10 @@ public class PolicyQueryServiceImpl implements PolicyQueryService {
         result.setApplicationId(view.getInsuranceId());
         result.setPolicyHolderId(view.getPolicyHolderId());
         result.setPolicyHolderName(view.getPolicyHolderName());
+        result.setPolicyHolderIdType(view.getPolicyHolderIdType());
+        result.setPolicyHolderIdNo(view.getPolicyHolderIdNo());
+        result.setPolicyHolderGender(view.getPolicyHolderGender());
+        result.setPolicyHolderBirthDate(view.getPolicyHolderBirthDate());
         result.setInsuredName(view.getInsuredName());
         result.setProductCode(view.getProductCode());
         // 列表保持保单主视图字段；详情由 enrichDetail 从保单产品快照补齐产品名称。

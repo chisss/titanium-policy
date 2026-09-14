@@ -1476,6 +1476,16 @@ public class Policy extends BaseAggregate {
         fields.put("policy.holder.id", snapshotField("TEXT", holder != null ? holder.customerId() : null));
         fields.put("policy.holder.mobile", snapshotField("TEXT", holder != null ? holder.phone() : null));
         fields.put("policy.holder.name", snapshotField("TEXT", holder != null ? holder.name() : null));
+        // 投保人身份要素（性别/出生日期/证件）自 m15-1803 起纳入可执行字段，同步纳入合同快照指纹——
+        // 否则批改性别或出生日期后 appliedSnapshotContentHash 不变，「生效后合同内容证据」漏掉费率依据项。
+        // 口径与字段目录逐字对应：DATE 取 ISO-8601、ENUM 取枚举 code。
+        fields.put("policy.holder.birthDate", snapshotField("DATE",
+                holder != null && holder.birthDate() != null ? holder.birthDate().toString() : null));
+        fields.put("policy.holder.documentNumber", snapshotField("TEXT", holder != null ? holder.certNo() : null));
+        fields.put("policy.holder.documentType", snapshotField("ENUM",
+                holder != null && holder.certType() != null ? holder.certType().getCode() : null));
+        fields.put("policy.holder.gender", snapshotField("ENUM",
+                holder != null && holder.gender() != null ? holder.gender().getCode() : null));
         fields.put("policy.number", snapshotField("TEXT", this.policyNo != null ? this.policyNo.value() : null));
         fields.put("policy.period.end", snapshotField("DATETIME", dateTime(
                 this.policyPeriod != null ? this.policyPeriod.insurancePeriodEnd() : null)));

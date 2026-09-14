@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -14,6 +15,8 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
+import com.titanium.metadata.enums.customer.CustomerEnum.CustomerGender;
+import com.titanium.metadata.enums.customer.CustomerEnum.IdCardType;
 import com.titanium.metadata.enums.maintenance.PolicyMaintenanceAction;
 import com.titanium.metadata.enums.policy.BeneficiaryType;
 import com.titanium.metadata.enums.product.ProductEnum.ProductCategory;
@@ -150,6 +153,35 @@ class EndorsementProjectionEventHandlerTest {
         verifyNoInteractions(productRepository);
     }
 
+    @Test
+    void projectsHolderIdentityIntoPolicyViewEvenWithoutProductChanges() {
+        PolicyEndorsementViewRepository endorsementRepository = mock(PolicyEndorsementViewRepository.class);
+        PolicyViewRepository policyRepository = mock(PolicyViewRepository.class);
+        PolicyProductViewRepository productRepository = mock(PolicyProductViewRepository.class);
+        PolicyBeneficiaryViewRepository beneficiaryRepository = mock(PolicyBeneficiaryViewRepository.class);
+        PolicyView policy = new PolicyView();
+        when(endorsementRepository.findById("END_HOLDER_001")).thenReturn(Optional.empty());
+        when(policyRepository.findByPolicyIdAndTenantId("POLICY_001", "TENANT_001"))
+                .thenReturn(Optional.of(policy));
+
+        new EndorsementProjectionEventHandler(
+                endorsementRepository, policyRepository, productRepository, mock(PolicyViewMapper.class),
+                beneficiaryRepository)
+                .on(holderEvent());
+
+        // 🔴 与缴费方式同理：本事件的执行状态不带险种段（policyProducts 为 null）。holder 分支必须位于
+        // applyExecutionState 中 policyProducts 的早返回之前，否则「仅改投保人字段」的保全读模型永不更新。
+        // 六项一次性回写，避免只回写其中一项造成读模型半新半旧。
+        assertEquals("李四", policy.getPolicyHolderName());
+        assertEquals("CHINA_ID_CARD", policy.getPolicyHolderIdType());
+        assertEquals("ID-9", policy.getPolicyHolderIdNo());
+        assertEquals("13900000000", policy.getPolicyHolderPhone());
+        assertEquals("FEMALE", policy.getPolicyHolderGender());
+        assertEquals(LocalDate.of(1990, 5, 20), policy.getPolicyHolderBirthDate());
+        verify(policyRepository).save(policy);
+        verifyNoInteractions(productRepository);
+    }
+
     private PolicyMaintenanceStateAppliedEvent stateEvent() {
         LocalDateTime appliedAt = LocalDateTime.parse("2026-08-25T16:00:00");
         return new PolicyMaintenanceStateAppliedEvent(
@@ -188,6 +220,26 @@ class EndorsementProjectionEventHandlerTest {
                 "POLICY_001", "REQUEST_BENEFICIARY_001", "a".repeat(64), "MAINTENANCE_BENEFICIARY_001",
                 "END_BENEFICIARY_001", PolicyDataUpdateType.BENEFICIARY_CHANGE,
                 EndorsementCategory.PARTY, 7, 8, appliedAt, "受益人变更",
+                "b".repeat(64), "c".repeat(64), "axon-event://policy/POLICY_001/8",
+                "d".repeat(64), "e".repeat(64), List.of(),
+                new PolicyMaintenanceExecutionState(parties, null),
+                appliedAt, "operator-1", "TENANT_001");
+    }
+
+    /** 投保人身份要素变更保全：执行状态为批改后的完整参与方快照，且不带险种段。 */
+    private PolicyMaintenanceAppliedEvent holderEvent() {
+        LocalDateTime appliedAt = LocalDateTime.parse("2026-09-14T10:00:00");
+        InsuredPartyList.HolderInfo holder = new InsuredPartyList.HolderInfo(
+                "CUSTOMER_001", "HOLDER_001", "李四", IdCardType.CHINA_ID_CARD, "ID-9", "13900000000",
+                CustomerGender.FEMALE, LocalDate.of(1990, 5, 20));
+        InsuredPartyList.BeneficiaryInfo beneficiary = new InsuredPartyList.BeneficiaryInfo(
+                null, "b".repeat(32), "王五", null, null, null, null, BeneficiaryType.DEATH, 1, 1.0d);
+        InsuredPartyList parties = new InsuredPartyList(
+                "PARTIES_001", holder, List.of(), List.of(beneficiary));
+        return new PolicyMaintenanceAppliedEvent(
+                "POLICY_001", "REQUEST_HOLDER_001", "a".repeat(64), "MAINTENANCE_HOLDER_001",
+                "END_HOLDER_001", PolicyDataUpdateType.HOLDER_CHANGE,
+                EndorsementCategory.PARTY, 7, 8, appliedAt, "投保人变更",
                 "b".repeat(64), "c".repeat(64), "axon-event://policy/POLICY_001/8",
                 "d".repeat(64), "e".repeat(64), List.of(),
                 new PolicyMaintenanceExecutionState(parties, null),
