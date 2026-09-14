@@ -22,6 +22,7 @@ import com.titanium.metadata.enums.policy.BeneficiaryType;
 import com.titanium.metadata.enums.product.ProductEnum.ProductCategory;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.common.enums.EndorsementCategory;
+import com.titanium.policy.common.enums.FamilyRelation;
 import com.titanium.policy.common.enums.PolicyDataUpdateType;
 import com.titanium.policy.common.enums.PolicyStatusCode;
 import com.titanium.policy.common.enums.PremiumPaymentCycle;
@@ -34,10 +35,12 @@ import com.titanium.policy.event.PolicyMaintenanceStateAppliedEvent;
 import com.titanium.policy.query.mapper.PolicyViewMapper;
 import com.titanium.policy.query.repository.PolicyBeneficiaryViewRepository;
 import com.titanium.policy.query.repository.PolicyEndorsementViewRepository;
+import com.titanium.policy.query.repository.PolicyInsuredViewRepository;
 import com.titanium.policy.query.repository.PolicyProductViewRepository;
 import com.titanium.policy.query.repository.PolicyViewRepository;
 import com.titanium.policy.query.view.PolicyBeneficiaryView;
 import com.titanium.policy.query.view.PolicyEndorsementView;
+import com.titanium.policy.query.view.PolicyInsuredView;
 import com.titanium.policy.query.view.PolicyProductView;
 import com.titanium.policy.query.view.PolicyView;
 import com.titanium.policy.valueobject.PremiumPlan;
@@ -51,6 +54,7 @@ class EndorsementProjectionEventHandlerTest {
         PolicyViewRepository policyRepository = mock(PolicyViewRepository.class);
         PolicyProductViewRepository productRepository = mock(PolicyProductViewRepository.class);
         PolicyBeneficiaryViewRepository beneficiaryRepository = mock(PolicyBeneficiaryViewRepository.class);
+        PolicyInsuredViewRepository insuredRepository = mock(PolicyInsuredViewRepository.class);
         PolicyView policy = new PolicyView();
         when(endorsementRepository.findById("END_001")).thenReturn(Optional.empty());
         when(policyRepository.findByPolicyIdAndTenantId("POLICY_001", "TENANT_001"))
@@ -59,7 +63,7 @@ class EndorsementProjectionEventHandlerTest {
 
         new EndorsementProjectionEventHandler(
                 endorsementRepository, policyRepository, productRepository, mock(PolicyViewMapper.class),
-                beneficiaryRepository).on(event);
+                beneficiaryRepository, insuredRepository).on(event);
 
         ArgumentCaptor<PolicyEndorsementView> endorsement =
                 ArgumentCaptor.forClass(PolicyEndorsementView.class);
@@ -78,6 +82,7 @@ class EndorsementProjectionEventHandlerTest {
         PolicyViewRepository policyRepository = mock(PolicyViewRepository.class);
         PolicyProductViewRepository productRepository = mock(PolicyProductViewRepository.class);
         PolicyBeneficiaryViewRepository beneficiaryRepository = mock(PolicyBeneficiaryViewRepository.class);
+        PolicyInsuredViewRepository insuredRepository = mock(PolicyInsuredViewRepository.class);
         PolicyView policy = new PolicyView();
         PolicyProductView productView = new PolicyProductView();
         productView.setPolicyProductId("LINE_001");
@@ -89,7 +94,7 @@ class EndorsementProjectionEventHandlerTest {
 
         new EndorsementProjectionEventHandler(
                 endorsementRepository, policyRepository, productRepository, mock(PolicyViewMapper.class),
-                beneficiaryRepository)
+                beneficiaryRepository, insuredRepository)
                 .on(coverageEvent());
 
         assertEquals(new BigDecimal("120000.00"), policy.getSumInsured());
@@ -105,6 +110,7 @@ class EndorsementProjectionEventHandlerTest {
         PolicyViewRepository policyRepository = mock(PolicyViewRepository.class);
         PolicyProductViewRepository productRepository = mock(PolicyProductViewRepository.class);
         PolicyBeneficiaryViewRepository beneficiaryRepository = mock(PolicyBeneficiaryViewRepository.class);
+        PolicyInsuredViewRepository insuredRepository = mock(PolicyInsuredViewRepository.class);
         PolicyView policy = new PolicyView();
         when(endorsementRepository.findById("END_BENEFICIARY_001")).thenReturn(Optional.empty());
         when(policyRepository.findByPolicyIdAndTenantId("POLICY_001", "TENANT_001"))
@@ -112,7 +118,7 @@ class EndorsementProjectionEventHandlerTest {
 
         new EndorsementProjectionEventHandler(
                 endorsementRepository, policyRepository, productRepository, mock(PolicyViewMapper.class),
-                beneficiaryRepository)
+                beneficiaryRepository, insuredRepository)
                 .on(beneficiaryEvent());
 
         verify(beneficiaryRepository).deleteByPolicyIdAndTenantId("POLICY_001", "TENANT_001");
@@ -134,6 +140,7 @@ class EndorsementProjectionEventHandlerTest {
         PolicyViewRepository policyRepository = mock(PolicyViewRepository.class);
         PolicyProductViewRepository productRepository = mock(PolicyProductViewRepository.class);
         PolicyBeneficiaryViewRepository beneficiaryRepository = mock(PolicyBeneficiaryViewRepository.class);
+        PolicyInsuredViewRepository insuredRepository = mock(PolicyInsuredViewRepository.class);
         PolicyView policy = new PolicyView();
         policy.setPaymentMethod(PremiumPaymentMethod.SINGLE_PAYMENT.getCode());
         when(endorsementRepository.findById("END_PAYMENT_001")).thenReturn(Optional.empty());
@@ -142,7 +149,7 @@ class EndorsementProjectionEventHandlerTest {
 
         new EndorsementProjectionEventHandler(
                 endorsementRepository, policyRepository, productRepository, mock(PolicyViewMapper.class),
-                beneficiaryRepository)
+                beneficiaryRepository, insuredRepository)
                 .on(paymentMethodEvent());
 
         // 🔴 本事件的执行状态不带险种段（policyProducts 为 null）。premiumPlan 分支必须位于
@@ -159,6 +166,7 @@ class EndorsementProjectionEventHandlerTest {
         PolicyViewRepository policyRepository = mock(PolicyViewRepository.class);
         PolicyProductViewRepository productRepository = mock(PolicyProductViewRepository.class);
         PolicyBeneficiaryViewRepository beneficiaryRepository = mock(PolicyBeneficiaryViewRepository.class);
+        PolicyInsuredViewRepository insuredRepository = mock(PolicyInsuredViewRepository.class);
         PolicyView policy = new PolicyView();
         when(endorsementRepository.findById("END_HOLDER_001")).thenReturn(Optional.empty());
         when(policyRepository.findByPolicyIdAndTenantId("POLICY_001", "TENANT_001"))
@@ -166,7 +174,7 @@ class EndorsementProjectionEventHandlerTest {
 
         new EndorsementProjectionEventHandler(
                 endorsementRepository, policyRepository, productRepository, mock(PolicyViewMapper.class),
-                beneficiaryRepository)
+                beneficiaryRepository, insuredRepository)
                 .on(holderEvent());
 
         // 🔴 与缴费方式同理：本事件的执行状态不带险种段（policyProducts 为 null）。holder 分支必须位于
@@ -178,6 +186,47 @@ class EndorsementProjectionEventHandlerTest {
         assertEquals("13900000000", policy.getPolicyHolderPhone());
         assertEquals("FEMALE", policy.getPolicyHolderGender());
         assertEquals(LocalDate.of(1990, 5, 20), policy.getPolicyHolderBirthDate());
+        verify(policyRepository).save(policy);
+        verifyNoInteractions(productRepository);
+    }
+
+    @Test
+    void replacesInsuredProjectionFromMaintenanceExecutionState() {
+        PolicyEndorsementViewRepository endorsementRepository = mock(PolicyEndorsementViewRepository.class);
+        PolicyViewRepository policyRepository = mock(PolicyViewRepository.class);
+        PolicyProductViewRepository productRepository = mock(PolicyProductViewRepository.class);
+        PolicyBeneficiaryViewRepository beneficiaryRepository = mock(PolicyBeneficiaryViewRepository.class);
+        PolicyInsuredViewRepository insuredRepository = mock(PolicyInsuredViewRepository.class);
+        PolicyView policy = new PolicyView();
+        when(endorsementRepository.findById("END_INSURED_001")).thenReturn(Optional.empty());
+        when(policyRepository.findByPolicyIdAndTenantId("POLICY_001", "TENANT_001"))
+                .thenReturn(Optional.of(policy));
+
+        new EndorsementProjectionEventHandler(
+                endorsementRepository, policyRepository, productRepository, mock(PolicyViewMapper.class),
+                beneficiaryRepository, insuredRepository)
+                .on(insuredEvent());
+
+        // 🔴 被保险人身份要素变更同样不带险种段（policyProducts 为 null），分支必须位于早返回之前。
+        // 主键即保全集合字段的对象标识（聚合内 insuredId），与出单投影同源——执行器按该标识定位元素，
+        // 两侧派生规则一旦分叉，受理成功的保全项会在生效环节失败关闭。
+        verify(insuredRepository).deleteByPolicyIdAndTenantId("POLICY_001", "TENANT_001");
+        verify(insuredRepository).flush();
+        ArgumentCaptor<PolicyInsuredView> insured = ArgumentCaptor.forClass(PolicyInsuredView.class);
+        verify(insuredRepository).save(insured.capture());
+        assertEquals("insured-1", insured.getValue().getId());
+        assertEquals("POLICY_001", insured.getValue().getPolicyId());
+        assertEquals("李四", insured.getValue().getInsuredName());
+        assertEquals("CHINA_ID_CARD", insured.getValue().getIdType());
+        assertEquals("ID-2", insured.getValue().getIdNo());
+        assertEquals(30, insured.getValue().getAge());
+        assertEquals("FEMALE", insured.getValue().getGender());
+        assertEquals("13700000000", insured.getValue().getPhone());
+        assertEquals("SELF", insured.getValue().getRelation());
+        assertEquals("SELF", insured.getValue().getFamilyRelation());
+        assertEquals("TENANT_001", insured.getValue().getTenantId());
+        // 保单主视图的冗余列与参与方投影同源（取首位被保险人）
+        assertEquals("李四", policy.getInsuredName());
         verify(policyRepository).save(policy);
         verifyNoInteractions(productRepository);
     }
@@ -240,6 +289,24 @@ class EndorsementProjectionEventHandlerTest {
                 "POLICY_001", "REQUEST_HOLDER_001", "a".repeat(64), "MAINTENANCE_HOLDER_001",
                 "END_HOLDER_001", PolicyDataUpdateType.HOLDER_CHANGE,
                 EndorsementCategory.PARTY, 7, 8, appliedAt, "投保人变更",
+                "b".repeat(64), "c".repeat(64), "axon-event://policy/POLICY_001/8",
+                "d".repeat(64), "e".repeat(64), List.of(),
+                new PolicyMaintenanceExecutionState(parties, null),
+                appliedAt, "operator-1", "TENANT_001");
+    }
+
+    /** 被保险人身份要素变更保全：执行状态为批改后的完整参与方快照，且不带险种段。 */
+    private PolicyMaintenanceAppliedEvent insuredEvent() {
+        LocalDateTime appliedAt = LocalDateTime.parse("2026-09-14T10:00:00");
+        InsuredPartyList.InsuredInfo insured = new InsuredPartyList.InsuredInfo(
+                "CUSTOMER_002", "insured-1", "李四", IdCardType.CHINA_ID_CARD, "ID-2", 30,
+                CustomerGender.FEMALE, "13700000000", "SELF", FamilyRelation.SELF);
+        InsuredPartyList parties = new InsuredPartyList(
+                "PARTIES_001", null, List.of(insured), List.of());
+        return new PolicyMaintenanceAppliedEvent(
+                "POLICY_001", "REQUEST_INSURED_001", "a".repeat(64), "MAINTENANCE_INSURED_001",
+                "END_INSURED_001", PolicyDataUpdateType.INSURED_INFO_CHANGE,
+                EndorsementCategory.PARTY, 7, 8, appliedAt, "被保险人变更",
                 "b".repeat(64), "c".repeat(64), "axon-event://policy/POLICY_001/8",
                 "d".repeat(64), "e".repeat(64), List.of(),
                 new PolicyMaintenanceExecutionState(parties, null),

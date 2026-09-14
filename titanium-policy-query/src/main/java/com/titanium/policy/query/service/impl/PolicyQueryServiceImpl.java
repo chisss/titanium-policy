@@ -37,6 +37,7 @@ import com.titanium.policy.query.result.PolicyStatisticsResult;
 import com.titanium.policy.query.service.PolicyQueryService;
 import com.titanium.policy.query.view.InsuranceView;
 import com.titanium.policy.query.view.PolicyBeneficiaryView;
+import com.titanium.policy.query.view.PolicyInsuredView;
 import com.titanium.policy.query.view.PolicyProductView;
 import com.titanium.policy.query.view.PolicyView;
 import com.titanium.policy.service.maintenance.PolicyMaintenanceHashing;
@@ -101,8 +102,10 @@ public class PolicyQueryServiceImpl implements PolicyQueryService {
         OffsetDateTime nextPolicyAnniversaryAt = nextPolicyAnniversary(policy, capturedAt.toLocalDateTime());
         List<PolicyBeneficiaryView> beneficiaries = policyBeneficiaryViewRepository
                 .findByPolicyIdAndTenantId(policyId, tenantId);
+        List<PolicyInsuredView> insureds = policyInsuredViewRepository
+                .findByPolicyIdAndTenantId(policyId, tenantId);
         Map<String, PolicySnapshotFieldValueQueryResult> fieldValues =
-                buildSnapshotFields(policy, mainProduct, beneficiaries);
+                buildSnapshotFields(policy, mainProduct, insureds, beneficiaries);
         String storageKey = "axon-event://policy/" + tenantId + "/" + policyId + "?version=" + policyVersion;
         String contentHash = snapshotHash(policy, mainProduct, policyVersion, fieldValues);
         return new PolicyMaintenanceSnapshotQueryResult(
@@ -173,6 +176,7 @@ public class PolicyQueryServiceImpl implements PolicyQueryService {
     private Map<String, PolicySnapshotFieldValueQueryResult> buildSnapshotFields(
             PolicyView policy,
             PolicyProductView product,
+            List<PolicyInsuredView> insureds,
             List<PolicyBeneficiaryView> beneficiaries) {
         TreeMap<String, PolicySnapshotFieldValueQueryResult> fields = new TreeMap<>();
         fields.put("policy.collection.mode", enumField(policy.getCollectionMode()));
@@ -202,6 +206,15 @@ public class PolicyQueryServiceImpl implements PolicyQueryService {
                     enumField(beneficiary.getBeneficiaryType(), objectId));
             fields.put(collectionKey(objectId, "policy.beneficiary.share"),
                     decimalField(beneficiary.getShareRatio(), objectId));
+        });
+        // 被保险人身份要素（m15-1804 起可批改）：行主键即保全对象标识，必须发布 objectId，
+        // 否则维护侧枚举不到被保险人集合元素、无从提交以 insuredId 定位的字段变更。
+        insureds.forEach(insured -> {
+            String objectId = insured.getId();
+            fields.put(collectionKey(objectId, "policy.insured.name"),
+                    textField(insured.getInsuredName(), objectId));
+            fields.put(collectionKey(objectId, "policy.insured.documentNumber"),
+                    textField(insured.getIdNo(), objectId));
         });
         return Map.copyOf(fields);
     }

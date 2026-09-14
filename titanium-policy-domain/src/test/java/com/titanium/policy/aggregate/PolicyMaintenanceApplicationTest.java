@@ -8,12 +8,14 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.stream.Stream;
 
 import org.axonframework.test.aggregate.AggregateTestFixture;
 import org.axonframework.test.aggregate.FixtureConfiguration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import com.titanium.metadata.enums.customer.CustomerEnum.CustomerGender;
@@ -25,6 +27,7 @@ import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.enums.product.ProductEnum.ProductCategory;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.command.ApplyPolicyMaintenanceCommand;
+import com.titanium.policy.common.enums.FamilyRelation;
 import com.titanium.policy.common.enums.PolicyDataUpdateType;
 import com.titanium.policy.common.enums.PolicyStatusCode;
 import com.titanium.policy.common.enums.PremiumPaymentCycle;
@@ -44,6 +47,7 @@ import com.titanium.policy.service.maintenance.BeneficiaryPolicyMaintenanceField
 import com.titanium.policy.service.maintenance.CoverageSumInsuredPolicyMaintenanceFieldExecutor;
 import com.titanium.policy.service.maintenance.HolderMobilePolicyMaintenanceFieldExecutor;
 import com.titanium.policy.service.maintenance.HolderPolicyMaintenanceFieldExecutor;
+import com.titanium.policy.service.maintenance.InsuredPolicyMaintenanceFieldExecutor;
 import com.titanium.policy.service.maintenance.PaymentMethodPolicyMaintenanceFieldExecutor;
 import com.titanium.policy.service.maintenance.PolicyMaintenanceFieldExecutorRegistry;
 import com.titanium.policy.service.maintenance.PolicyMaintenanceHashing;
@@ -62,6 +66,8 @@ class PolicyMaintenanceApplicationTest {
     private static final String POLICY_ID = "policy-1";
     private static final String TENANT_ID = "tenant-1";
     private static final String REQUEST_ID = "effect-request-1";
+    /** 首位被保险人的聚合内标识：集合字段保全的对象标识（字段目录 identityField=insuredId） */
+    private static final String INSURED_ID = "insured-1";
     private static final LocalDateTime EFFECTIVE_AT = LocalDateTime.of(2026, 8, 25, 10, 0);
 
     private FixtureConfiguration<Policy> fixture;
@@ -74,6 +80,7 @@ class PolicyMaintenanceApplicationTest {
                         new HolderPolicyMaintenanceFieldExecutor(),
                         new CoverageSumInsuredPolicyMaintenanceFieldExecutor(),
                         new BeneficiaryPolicyMaintenanceFieldExecutor(),
+                        new InsuredPolicyMaintenanceFieldExecutor(),
                         new PaymentMethodPolicyMaintenanceFieldExecutor()));
         fixture = new AggregateTestFixture<>(Policy.class);
         fixture.registerInjectableResource(registry);
@@ -292,6 +299,92 @@ class PolicyMaintenanceApplicationTest {
         // 字段目录声明 policy.holder.gender 为 ENUM，按 TEXT 提交即数据类型不符
         fixture.given(createdEvent(), activatedEvent())
                 .when(holderCommand(holderChange("policy.holder.gender", "TEXT", "FEMALE")))
+                .expectException(PolicyBusinessRuleException.class)
+                .expectNoEvents();
+    }
+
+    @Test
+    void shouldApplyInsuredIdentityFieldsIntoContractSnapshot() {
+        ApplyPolicyMaintenanceCommand command = insuredCommand(
+                insuredChange(INSURED_ID, "policy.insured.name", "TEXT", "李小四"),
+                insuredChange(INSURED_ID, "policy.insured.documentNumber", "TEXT", "ID-9"));
+
+        fixture.given(insuredCreatedEvent(), activatedEvent())
+                .when(command)
+                .expectSuccessfulHandlerExecution()
+                .expectEventsMatching(org.axonframework.test.matchers.Matchers.payloadsMatching(
+                        org.axonframework.test.matchers.Matchers.exactSequenceOf(
+                                org.axonframework.test.matchers.Matchers.predicate(payload -> {
+                                    PolicyMaintenanceAppliedEvent event =
+                                            (PolicyMaintenanceAppliedEvent) payload;
+                                    assertEquals(PolicyDataUpdateType.INSURED_INFO_CHANGE, event.updateType());
+                                    List<InsuredPartyList.InsuredInfo> insureds =
+                                            event.executionStateAfter().insuredPartyList().insuredList();
+                                    assertEquals("李小四", insureds.get(0).name());
+                                    assertEquals("ID-9", insureds.get(0).certNo());
+                                    // 非目标要素（年龄/证件类型/关系）原样透传
+                                    assertEquals(30, insureds.get(0).age());
+                                    assertEquals(IdCardType.CHINA_ID_CARD, insureds.get(0).certType());
+                                    assertEquals("SELF", insureds.get(0).relationToHolder());
+                                    // 同集合的另一位被保险人不得被批改波及
+                                    assertEquals("王五", insureds.get(1).name());
+                                    assertEquals("ID-3", insureds.get(1).certNo());
+                                    // 规范化回执口径：两项均为 TEXT 原文，与字段目录发布类型逐字对应
+                                    assertEquals(
+                                            List.of("李小四", "ID-9"),
+                                            event.appliedFields().stream()
+                                                    .map(PolicyMaintenanceAppliedField::canonicalValue)
+                                                    .toList());
+                                    return true;
+                                }))))
+                .expectState(policy -> {
+                    List<InsuredPartyList.InsuredInfo> insureds =
+                            policy.getInsuredPartyList().insuredList();
+                    assertEquals("李小四", insureds.get(0).name());
+                    assertEquals("ID-9", insureds.get(0).certNo());
+                    assertEquals("王五", insureds.get(1).name());
+                });
+    }
+
+    @Test
+    void shouldRejectInsuredOutsidePartyListWithoutEvent() {
+        // 目标被保险人不存在必须失败关闭：被保险人是承保标的，不得按此路径新建（增员走 AddInsuredMemberCommand）
+        fixture.given(insuredCreatedEvent(), activatedEvent())
+                .when(insuredCommand(
+                        insuredChange("insured-9", "policy.insured.name", "TEXT", "赵六")))
+                .expectException(PolicyBusinessRuleException.class)
+                .expectNoEvents();
+    }
+
+    @ParameterizedTest
+    @MethodSource("illegalInsuredObjectIds")
+    void shouldRejectInsuredObjectIdNotInProjectionFormatWithoutEvent(String objectId) {
+        // 受理快照发布的对象标识恒为 1-32 位 [A-Za-z0-9._-]；非该形态即拒，绝不退化为「按顺序改第一个」
+        fixture.given(insuredCreatedEvent(), activatedEvent())
+                .when(insuredCommand(insuredChange(objectId, "policy.insured.name", "TEXT", "李小四")))
+                .expectException(PolicyBusinessRuleException.class)
+                .expectNoEvents();
+    }
+
+    /** 非法集合对象标识：超长、含非法字符。 */
+    private static Stream<String> illegalInsuredObjectIds() {
+        return Stream.of("insured#1", "i".repeat(33));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "   "})
+    void shouldRejectBlankInsuredNameWithoutEvent(String name) {
+        fixture.given(insuredCreatedEvent(), activatedEvent())
+                .when(insuredCommand(insuredChange(INSURED_ID, "policy.insured.name", "TEXT", name)))
+                .expectException(PolicyBusinessRuleException.class)
+                .expectNoEvents();
+    }
+
+    @Test
+    void shouldRejectInsuredFieldWithMismatchedDataTypeWithoutEvent() {
+        // 字段目录声明 policy.insured.name 为 TEXT，按 DECIMAL 提交即数据类型不符
+        fixture.given(insuredCreatedEvent(), activatedEvent())
+                .when(insuredCommand(insuredChange(INSURED_ID, "policy.insured.name", "DECIMAL", "1")))
                 .expectException(PolicyBusinessRuleException.class)
                 .expectNoEvents();
     }
@@ -566,6 +659,26 @@ class PolicyMaintenanceApplicationTest {
                 "IMMEDIATE", EFFECTIVE_AT, summary, changeList, "operator-1", TENANT_ID);
     }
 
+    /**
+     * 被保险人身份要素变更（INSURED_INFO_CHANGE 类）：集合字段，objectId 即集合元素在聚合内的 insuredId。
+     */
+    private PolicyMaintenanceFieldChange insuredChange(
+            String objectId, String fieldCode, String dataType, String value) {
+        return new PolicyMaintenanceFieldChange("INSURED_INFO_CHANGE", objectId, fieldCode, dataType, value);
+    }
+
+    private ApplyPolicyMaintenanceCommand insuredCommand(PolicyMaintenanceFieldChange... changes) {
+        String requestId = REQUEST_ID + "-insured";
+        List<PolicyMaintenanceFieldChange> changeList = List.of(changes);
+        String summary = "maintenance=maintenance-1;fields=policy.insured";
+        String hash = PolicyMaintenanceHashing.requestHash(
+                TENANT_ID, POLICY_ID, requestId, "maintenance-1", 0,
+                "a".repeat(64), "IMMEDIATE", EFFECTIVE_AT, summary, changeList);
+        return new ApplyPolicyMaintenanceCommand(
+                POLICY_ID, requestId, "maintenance-1", 0, hash, "a".repeat(64),
+                "IMMEDIATE", EFFECTIVE_AT, summary, changeList, "operator-1", TENANT_ID);
+    }
+
     private ApplyPolicyMaintenanceCommand paymentMethodCommand(String methodCode) {
         String requestId = REQUEST_ID + "-payment-method";
         List<PolicyMaintenanceFieldChange> changes = List.of(new PolicyMaintenanceFieldChange(
@@ -615,6 +728,15 @@ class PolicyMaintenanceApplicationTest {
     }
 
     private PolicyCreatedEvent createdEvent() {
+        return createdEvent(parties("13800000000"));
+    }
+
+    /** 含两名被保险人的出单事件：集合字段保全需按 insuredId 定位到具体元素 */
+    private PolicyCreatedEvent insuredCreatedEvent() {
+        return createdEvent(insuredParties());
+    }
+
+    private PolicyCreatedEvent createdEvent(InsuredPartyList partyList) {
         Money amount = Money.of(new BigDecimal("1000.00"), "CNY");
         PolicyProduct mainProduct = new PolicyProduct(
                 "line-1", 1, ProductCategory.MAIN, null, "product-1", "P001", "测试主险",
@@ -627,7 +749,7 @@ class PolicyMaintenanceApplicationTest {
                 null, null, null, null, null,
                 PolicyPeriod.of(EFFECTIVE_AT.minusYears(1), EFFECTIVE_AT.plusYears(10), 0, 0),
                 amount, amount, amount, List.of(mainProduct), premiumPlan(), null, null, status,
-                parties("13800000000"), null, TENANT_ID);
+                partyList, null, TENANT_ID);
     }
 
     private PolicyActivatedEvent activatedEvent() {
@@ -638,6 +760,19 @@ class PolicyMaintenanceApplicationTest {
         InsuredPartyList.HolderInfo holder = new InsuredPartyList.HolderInfo(
                 "customer-1", "holder-1", "张三", null, "ID-1", mobile);
         return new InsuredPartyList("parties-1", holder, List.of(), List.of());
+    }
+
+    /** 两名被保险人的参与方快照：用于验证集合字段按 insuredId 精确定位、不波及同集合其它元素 */
+    private InsuredPartyList insuredParties() {
+        InsuredPartyList.HolderInfo holder = new InsuredPartyList.HolderInfo(
+                "customer-1", "holder-1", "张三", null, "ID-1", "13800000000");
+        InsuredPartyList.InsuredInfo first = new InsuredPartyList.InsuredInfo(
+                "customer-2", INSURED_ID, "李四", IdCardType.CHINA_ID_CARD, "ID-2", 30,
+                CustomerGender.MALE, "13700000000", "SELF", FamilyRelation.SELF);
+        InsuredPartyList.InsuredInfo second = new InsuredPartyList.InsuredInfo(
+                "customer-3", "insured-2", "王五", IdCardType.CHINA_ID_CARD, "ID-3", 8,
+                CustomerGender.MALE, null, "CHILD", FamilyRelation.CHILD);
+        return new InsuredPartyList("parties-1", holder, List.of(first, second), List.of());
     }
 
     /** 期缴保费计划：缴费方式变更执行器的写入目标，也是「变更参与方不得丢计划」回归的观测点 */

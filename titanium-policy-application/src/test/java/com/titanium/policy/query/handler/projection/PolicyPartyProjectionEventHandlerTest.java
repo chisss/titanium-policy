@@ -44,6 +44,9 @@ class PolicyPartyProjectionEventHandlerTest {
         verify(insuredRepository).save(captor.capture());
         assertEquals("SELF", captor.getValue().getRelation());
         assertEquals("CUSTOMER_001", captor.getValue().getCustomerId());
+        // 🔴 读模型主键即保全集合字段的对象标识（聚合内 insuredId）：写侧执行器按该标识定位被保险人元素，
+        // 两侧派生规则必须同源，否则受理成功的保全项会在生效环节失败关闭
+        assertEquals("INSURED_001", captor.getValue().getId());
     }
 
     @Test

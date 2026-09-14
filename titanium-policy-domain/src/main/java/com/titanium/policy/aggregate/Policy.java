@@ -91,6 +91,7 @@ import com.titanium.policy.event.SubPolicyLinkedEvent;
 import com.titanium.policy.exception.PolicyBusinessRuleException;
 import com.titanium.policy.service.PolicyCompositionDomainService;
 import com.titanium.policy.service.maintenance.BeneficiaryPolicyMaintenanceFieldExecutor;
+import com.titanium.policy.service.maintenance.InsuredPolicyMaintenanceFieldExecutor;
 import com.titanium.policy.service.maintenance.PolicyMaintenanceFieldExecutorRegistry;
 import com.titanium.policy.service.maintenance.PolicyMaintenanceHashing;
 import com.titanium.policy.valueobject.AnnuityPayoutPlan;
@@ -1510,6 +1511,19 @@ public class Policy extends BaseAggregate {
             fields.put(collectionSnapshotKey(objectId, BeneficiaryPolicyMaintenanceFieldExecutor.SHARE_FIELD),
                     snapshotField("DECIMAL", BigDecimal.valueOf(beneficiary.beneficiaryRatio())
                             .movePointRight(2).stripTrailingZeros().toPlainString()));
+        }
+        // 被保险人身份要素（姓名/证件号码）自 m15-1804 起纳入可执行字段，同步纳入合同快照指纹——
+        // 否则批改被保险人姓名或证件号后 appliedSnapshotContentHash 不变，「生效后合同内容证据」漏掉承保标的身份项。
+        List<InsuredPartyList.InsuredInfo> insureds = parties == null || parties.insuredList() == null
+                ? List.of() : parties.insuredList();
+        for (int index = 0; index < insureds.size(); index++) {
+            InsuredPartyList.InsuredInfo insured = insureds.get(index);
+            String objectId = PolicyMaintenanceObjectId.insured(this.policyId, insured, index).value();
+            fields.put(collectionSnapshotKey(objectId, InsuredPolicyMaintenanceFieldExecutor.NAME_FIELD),
+                    snapshotField("TEXT", insured.name()));
+            fields.put(collectionSnapshotKey(
+                            objectId, InsuredPolicyMaintenanceFieldExecutor.DOCUMENT_NUMBER_FIELD),
+                    snapshotField("TEXT", insured.certNo()));
         }
         return Map.copyOf(fields);
     }

@@ -129,13 +129,17 @@ class PolicyQueryServiceImplTest {
         PolicyBeneficiaryView beneficiary = maintenanceBeneficiaryView();
         PolicyBeneficiaryViewRepository beneficiaryRepository =
                 Mockito.mock(PolicyBeneficiaryViewRepository.class);
+        PolicyInsuredView insured = maintenanceInsuredView();
+        PolicyInsuredViewRepository insuredRepository = Mockito.mock(PolicyInsuredViewRepository.class);
         when(policyRepository.findByPolicyIdAndTenantId(POLICY_ID, TENANT_ID)).thenReturn(Optional.of(policy));
         when(productRepository.findByPolicyIdAndTenantIdOrderByLineNoAsc(POLICY_ID, TENANT_ID))
                 .thenReturn(List.of(product));
         when(beneficiaryRepository.findByPolicyIdAndTenantId(POLICY_ID, TENANT_ID))
                 .thenReturn(List.of(beneficiary));
+        when(insuredRepository.findByPolicyIdAndTenantId(POLICY_ID, TENANT_ID))
+                .thenReturn(List.of(insured));
         PolicyQueryServiceImpl service = new PolicyQueryServiceImpl(
-                policyRepository, productRepository, null, null, beneficiaryRepository);
+                policyRepository, productRepository, insuredRepository, null, beneficiaryRepository);
 
         var first = service.findMaintenanceSnapshot(POLICY_ID, TENANT_ID);
         var second = service.findMaintenanceSnapshot(POLICY_ID, TENANT_ID);
@@ -160,6 +164,16 @@ class PolicyQueryServiceImplTest {
                 first.fieldValues().get("beneficiary-1:policy.beneficiary.name").objectId());
         assertEquals("100",
                 first.fieldValues().get("beneficiary-1:policy.beneficiary.share").canonicalValue());
+        // 被保险人身份要素（m15-1804 起可批改）：键前缀即保全对象标识，且必须与读模型主键同源——
+        // 依据该标识提交的字段变更，写侧执行器才能在被保险人清单中定位到目标元素
+        assertEquals("insured-1",
+                first.fieldValues().get("insured-1:policy.insured.name").objectId());
+        assertEquals("李四",
+                first.fieldValues().get("insured-1:policy.insured.name").canonicalValue());
+        assertEquals("ID-2",
+                first.fieldValues().get("insured-1:policy.insured.documentNumber").canonicalValue());
+        assertEquals("TEXT",
+                first.fieldValues().get("insured-1:policy.insured.documentNumber").dataType());
         assertNotNull(first.nextBillingDateAt());
         assertNotNull(first.nextPolicyAnniversaryAt());
     }
@@ -178,7 +192,8 @@ class PolicyQueryServiceImplTest {
                 .thenReturn(List.of(product));
 
         assertThrows(BusinessException.class, () -> new PolicyQueryServiceImpl(
-                policyRepository, productRepository, null, null, beneficiaryRepository)
+                policyRepository, productRepository, Mockito.mock(PolicyInsuredViewRepository.class), null,
+                beneficiaryRepository)
                 .findMaintenanceSnapshot(POLICY_ID, TENANT_ID));
     }
 
@@ -214,6 +229,17 @@ class PolicyQueryServiceImplTest {
         view.setPremiumPaymentYears(10);
         view.setSumInsured(new BigDecimal("100000"));
         view.setCurrency("CNY");
+        return view;
+    }
+
+    /** 被保险人读模型：主键即保全集合字段的对象标识（读模型主键 = 聚合内 insuredId）。 */
+    private PolicyInsuredView maintenanceInsuredView() {
+        PolicyInsuredView view = new PolicyInsuredView();
+        view.setId("insured-1");
+        view.setPolicyId(POLICY_ID);
+        view.setInsuredName("李四");
+        view.setIdNo("ID-2");
+        view.setTenantId(TENANT_ID);
         return view;
     }
 

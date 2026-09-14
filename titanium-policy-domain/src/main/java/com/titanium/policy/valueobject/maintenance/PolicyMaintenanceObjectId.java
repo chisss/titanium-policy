@@ -39,4 +39,32 @@ public record PolicyMaintenanceObjectId(String value) {
                 .toString().replace("-", "");
         return new PolicyMaintenanceObjectId(derived);
     }
+
+    /**
+     * 被保险人集合元素标识：优先复用聚合内 {@code insuredId}（字段目录声明的 identityField），
+     * 标识缺失或超长时退化为「保单 + 顺序」派生值。
+     * <p>
+     * 🔴 <b>派生前缀 {@code ":I:"} 与读模型 {@code PolicyInsuredView} 主键生成逐字一致</b>——
+     * 读侧投影与写侧执行器必须使用同一函数，否则快照发布的对象标识执行侧解析不到，
+     * 受理成功的保全项会在生效环节必然失败。
+     * </p>
+     *
+     * @param policyId 保单ID
+     * @param insured  聚合内被保险人快照
+     * @param index    被保险人清单顺序（仅退化路径使用）
+     * @return 集合元素对象标识
+     */
+    public static PolicyMaintenanceObjectId insured(
+            String policyId,
+            InsuredPartyList.InsuredInfo insured,
+            int index) {
+        String insuredId = insured == null ? null : insured.insuredId();
+        if (insuredId != null && PROJECTION_ID.matcher(insuredId).matches()) {
+            return new PolicyMaintenanceObjectId(insuredId);
+        }
+        String seed = policyId + ":I:" + index;
+        String derived = UUID.nameUUIDFromBytes(seed.getBytes(StandardCharsets.UTF_8))
+                .toString().replace("-", "");
+        return new PolicyMaintenanceObjectId(derived);
+    }
 }

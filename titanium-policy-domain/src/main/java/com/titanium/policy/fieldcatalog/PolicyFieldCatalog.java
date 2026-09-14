@@ -19,7 +19,7 @@ import com.titanium.metadata.enums.policy.fieldcatalog.PolicyFieldValueType;
 /** Policy 对外发布的不可变字段目录。 */
 public record PolicyFieldCatalog(String catalogVersion, String contentHash, List<PolicyFieldDescriptor> fields) {
 
-    public static final String STANDARD_VERSION = "2026.09.14.1";
+    public static final String STANDARD_VERSION = "2026.09.14.2";
 
     public PolicyFieldCatalog {
         if (catalogVersion == null || catalogVersion.isBlank()) {
@@ -81,11 +81,12 @@ public record PolicyFieldCatalog(String catalogVersion, String contentHash, List
                         "policy.field.holder.address", proposal("POLICY_INFO_CHANGE", true, false),
                         PolicyFieldSensitivityLevel.SENSITIVE, PolicyFieldMaskingPolicy.ADDRESS),
                 collection("policy.insured.name", PolicyFieldObjectType.INSURED, PolicyFieldValueType.TEXT,
-                        "policy.field.insured.name", "insuredId", proposal("INSURED_INFO_CHANGE", false, true),
+                        "policy.field.insured.name", "insuredId",
+                        executable("INSURED_INFO_CHANGE", false, true),
                         PolicyFieldSensitivityLevel.SENSITIVE, PolicyFieldMaskingPolicy.NAME),
                 collection("policy.insured.documentNumber", PolicyFieldObjectType.INSURED, PolicyFieldValueType.TEXT,
                         "policy.field.insured.documentNumber", "insuredId",
-                        proposal("INSURED_INFO_CHANGE", false, true), PolicyFieldSensitivityLevel.RESTRICTED,
+                        executable("INSURED_INFO_CHANGE", false, true), PolicyFieldSensitivityLevel.RESTRICTED,
                         PolicyFieldMaskingPolicy.ID_NUMBER),
                 collection("policy.beneficiary.name", PolicyFieldObjectType.BENEFICIARY, PolicyFieldValueType.TEXT,
                         "policy.field.beneficiary.name", "beneficiaryId",

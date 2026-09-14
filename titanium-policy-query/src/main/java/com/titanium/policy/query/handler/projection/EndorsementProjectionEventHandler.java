@@ -18,10 +18,12 @@ import com.titanium.policy.event.PolicyMaintenanceStateAppliedEvent;
 import com.titanium.policy.query.mapper.PolicyViewMapper;
 import com.titanium.policy.query.repository.PolicyBeneficiaryViewRepository;
 import com.titanium.policy.query.repository.PolicyEndorsementViewRepository;
+import com.titanium.policy.query.repository.PolicyInsuredViewRepository;
 import com.titanium.policy.query.repository.PolicyProductViewRepository;
 import com.titanium.policy.query.repository.PolicyViewRepository;
 import com.titanium.policy.query.view.PolicyBeneficiaryView;
 import com.titanium.policy.query.view.PolicyEndorsementView;
+import com.titanium.policy.query.view.PolicyInsuredView;
 import com.titanium.policy.query.view.PolicyProductView;
 import com.titanium.policy.query.view.PolicyView;
 import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceExecutionState;
@@ -49,6 +51,7 @@ public class EndorsementProjectionEventHandler {
     private final PolicyProductViewRepository     policyProductViewRepository;
     private final PolicyViewMapper                policyViewMapper;
     private final PolicyBeneficiaryViewRepository beneficiaryViewRepository;
+    private final PolicyInsuredViewRepository     insuredViewRepository;
 
     /**
      * 投影批改事件：写批单流水 + 刷新保单读模型版本
@@ -161,6 +164,10 @@ public class EndorsementProjectionEventHandler {
             policy.setPolicyHolderBirthDate(holder.birthDate());
         }
         if (executionState.insuredPartyList() != null) {
+            // 被保险人身份要素（姓名/证件号码）：执行状态快照是保全生效后的权威参与方快照，
+            // 整表重建该保单的被保险人读模型行。🔴 同 holder 分支，本块必须留在下方 policyProducts
+            // 早返回之前——「仅改被保险人字段」的保全不带险种段变更。
+            replaceInsureds(policyId, tenantId, policy, executionState.insuredPartyList().insuredList());
             replaceBeneficiaries(policyId, tenantId, executionState.insuredPartyList().beneficiaryList());
         }
         // 缴费方式（趸缴/期缴）：字段执行器改写 PremiumPlan 后经执行状态快照回投影。
@@ -188,6 +195,46 @@ public class EndorsementProjectionEventHandler {
                 policy.setSumInsured(product.sumInsured() == null ? null : product.sumInsured().value());
             }
         }
+    }
+
+    /**
+     * 用执行状态快照整表重建该保单的被保险人读模型行。
+     * <p>
+     * 主键即保全集合字段的对象标识（{@link PolicyMaintenanceObjectId#insured}），与出单投影
+     * {@code PolicyPartyProjectionEventHandler} 同源，保证读侧发布的对象标识写侧执行器可解析。
+     * 先删后插并显式 flush：事件重放时新旧主键相同，不强制先落 DELETE 会撞主键。
+     * </p>
+     */
+    private void replaceInsureds(
+            String policyId,
+            String tenantId,
+            PolicyView policy,
+            List<InsuredPartyList.InsuredInfo> insureds) {
+        insuredViewRepository.deleteByPolicyIdAndTenantId(policyId, tenantId);
+        insuredViewRepository.flush();
+        List<InsuredPartyList.InsuredInfo> resolved = insureds == null ? List.of() : insureds;
+        LocalDateTime now = LocalDateTime.now();
+        for (int index = 0; index < resolved.size(); index++) {
+            InsuredPartyList.InsuredInfo insured = resolved.get(index);
+            PolicyInsuredView view = new PolicyInsuredView();
+            view.setId(PolicyMaintenanceObjectId.insured(policyId, insured, index).value());
+            view.setPolicyId(policyId);
+            view.setCustomerId(insured.customerId());
+            view.setInsuredName(insured.name());
+            view.setIdType(insured.certType() == null ? null : insured.certType().getCode());
+            view.setIdNo(insured.certNo());
+            view.setAge(insured.age());
+            view.setGender(insured.gender() == null ? null : insured.gender().getCode());
+            view.setPhone(insured.phone());
+            view.setRelation(insured.relationToHolder());
+            view.setFamilyRelation(insured.familyRelation() == null ? null : insured.familyRelation().getCode());
+            view.setTenantId(tenantId);
+            view.setCreateTime(now);
+            view.setUpdateTime(now);
+            insuredViewRepository.save(view);
+        }
+        // 保单主视图的被保险人姓名是列表检索用的冗余列，与参与方投影保持同源（取首位被保险人）
+        policy.setInsuredName(resolved.isEmpty() ? null : resolved.getFirst().name());
     }
 
     private void replaceBeneficiaries(

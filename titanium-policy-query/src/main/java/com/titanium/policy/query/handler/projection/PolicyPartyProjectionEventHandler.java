@@ -3,7 +3,6 @@ package com.titanium.policy.query.handler.projection;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.UUID;
 
 import org.axonframework.config.ProcessingGroup;
 import org.axonframework.eventhandling.EventHandler;
@@ -73,8 +72,9 @@ public class PolicyPartyProjectionEventHandler {
             for (int i = 0; i < insuredList.size(); i++) {
                 InsuredPartyList.InsuredInfo insured = insuredList.get(i);
                 PolicyInsuredView view = new PolicyInsuredView();
-                // 确定性 ID：policyId 前20位 + 被保险人序号，去除横线后截取保证 32 字符以内
-                view.setId(deterministicId(policyId, "I", i));
+                // 主键即保全集合字段的对象标识：读侧发布的对象标识必须与写侧执行器的解析函数同源，
+                // 否则受理通过的被保险人类保全项在生效环节解析不到目标（详见 PolicyMaintenanceObjectId#insured）
+                view.setId(PolicyMaintenanceObjectId.insured(policyId, insured, i).value());
                 view.setPolicyId(policyId);
                 view.setCustomerId(insured.customerId());
                 view.setInsuredName(insured.name());
@@ -124,18 +124,4 @@ public class PolicyPartyProjectionEventHandler {
                 beneficiaryList != null ? beneficiaryList.size() : 0);
     }
 
-    /**
-     * 生成确定性投影主键：基于 policyId + 类型前缀 + 序号，保证 32 字符内、幂等可重入。
-     *
-     * @param policyId 保单ID
-     * @param prefix   类型前缀（I=被保险人, B=受益人）
-     * @param index    列表序号
-     * @return 32 字符以内的唯一 ID
-     */
-    private String deterministicId(String policyId, String prefix, int index) {
-        // 用 UUID5 语义：取 policyId+prefix+index 的 UUID，去横线
-        String seed = policyId + ":" + prefix + ":" + index;
-        return UUID.nameUUIDFromBytes(seed.getBytes())
-                .toString().replace("-", "");
-    }
 }
