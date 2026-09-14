@@ -274,6 +274,13 @@ mvn -pl titanium-policy-domain test
     - 🔴 **判据（死 Port 分类处置，两者相反不可一刀切）**：①「**能力已有活链路、接口+实现均零引用**」= 被取代的冗余死壳 → **删除**（本域情形）；②「**接口已定义、javadoc 标注需求编号，但实现与调用方从未落地**」= 未落地的能力契约 → **保留并登记**（删了会抹掉已设计的能力契约，如 claim 域 `CustomerServicePort`/`DocumentServicePort`）。
     - 🔴 **排查要点**：接口有实现类 ≠ 活链路——`@Component` 适配器**自身零注入**即等价于死代码（Spring 装配它但无人使用，编译与测试全绿、外部无感）。扫描死 Port 须同时看「接口引用」与「实现类注入点」两端。
 
+20. ✅ **待生效保单的定时激活补偿（m12-1501，2026-09-14）**：`Policy.handle(ActivatePolicyCommand)`（`Policy.java:306-321`）有三重前置校验——① 须为未生效态 ② 首期保费已收讫 ③ **保障起期已到**。第 ③ 条命中**正常主路径**（「今日投保、次日起保」是标准场景）：支付回调到达时起期未到，即时激活必被拒；而 `PremiumCollectionResultOrchestrator.activateIfReady`（:72-82）失败即 catch 吞掉、仅留一行 info，`IssuanceSaga`(:393) 与 `IssuanceOrchestrator`(:276) 两处 javadoc 同样承诺「由定时任务激活」——**但该定时任务在全仓并不存在**（本域三个 `@Scheduled`：`AnnuityPayoutScheduler`/`PolicyMaturityScheduler`/`DeadLetterQueueService` 均与激活无关）。后果：起期在未来的保单**永远停在 `PENDING_EFFECTIVE`**，无任何补救通道。
+    - **修法**：照满期/年金双样板新增 `PolicyActivationScheduler`（`application/scheduled`，cron `${titanium.policy.activation.cron:0 0 2 * * ?}`，02:00 避开 01:00 年金与 01:30 满期）+ `PolicyViewRepository.findByPolicyStatusAndStartDateLessThanEqual`（跨租户分页扫描，每行自带 tenantId 定位租户，同满期样板）。
+    - 🔴 **调度器不复制业务规则**：查询**只按「待生效 + 起期已到」取数，不在读侧过滤保费条件**——能否真生效全部交由聚合 `canActivate()` 判定（保费未收讫 / 已生效 / 已终止一律由其拒绝）。读侧复制一份规则必与写侧漂移。故本类无任何收费或状态判断分支。
+    - 🔴 **告警即补偿信号**：起期已到但保费始终未到账的保单会**每轮重复命中并 warn**（含 policyId/policyNo/tenantId），这是有意为之——该告警就是「保单卡在待生效」的人工介入信号；失效应由 billing 逾期失效链路承担，本类不越权处置。
+    - **测试 +4**（`PolicyActivationSchedulerTest`，本域 `application/scheduled` 首个测试类）：跨租户各自携带 tenantId / 取数口径锁定 `PENDING_EFFECTIVE` 且基准日为当下（**并断言不得混用写侧 `NOT_EFFECTIVE`**，二者是有意映射）/ 单条失败不中断批次 / 空结果不空转。
+    - 🔴 **可复用判据**：**javadoc 承诺的机制必须与实际代码对齐**——「由 XX 定时任务补齐」「待 YY 通道驱动」这类措辞若指向一个不存在的组件，则链路在该分支上是**静默断裂**的（异常被 catch 吞掉、只留 info 日志，编译与测试全绿）。排查断链时须把**注释里的承诺**当作待验证项，反向搜索其指代物是否存在。
+
 ---
 
 *改动聚合根/事件/命令前，请同步阅读 [AGENTS.md](./AGENTS.md) 的协作检查清单与文件锁定建议。*

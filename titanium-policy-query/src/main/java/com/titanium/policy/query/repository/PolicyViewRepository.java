@@ -82,6 +82,27 @@ public interface PolicyViewRepository
             InsuranceProductType insuranceType, LocalDateTime endDate, Pageable pageable);
 
     /**
+     * 查询保障起期已到的待生效保单（系统定时激活批处理用，跨租户分页扫描）。
+     * <p>
+     * 命中条件：读模型状态为待生效、保障起期不晚于基准日。出单后保单停在待生效态，收费条件满足时由
+     * 支付回调即时激活；若回调到达时保障起期未到，则须待起期到达后由定时激活任务补齐——本查询即该
+     * 任务的取数入口。🔴 读模型状态 {@code PENDING_EFFECTIVE} 是写侧 {@code NOT_EFFECTIVE} 的有意映射，
+     * 二者非同一枚举，勿混用。
+     * </p>
+     * <p>
+     * 保费条件不在此过滤：候选保单是否真能生效由聚合 {@code canActivate()} 统一判定（收讫未达 / 已生效
+     * 均被拒），查询只负责「起期已到」这一时间维度，避免业务规则在读侧复制一份。
+     * </p>
+     *
+     * @param policyStatus 保单状态（传 {@code PENDING_EFFECTIVE}）
+     * @param startDate 起期基准日（含）
+     * @param pageable 分页参数（按主键稳定排序，游标翻页）
+     * @return 保障起期已到的待生效保单列表
+     */
+    List<PolicyView> findByPolicyStatusAndStartDateLessThanEqual(PolicyEnum.PolicyStatus policyStatus,
+            LocalDateTime startDate, Pageable pageable);
+
+    /**
      * 按租户ID统计保单总数（多租户隔离）
      *
      * @param tenantId 租户ID
