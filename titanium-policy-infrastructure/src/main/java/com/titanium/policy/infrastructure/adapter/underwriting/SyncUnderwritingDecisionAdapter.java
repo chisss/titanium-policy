@@ -13,10 +13,10 @@ import com.titanium.policy.port.underwriting.UnderwritingDecisionGateway;
 import com.titanium.policy.valueobject.insurance.UnderwritingDecisionRequest;
 import com.titanium.policy.valueobject.insurance.UnderwritingResult;
 import com.titanium.underwriting.api.UnderwritingApi;
-import com.titanium.underwriting.api.request.CreateUnderwritingRequest;
-import com.titanium.underwriting.api.request.DecideUnderwritingApiRequest;
-import com.titanium.underwriting.api.request.SubmitUnderwritingInputApiRequest;
-import com.titanium.underwriting.api.response.UnderwritingResponse;
+import com.titanium.underwriting.api.request.underwriting.CreateUnderwritingRequest;
+import com.titanium.underwriting.api.request.underwriting.DecideUnderwritingApiRequest;
+import com.titanium.underwriting.api.request.underwriting.SubmitUnderwritingInputApiRequest;
+import com.titanium.underwriting.api.response.underwriting.UnderwritingResponse;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
