@@ -268,6 +268,12 @@ mvn -pl titanium-policy-domain test
     - 🔴 **契约走可选请求头** `X-Business-Id`/`X-Business-Type`（与既有 `X-Tenant-Id` 同构），**不进请求体**——规则执行入口的 body 是裸 `Map<String,Object>` 规则变量，塞业务字段会污染规则变量命名空间。
     - 🔴 `businessType` 是**端口归属**（adapter 常量），不是调用方逐次传入的入参；`businessId` 一律**追加为最后一个参数**，最小化既有参数语义扰动。新增规则集调用点时**勿再走无 businessId 的签名**。
 
+19. ✅ **核保死 Port 与死 Adapter 已删除（m10-1303，2026-09-14）**：`port/underwriting/UnderwritingServicePort`（4 方法全弱类型 `Object`/`List<?>`；javadoc 自称「由应用层实现」——**本身即违反根规约 §3.4.5**，Adapter 必须落 infrastructure）与其实现 `infrastructure/adapter/underwriting/UnderwritingServiceAdapter`（`@Component`，自身在 `src/main` 亦零注入）**双双零引用**，属「能力已被活链路取代的冗余死壳」。
+    - **活性证据（取代者）**：一对活的 Port/Adapter 就在**同一对包内**——`port/underwriting/UnderwritingDecisionGateway`（domain 端口）+ `infrastructure/adapter/underwriting/SyncUnderwritingDecisionAdapter`（注入 `UnderwritingApi`，完成「创建核保 → 提交结构化输入 → 触发决策 → 回传结论」四步 Feign），由 `IssuanceSaga` 驱动，是当前唯一在用的核保调用链路。**新旧并存是本次缺陷的成因**：分包改造时新链路落地，旧壳未清。
+    - **处置**：按精确字面路径删除两文件；全仓复核零残留 import（唯一外部提及是 underwriting 域架构测试的一处 javadoc `{@code}` 举例，已同步改写）；**保留**本域对 `titanium-underwriting-api` 的依赖——活链路仍在用 `UnderwritingApi` 与 `UnderwritingResponse`。
+    - 🔴 **判据（死 Port 分类处置，两者相反不可一刀切）**：①「**能力已有活链路、接口+实现均零引用**」= 被取代的冗余死壳 → **删除**（本域情形）；②「**接口已定义、javadoc 标注需求编号，但实现与调用方从未落地**」= 未落地的能力契约 → **保留并登记**（删了会抹掉已设计的能力契约，如 claim 域 `CustomerServicePort`/`DocumentServicePort`）。
+    - 🔴 **排查要点**：接口有实现类 ≠ 活链路——`@Component` 适配器**自身零注入**即等价于死代码（Spring 装配它但无人使用，编译与测试全绿、外部无感）。扫描死 Port 须同时看「接口引用」与「实现类注入点」两端。
+
 ---
 
 *改动聚合根/事件/命令前，请同步阅读 [AGENTS.md](./AGENTS.md) 的协作检查清单与文件锁定建议。*
