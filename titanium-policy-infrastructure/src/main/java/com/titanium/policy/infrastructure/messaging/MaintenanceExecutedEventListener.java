@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 
 import com.alibaba.fastjson2.JSONObject;
 
+import com.titanium.metadata.topic.CrossDomainTopics;
 import com.titanium.policy.application.orchestration.maintenance.context.MaintenanceWriteBackContext;
 import com.titanium.policy.application.orchestration.maintenance.strategy.MaintenanceWriteBackStrategy;
 import com.titanium.policy.common.enums.PolicyDataUpdateType;
@@ -38,7 +39,7 @@ import lombok.extern.slf4j.Slf4j;
 public class MaintenanceExecutedEventListener {
 
     /** 保全执行事件主题（与 maintenance 域 MaintenanceConstants.KafkaTopic.MAINTENANCE_EXECUTED 约定一致） */
-    private static final String MAINTENANCE_EXECUTED_TOPIC = "maintenance-executed";
+    private static final String MAINTENANCE_EXECUTED_TOPIC = CrossDomainTopics.MAINTENANCE_EXECUTED;
 
     /** 数据/要素类批改统一策略的注册键 */
     private static final String ENDORSEMENT_STRATEGY_KEY = "ENDORSEMENT";

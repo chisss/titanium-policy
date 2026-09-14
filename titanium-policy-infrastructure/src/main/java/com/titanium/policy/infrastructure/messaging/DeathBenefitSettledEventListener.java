@@ -5,6 +5,7 @@ import org.springframework.stereotype.Component;
 
 import com.alibaba.fastjson2.JSONObject;
 
+import com.titanium.metadata.topic.CrossDomainTopics;
 import com.titanium.policy.application.orchestration.lifecycle.DeathBenefitTerminationOrchestrator;
 import com.titanium.policy.infrastructure.messaging.inbound.DeathBenefitSettledMessage;
 
@@ -34,7 +35,7 @@ import lombok.extern.slf4j.Slf4j;
 public class DeathBenefitSettledEventListener {
 
     /** 身故给付结算事件主题（与 claim 域 ClaimConstants.KafkaTopic.DEATH_BENEFIT_SETTLED 约定一致） */
-    private static final String DEATH_BENEFIT_SETTLED_TOPIC = "claim-death-benefit-settled";
+    private static final String DEATH_BENEFIT_SETTLED_TOPIC = CrossDomainTopics.CLAIM_DEATH_BENEFIT_SETTLED;
 
     /** 终止描述文案常量（落库，红线 20 禁裸串） */
     private static final String TERMINATION_DESCRIPTION = "身故给付后保单责任终止";

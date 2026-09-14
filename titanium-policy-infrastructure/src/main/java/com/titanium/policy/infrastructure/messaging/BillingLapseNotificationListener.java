@@ -5,6 +5,7 @@ import org.springframework.stereotype.Component;
 
 import com.alibaba.fastjson2.JSONObject;
 
+import com.titanium.metadata.topic.CrossDomainTopics;
 import com.titanium.policy.application.orchestration.lifecycle.BillingLapseOrchestrator;
 import com.titanium.policy.infrastructure.messaging.inbound.BillingLapseNotificationMessage;
 
@@ -34,7 +35,7 @@ import lombok.extern.slf4j.Slf4j;
 public class BillingLapseNotificationListener {
 
     /** 计费失效通知主题（与 billing 域 BillingConstants.KafkaTopic.LAPSE_NOTIFICATION 约定一致） */
-    private static final String LAPSE_NOTIFICATION_TOPIC = "titanium.billing.lapse-notification";
+    private static final String LAPSE_NOTIFICATION_TOPIC = CrossDomainTopics.BILLING_LAPSE_NOTIFICATION;
 
     /** 失效命令编排器（application 层，发命令职责归此，infra 监听器不直接持有 CommandGateway） */
     private final BillingLapseOrchestrator billingLapseOrchestrator;

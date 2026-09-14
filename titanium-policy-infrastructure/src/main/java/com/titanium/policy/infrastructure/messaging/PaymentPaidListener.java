@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component;
 import com.alibaba.fastjson2.JSONObject;
 
 import com.titanium.metadata.enums.BusinessDomainType;
+import com.titanium.metadata.topic.CrossDomainTopics;
 import com.titanium.policy.application.orchestration.payment.PremiumCollectionResultOrchestrator;
 import com.titanium.policy.infrastructure.messaging.inbound.PaymentOrderPaidMessage;
 import com.titanium.policy.infrastructure.messaging.mapper.PolicyPaymentResultMapper;
@@ -44,7 +45,7 @@ import lombok.extern.slf4j.Slf4j;
 public class PaymentPaidListener {
 
     /** 支付域出账成功主题（与 payment 域 PaymentConstants.KafkaTopic.PAYMENT_ORDER_PAID 约定一致） */
-    private static final String PAYMENT_ORDER_PAID_TOPIC = "payment-order-paid";
+    private static final String PAYMENT_ORDER_PAID_TOPIC = CrossDomainTopics.PAYMENT_ORDER_PAID;
 
     /** 保费实收回写编排器（application 层，发命令职责归此，infra 监听器不直接持有 CommandGateway） */
     private final PremiumCollectionResultOrchestrator premiumCollectionResultOrchestrator;

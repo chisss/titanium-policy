@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 import com.alibaba.fastjson2.JSONObject;
 
 import com.titanium.metadata.enums.underwriting.UnderwritingEnum.ConclusionType;
+import com.titanium.metadata.topic.CrossDomainTopics;
 import com.titanium.policy.application.command.InsuranceApplicationService;
 import com.titanium.policy.infrastructure.messaging.inbound.UnderwritingDecidedMessage;
 import com.titanium.policy.valueobject.insurance.UnderwritingResult;
@@ -34,7 +35,7 @@ import lombok.extern.slf4j.Slf4j;
 public class UnderwritingDecidedEventListener {
 
     /** 核保决策事件主题（与核保域 UnderwritingConstants.TOPIC_UNDERWRITING_DECIDED 约定一致） */
-    private static final String UNDERWRITING_DECIDED_TOPIC = "underwriting-decided";
+    private static final String UNDERWRITING_DECIDED_TOPIC = CrossDomainTopics.UNDERWRITING_DECIDED;
 
     private final InsuranceApplicationService insuranceApplicationService;
 
