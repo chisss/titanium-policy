@@ -1,4 +1,4 @@
-package com.titanium.policy.port;
+package com.titanium.policy.port.payment;
 
 import com.titanium.policy.valueobject.payment.PaymentOrderResult;
 import com.titanium.policy.valueobject.payment.PremiumPaymentRequest;

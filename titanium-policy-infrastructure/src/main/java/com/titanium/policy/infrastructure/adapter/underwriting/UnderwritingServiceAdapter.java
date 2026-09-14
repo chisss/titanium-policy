@@ -5,7 +5,7 @@ import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 
-import com.titanium.policy.port.UnderwritingServicePort;
+import com.titanium.policy.port.underwriting.UnderwritingServicePort;
 import com.titanium.underwriting.api.UnderwritingApi;
 import com.titanium.underwriting.api.request.CreateUnderwritingRequest;
 import com.titanium.underwriting.api.request.UnderwriteRequest;

@@ -31,7 +31,7 @@ import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.common.enums.RiskAssessmentStep;
 import com.titanium.policy.common.enums.RuleEngineDecision;
 import com.titanium.policy.entity.insurance.InsuredPartyList;
-import com.titanium.policy.port.RuleEngineServicePort;
+import com.titanium.policy.port.ruleengine.RuleEngineServicePort;
 import com.titanium.policy.service.RiskAssessmentDomainService;
 import com.titanium.policy.service.impl.RiskAssessmentDomainServiceImpl;
 import com.titanium.policy.valueobject.IssuancePlanLine;

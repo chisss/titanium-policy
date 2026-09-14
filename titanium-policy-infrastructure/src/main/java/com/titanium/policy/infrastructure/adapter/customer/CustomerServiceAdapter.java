@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component;
 import com.titanium.customer.api.CustomerApi;
 import com.titanium.customer.api.request.ResolveCustomerRequest;
 import com.titanium.customer.api.response.CustomerResponse;
-import com.titanium.policy.port.CustomerServicePort;
+import com.titanium.policy.port.customer.CustomerServicePort;
 import com.titanium.policy.valueobject.customer.CustomerIdentitySnapshot;
 
 import feign.FeignException;

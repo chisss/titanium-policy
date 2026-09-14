@@ -95,6 +95,27 @@ class PolicyArchitectureTest extends AbstractArchitectureGuardTest {
         super.apiInterfacesMustBeNamedByAggregate();
     }
 
+    /**
+     * 启用「domain/port 顶层不得平铺类（按对端域拆子包）」（根规约 §3.4.13，m6-910）。
+     * <p>
+     * 本域 12 个远程端口原为**目录已拆、包名未拆**：文件置于 {@code port/billing} 等子目录，
+     * 但 11 个类的 {@code package} 声明仍是扁平的 {@code com.titanium.policy.port}。ArchUnit 断言
+     * 基于**字节码包名**而非目录树，故该规则长期形同虚设——新增端口照抄相邻文件即会持续复制该缺陷。
+     * 本次已把 11 处 {@code package} 声明改为对端域子包（{@code billing}/{@code clause}/{@code customer}/
+     * {@code investment}/{@code payment}/{@code product}/{@code ruleengine}/{@code underwriting}），
+     * 并同步全域 33 个引用文件共 48 处 import，故启用本断言固化。
+     * </p>
+     * <p>
+     * 🔴 判据可复用：「**目录重构 ≠ 包重构**」——{@code git mv} 只搬文件、不换包名；凡以 ArchUnit
+     * 断言包结构的规约，必须核对 {@code package} 声明而非目录树。
+     * </p>
+     */
+    @Test
+    @Override
+    protected void portShouldNotContainFlatClasses() {
+        super.portShouldNotContainFlatClasses();
+    }
+
     // 注：早期严格隔离断言 webShouldNotDependOnDomainCommandsOrAggregates 不再启用。
     // 现行 api/web 规范改为 web 直接构造 domain Command / 读侧 FindXxxQuery 作 application 门面入参
     // （主流 Axon/CQRS 做法），web 允许依赖 command/query（但不碰 aggregate），故回退为基类默认 @Disabled。

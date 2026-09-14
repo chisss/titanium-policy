@@ -14,7 +14,7 @@ import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.enums.product.ProductEnum.IssuanceMode;
 import com.titanium.metadata.enums.product.ProductEnum.PolicyFormType;
 import com.titanium.metadata.response.ApiResponse;
-import com.titanium.policy.port.ProductServicePort;
+import com.titanium.policy.port.product.ProductServicePort;
 import com.titanium.policy.valueobject.product.ProductBasicInfo;
 import com.titanium.policy.valueobject.product.ProductClauseRef;
 import com.titanium.policy.valueobject.product.ProductIssueRules;

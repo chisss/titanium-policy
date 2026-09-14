@@ -7,7 +7,7 @@ import org.springframework.stereotype.Service;
 
 import com.titanium.policy.common.enums.RiskAssessmentStep;
 import com.titanium.policy.common.enums.RuleEngineDecision;
-import com.titanium.policy.port.RuleEngineServicePort;
+import com.titanium.policy.port.ruleengine.RuleEngineServicePort;
 import com.titanium.policy.service.RiskAssessmentDomainService;
 import com.titanium.policy.valueobject.IssuanceRequest;
 import com.titanium.policy.valueobject.RiskAssessmentDecision;

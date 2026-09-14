@@ -153,7 +153,7 @@ InsuranceIssuedEvent   --@EndSaga----> commandGateway.sendAndWait(CreatePolicyCo
 
 - **枚举归属**：本域专属枚举统一在 `titanium-policy-common` 的 `enums` 子包；跨域共享枚举在 `titanium-metadata/enums/policy`。**domain/valueobject 内禁止再定义枚举**（原 8 个枚举已迁出）。
 - **domain/valueobject**：仅放 record 值对象（含 `IssuanceRequest`/`IssuanceResult`，已从 service 迁入）。
-- **domain/port（🆕 与 aggregate 平级）**：远程调用 Port，`ProductServicePort`/`ClauseServicePort`/`UnderwritingServicePort`/`RuleEngineServicePort`/`UnderwritingDecisionGateway`（六边形架构 Port，**保留后缀，非命名错误**）。5 个平铺，>8 个再按 `port/remote` 二级子包拆。
+- **domain/port（🆕 与 aggregate 平级）**：远程调用 Port，`ProductServicePort`/`ClauseServicePort`/`UnderwritingServicePort`/`RuleEngineServicePort`/`UnderwritingDecisionGateway` 等 12 个（六边形架构 Port，**保留后缀，非命名错误**）。🔴 **按对端域拆子包、顶层清零**（`billing`/`clause`/`customer`/`investment`/`payment`/`product`/`ruleengine`/`underwriting`，含单类子包），由 ArchUnit `portShouldNotContainFlatClasses` 构建期固化（见第七节第 17 条）。
 - **domain/generator（🆕 与 aggregate 平级）**：`PolicyNoGenerator`/`EndorsementNoGenerator` 领域凭证号生成契约。
 - **domain/repository**：仓储接口保持独立（本质也是 driven port，位置尊重 DDD 惯例，不并入 port）。
 - **domain/service（🔴 只放跨聚合纯领域服务）**：判定铁律「三无 + 一不属于」——无 CommandGateway、无外部 Port、无基础设施依赖，且不属于任何单个聚合根。
@@ -255,12 +255,10 @@ mvn -pl titanium-policy-domain test
     - 🔴 **分支位置即语义**：`premiumPlan` 分支**必须置于 `policyProducts` 的早返回之前**——「仅改缴费方式」的保全**不带险种段变更**（`policyProducts == null`），放在早返回之后会被整体跳过、读模型永不更新。**这正是 G7 的成因**。改投影方法时新增分支必须先核对早返回路径是否吞掉该事件形态。
     - 🔴 **维度区分**：`paymentMethod`（**缴费方式**：趸缴/期缴）与相邻列 `collectionMode`（**收费方式**：线下/线上/免费/先用后付/代扣）是**两个正交维度**——前者说「保费怎么缴」，后者说「钱怎么收进来」。字段注释与 `@Schema` 均已标注，勿混用。
     - **测试 +4**：`EndorsementProjectionEventHandlerTest` +1（无险种段变更时缴费方式仍入读模型，以 `verifyNoInteractions(productRepository)` **锁死分支顺序**）；`PolicyViewMapperTest` +3（新建，直接断言生成实现 `PolicyViewMapperImpl`）。
-17. 🔴 **`domain/port` 分包只做了一半：目录已拆、`package` 未拆（m6-908 侦察命中，2026-09-14）**：根规约 §3.4.13 要求 `domain/port` **按对端域拆子包、顶层清零**，并有 ArchUnit `portShouldNotContainFlatClasses` 在构建期固化（billing / maintenance / product 三域均已 `@Override` 启用）。本域实况：
-    - **目录已拆**（`billing` / `clause` / `customer` / `investment` / `payment` / `product` / `ruleengine` / `underwriting` 八个子包），**但 12 个端口类中 11 个的 `package` 声明仍是扁平的 `com.titanium.policy.port`**，仅 `product/PolicyCashValuePort` 用了对子包名 `com.titanium.policy.port.product`。
-    - **后果**：ArchUnit 断言基于**字节码包名**而非文件目录 —— 在这 11 个类眼中它们**仍在顶层**，§3.4.13 的「按对端域拆子包」在本域**形同虚设**。`PolicyArchitectureTest` 已启用的 6 条断言（`applicationMustNotDependOnApiDto` / `apiLayerUsesRequestResponseNotDto` / `webLayerUsesDtoVoNotRequest` / `apiContractImplMustResideInProviderPackage` / `controllerMustNotImplementApi` / `apiInterfacesMustBeNamedByAggregate`）**不含**本断言。
-    - **为何危险**：包名是**编译期契约** —— 后续新增端口若照抄相邻文件（放进 `port/xxx/` 目录但 `package` 仍写 `com.titanium.policy.port`）会持续复制该缺陷，而**编译通过、测试全绿**，无人察觉；跨模块 import 也全部指向扁平包名。
-    - **修复路径（属破坏性变更，须整体推进）**：① 11 个文件改 `package` 声明为对子包名；② 全域（domain / application / infrastructure / query / web / bootstrap + 测试）更新 import；③ `PolicyArchitectureTest` `@Override` 启用 `portShouldNotContainFlatClasses` 并转绿作为验收标志。**已立独立 harness 任务 m6-910 承接**，勿在无关联任务中顺手改。
-    - 🔴 **可复用判据**：「**目录重构 ≠ 包重构**」—— 凡以 ArchUnit 断言包结构的规约，**必须核对 `package` 声明而非目录树**；`git mv` 只搬文件、不换包名。
+17. ✅ **`domain/port` 包名拆分已完成（m6-910，2026-09-14）**：本域曾有「**目录已拆、`package` 未拆**」缺陷（m6-908 侦察命中）——文件置于 `billing`/`clause`/`customer`/`investment`/`payment`/`product`/`ruleengine`/`underwriting` 八个子目录，**但 12 个端口类中 11 个的 `package` 声明仍是扁平的 `com.titanium.policy.port`**。ArchUnit 断言基于**字节码包名**而非目录树，故根规约 §3.4.13 在本域形同虚设（`git mv` 只搬文件、不换包名），后续新增端口照抄相邻文件会持续复制该缺陷而**编译通过、测试全绿**。
+    - **整改**：11 处 `package` 声明按所在子目录归位；全域 **33 个引用文件、48 处 import** 同步改写（`application` 13 + `application/test` 11 + `infrastructure` 12 = 36 个引用方，其中 3 个仅引用本就合规的 `PolicyCashValuePort`，无需改动）；`InvestmentAccountPort` 的 javadoc 包路径同步更新。改写前已先扫描「同包简单名引用」——命中 6 处 **均为 javadoc `{@code}` 文本提及**（非代码引用），故无需补 import。
+    - **验收**：`PolicyArchitectureTest` `@Override` 启用 `portShouldNotContainFlatClasses`（本域第 7 条启用的断言），架构测试 **43 例 0 失败（12 跳过）**、policy 域 **392 例 0 失败**；并做**反向验证**——向 `com.titanium.policy.port` 顶层注入探针类后断言立即 RED（失败信息精确指向 `com.titanium.policy.port.FlatProbePort`），证明断言有牙而非空转，探针已清理。
+    - 🔴 **可复用判据**：「**目录重构 ≠ 包重构**」——凡以 ArchUnit 断言包结构的规约，**必须核对 `package` 声明而非目录树**；批量分包后须全仓 `grep "port\.[A-Z]"` 校验残留（扁平引用特征是子包位置紧跟大写字母）。
 
 ---
 

@@ -13,7 +13,7 @@ import com.titanium.policy.application.orchestration.issuance.assembler.Confirme
 import com.titanium.policy.application.orchestration.issuance.validator.ConfirmedPremiumRequestValidator;
 import com.titanium.policy.entity.insurance.InsuranceLine;
 import com.titanium.policy.entity.insurance.InsuredPartyList;
-import com.titanium.policy.port.ConfirmedPremiumPricingPort;
+import com.titanium.policy.port.billing.ConfirmedPremiumPricingPort;
 import com.titanium.policy.valueobject.pricing.ConfirmedPremiumRequest;
 import com.titanium.policy.valueobject.pricing.ConfirmedPremiumResult;
 import com.titanium.policy.valueobject.pricing.PremiumCalculationReference;

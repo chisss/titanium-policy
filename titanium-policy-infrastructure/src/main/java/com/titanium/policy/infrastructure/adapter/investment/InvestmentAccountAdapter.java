@@ -11,7 +11,7 @@ import com.titanium.metadata.enums.CurrencyEnum;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.response.ApiResponse;
 import com.titanium.metadata.valueobject.Money;
-import com.titanium.policy.port.InvestmentAccountPort;
+import com.titanium.policy.port.investment.InvestmentAccountPort;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

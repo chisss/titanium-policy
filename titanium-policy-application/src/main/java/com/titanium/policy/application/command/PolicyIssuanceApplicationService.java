@@ -20,7 +20,7 @@ import com.titanium.policy.application.exception.IssuanceOrchestrationException;
 import com.titanium.policy.application.orchestration.issuance.orchestrator.IssuanceOrchestrator;
 import com.titanium.policy.application.orchestration.issuance.resolver.IssuanceCustomerResolver;
 import com.titanium.policy.common.enums.IssuanceStage;
-import com.titanium.policy.port.ProductServicePort;
+import com.titanium.policy.port.product.ProductServicePort;
 import com.titanium.policy.query.repository.InsuranceViewRepository;
 import com.titanium.policy.query.repository.IssuanceProgressViewRepository;
 import com.titanium.policy.query.repository.PolicyViewRepository;

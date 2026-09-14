@@ -9,7 +9,7 @@ import com.titanium.billing.api.PremiumCalculationApi;
 import com.titanium.billing.api.PremiumCalculationApi.PremiumCalculationRequest;
 import com.titanium.billing.api.PremiumCalculationApi.PremiumCalculationResponse;
 import com.titanium.metadata.response.ApiResponse;
-import com.titanium.policy.port.PremiumCalculationGateway;
+import com.titanium.policy.port.billing.PremiumCalculationGateway;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

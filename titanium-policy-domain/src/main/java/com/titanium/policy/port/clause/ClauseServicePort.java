@@ -1,4 +1,4 @@
-package com.titanium.policy.port;
+package com.titanium.policy.port.clause;
 
 import java.util.List;
 

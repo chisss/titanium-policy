@@ -1,4 +1,4 @@
-package com.titanium.policy.port;
+package com.titanium.policy.port.investment;
 
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.valueobject.Money;
@@ -10,7 +10,7 @@ import com.titanium.metadata.valueobject.Money;
  * 由基础设施层 {@code infrastructure.adapter} 的适配器实现，领域侧不依赖任何远程响应类型（防腐）。
  * </p>
  * <p>
- * Port 置于 {@code com.titanium.policy.port}（与 aggregate 平级），符合六边形架构。
+ * Port 置于 {@code com.titanium.policy.port.investment}（与 aggregate 平级、按对端域归子包），符合六边形架构。
  * </p>
  */
 public interface InvestmentAccountPort {

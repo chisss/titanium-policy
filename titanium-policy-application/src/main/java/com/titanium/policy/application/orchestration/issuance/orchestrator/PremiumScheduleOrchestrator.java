@@ -8,7 +8,7 @@ import java.util.Map;
 import org.springframework.stereotype.Service;
 
 import com.titanium.metadata.valueobject.Money;
-import com.titanium.policy.port.BillingServicePort;
+import com.titanium.policy.port.billing.BillingServicePort;
 import com.titanium.policy.valueobject.billing.PremiumScheduleRequest;
 
 import lombok.RequiredArgsConstructor;

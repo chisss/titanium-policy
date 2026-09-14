@@ -1,4 +1,4 @@
-package com.titanium.policy.port;
+package com.titanium.policy.port.underwriting;
 
 import com.titanium.policy.valueobject.insurance.UnderwritingDecisionRequest;
 import com.titanium.policy.valueobject.insurance.UnderwritingResult;

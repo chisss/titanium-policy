@@ -19,7 +19,7 @@ import com.titanium.metadata.enums.product.ProductEnum.ProductCategory;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.entity.insurance.InsuranceLine;
 import com.titanium.policy.entity.policy.InsuredSubject;
-import com.titanium.policy.port.PremiumCalculationGateway;
+import com.titanium.policy.port.billing.PremiumCalculationGateway;
 import com.titanium.policy.valueobject.policy.LineCoveragePeriod;
 import com.titanium.policy.valueobject.policy.LinePaymentTerms;
 

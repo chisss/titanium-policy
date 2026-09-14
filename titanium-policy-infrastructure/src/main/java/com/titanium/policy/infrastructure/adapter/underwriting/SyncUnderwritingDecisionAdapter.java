@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
 import com.titanium.common.exception.BusinessException;
 import com.titanium.metadata.enums.underwriting.UnderwritingEnum;
 import com.titanium.metadata.enums.underwriting.UnderwritingEnum.ConclusionType;
-import com.titanium.policy.port.UnderwritingDecisionGateway;
+import com.titanium.policy.port.underwriting.UnderwritingDecisionGateway;
 import com.titanium.policy.valueobject.insurance.UnderwritingDecisionRequest;
 import com.titanium.policy.valueobject.insurance.UnderwritingResult;
 import com.titanium.underwriting.api.UnderwritingApi;

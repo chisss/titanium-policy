@@ -30,7 +30,7 @@ import com.titanium.policy.entity.insurance.InsuranceLine;
 import com.titanium.policy.entity.policy.PolicyProduct;
 import com.titanium.policy.entity.proposal.ProposalLine;
 import com.titanium.policy.generator.PolicyNoGenerator;
-import com.titanium.policy.port.ProductServicePort;
+import com.titanium.policy.port.product.ProductServicePort;
 import com.titanium.policy.valueobject.IssuancePlanLine;
 import com.titanium.policy.valueobject.IssuanceProcessConfig;
 import com.titanium.policy.valueobject.IssuanceRequest;

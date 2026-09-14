@@ -25,7 +25,7 @@ import com.titanium.policy.application.orchestration.issuance.validator.Confirme
 import com.titanium.policy.entity.insurance.InsuranceLine;
 import com.titanium.policy.entity.insurance.InsuredPartyList;
 import com.titanium.policy.entity.policy.InsuredSubject;
-import com.titanium.policy.port.ConfirmedPremiumPricingPort;
+import com.titanium.policy.port.billing.ConfirmedPremiumPricingPort;
 import com.titanium.policy.valueobject.policy.LineCoveragePeriod;
 import com.titanium.policy.valueobject.policy.LinePaymentTerms;
 import com.titanium.policy.valueobject.pricing.ConfirmedPremiumRequest;

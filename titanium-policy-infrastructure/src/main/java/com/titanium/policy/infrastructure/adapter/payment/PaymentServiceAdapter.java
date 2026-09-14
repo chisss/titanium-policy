@@ -9,7 +9,7 @@ import com.titanium.payment.api.PaymentApi;
 import com.titanium.payment.api.request.CancelPaymentRequest;
 import com.titanium.payment.api.request.CreatePaymentOrderRequest;
 import com.titanium.payment.api.response.PaymentOrderResponse;
-import com.titanium.policy.port.PaymentServicePort;
+import com.titanium.policy.port.payment.PaymentServicePort;
 import com.titanium.policy.valueobject.payment.PaymentOrderResult;
 import com.titanium.policy.valueobject.payment.PremiumPaymentRequest;
 

@@ -11,7 +11,7 @@ import com.titanium.billing.api.response.bill.BillResponse;
 import com.titanium.common.exception.BusinessException;
 import com.titanium.metadata.response.ApiResponse;
 import com.titanium.policy.infrastructure.adapter.mapper.BillingRequestMapper;
-import com.titanium.policy.port.BillingServicePort;
+import com.titanium.policy.port.billing.BillingServicePort;
 import com.titanium.policy.valueobject.billing.BillingResult;
 import com.titanium.policy.valueobject.billing.PremiumBillRequest;
 import com.titanium.policy.valueobject.billing.PremiumScheduleRequest;

@@ -18,7 +18,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 
 import com.titanium.metadata.valueobject.Money;
-import com.titanium.policy.port.BillingServicePort;
+import com.titanium.policy.port.billing.BillingServicePort;
 import com.titanium.policy.valueobject.billing.PremiumScheduleRequest;
 
 class PremiumScheduleOrchestratorTest {

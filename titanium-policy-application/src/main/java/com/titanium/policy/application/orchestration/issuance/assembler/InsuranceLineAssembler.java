@@ -15,7 +15,7 @@ import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.entity.insurance.InsuranceLine;
 import com.titanium.policy.entity.insurance.InsuredPartyList;
 import com.titanium.policy.entity.policy.InsuredSubject;
-import com.titanium.policy.port.ProductServicePort;
+import com.titanium.policy.port.product.ProductServicePort;
 import com.titanium.policy.valueobject.IssuancePlanLine;
 import com.titanium.policy.valueobject.IssuanceRequest;
 import com.titanium.policy.valueobject.policy.LineCoveragePeriod;

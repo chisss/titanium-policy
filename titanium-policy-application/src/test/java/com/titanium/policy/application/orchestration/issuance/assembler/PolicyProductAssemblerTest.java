@@ -17,8 +17,8 @@ import com.titanium.metadata.enums.product.ProductEnum.ProductCategory;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.entity.insurance.InsuranceLine;
 import com.titanium.policy.entity.policy.PolicyProduct;
-import com.titanium.policy.port.ClauseServicePort;
-import com.titanium.policy.port.ProductServicePort;
+import com.titanium.policy.port.clause.ClauseServicePort;
+import com.titanium.policy.port.product.ProductServicePort;
 import com.titanium.policy.valueobject.pricing.PremiumCalculationReference;
 import com.titanium.policy.valueobject.product.ProductBasicInfo;
 

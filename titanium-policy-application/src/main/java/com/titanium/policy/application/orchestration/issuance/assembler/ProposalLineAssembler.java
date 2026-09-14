@@ -7,7 +7,7 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 
 import com.titanium.policy.entity.proposal.ProposalLine;
-import com.titanium.policy.port.ProductServicePort;
+import com.titanium.policy.port.product.ProductServicePort;
 import com.titanium.policy.valueobject.IssuancePlanLine;
 import com.titanium.policy.valueobject.IssuanceRequest;
 import com.titanium.policy.valueobject.product.ProductBasicInfo;

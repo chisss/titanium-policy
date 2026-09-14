@@ -1,4 +1,4 @@
-package com.titanium.policy.port;
+package com.titanium.policy.port.billing;
 
 import com.titanium.policy.valueobject.pricing.ConfirmedPremiumRequest;
 import com.titanium.policy.valueobject.pricing.ConfirmedPremiumResult;

@@ -9,7 +9,7 @@ import com.titanium.common.exception.BusinessException;
 import com.titanium.metadata.errorcode.PolicyErrorCode;
 import com.titanium.metadata.response.ApiResponse;
 import com.titanium.policy.common.enums.PremiumCalculationPurpose;
-import com.titanium.policy.port.ConfirmedPremiumPricingPort;
+import com.titanium.policy.port.billing.ConfirmedPremiumPricingPort;
 import com.titanium.policy.valueobject.pricing.ConfirmationContextSnapshot;
 import com.titanium.policy.valueobject.pricing.ConfirmedPremiumRequest;
 import com.titanium.policy.valueobject.pricing.ConfirmedPremiumResult;

@@ -15,7 +15,7 @@ import com.titanium.metadata.enums.customer.CustomerEnum.IdCardType;
 import com.titanium.metadata.errorcode.PolicyErrorCode;
 import com.titanium.policy.application.exception.CustomerResolutionException;
 import com.titanium.policy.entity.insurance.InsuredPartyList;
-import com.titanium.policy.port.CustomerServicePort;
+import com.titanium.policy.port.customer.CustomerServicePort;
 import com.titanium.policy.valueobject.IssuancePlanLine;
 import com.titanium.policy.valueobject.IssuanceRequest;
 import com.titanium.policy.valueobject.customer.CustomerIdentitySnapshot;

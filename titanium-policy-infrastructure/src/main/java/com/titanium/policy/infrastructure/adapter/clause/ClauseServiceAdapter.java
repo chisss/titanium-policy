@@ -11,7 +11,7 @@ import com.titanium.clause.api.response.CoverageResponse;
 import com.titanium.metadata.enums.CurrencyEnum;
 import com.titanium.metadata.enums.clause.DeductibleType;
 import com.titanium.metadata.valueobject.Money;
-import com.titanium.policy.port.ClauseServicePort;
+import com.titanium.policy.port.clause.ClauseServicePort;
 import com.titanium.policy.valueobject.policy.ClauseSnapshot;
 import com.titanium.policy.valueobject.policy.CoverageSnapshot;
 

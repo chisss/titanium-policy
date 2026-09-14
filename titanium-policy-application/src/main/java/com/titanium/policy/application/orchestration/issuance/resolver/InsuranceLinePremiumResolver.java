@@ -13,9 +13,9 @@ import com.titanium.metadata.enums.CurrencyEnum;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.entity.insurance.InsuranceLine;
 import com.titanium.policy.entity.policy.InsuredSubject;
-import com.titanium.policy.port.PremiumCalculationGateway;
-import com.titanium.policy.port.PremiumCalculationGateway.StandardPremiumRequest;
-import com.titanium.policy.port.PremiumCalculationGateway.StandardPremiumResult;
+import com.titanium.policy.port.billing.PremiumCalculationGateway;
+import com.titanium.policy.port.billing.PremiumCalculationGateway.StandardPremiumRequest;
+import com.titanium.policy.port.billing.PremiumCalculationGateway.StandardPremiumResult;
 
 import lombok.RequiredArgsConstructor;
 
