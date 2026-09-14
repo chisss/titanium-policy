@@ -215,6 +215,9 @@ mvn -pl titanium-policy-domain test
    - 🔴 **product 三主题（`created`/`audited`/`invalidated`）均不接入本域（2026-09-14 m6-907）**：本域对产品的取用是**业务时点的同步 Feign 实时查询**（`ProductServicePort` 4 方法：基本信息/出单模式/投保规则/条款绑定），不是长期状态订阅；
      产品在售状态已由出单必经的 CONFIRM 试算**同步强校验**（product 侧对非 `EFFECTIVE` 抛 `PRICING_PLAN_NOT_EFFECTIVE` **阻断出单**），异步订阅属可靠性降级。且存量保单为产品快照、产品下架**不回溯**，`Insurance` 聚合无作废命令、订阅亦无从承接。
      判定依据见 [跨域事件目录 §六.15](../docs/技术文档/跨域事件目录-2026-09.md)，登记点见 `ProductServicePort` 类注释与 `ProductBasicInfo.isEffective()`。<br>⚠️ 附带登记：`ProductBasicInfo.isEffective()` 当前**零调用**，但**不是缺口**（试算已拦截），**勿**据它另建第二条在售校验链。
+   - 🔴 **customer 四主题（`created`/`updated`/`status-changed`/`relationship-added`）均不接入本域（2026-09-14 m6-908）**：本域对客户只有**出单时点的同步 Feign 校验**（`CustomerServicePort` 3 方法：存在性 / 身份快照 / 幂等建档，唯一调用方 `IssuanceCustomerResolver`），无状态订阅语义。
+     且本域已明确设计为「`customerId` 引用 + 出单时点快照」——`InsuredPartyList.HolderInfo` 注释原文「`customerId` 引用 customer 域客户主数据（**单一事实来源**）；姓名/证件为**出单时点快照**，**权威值以 customerId 指向的主数据为准**」，本就不复制不跟随；客户信息变更须走**保全批改**（`PolicyMaintenanceFieldExecutor` 体系，有留痕可审核），
+     因姓名/证件是合同要素、年龄/性别参与费率，静默改写将破坏合同一致性与费率依据。判定依据见 [跨域事件目录 §六.16](../docs/技术文档/跨域事件目录-2026-09.md)，登记点见 `CustomerServicePort` 类注释与 `InsuredPartyList.HolderInfo` 注释。
 4. ✅ **孤儿事件已清理（m0-705，2026-09-11）**：`PolicyDataUpdatedEvent`、`PolicyRenewedEvent`（无产生者无消费者）与 `LineUnderwritingResultUpdatedEvent` + `UpdateLineUnderwritingResultCommand`（核保域 `UnderwritingDecidedEvent` 载荷不含分段结论字段，上游不存在）已删除；注释中「待核保域支持分段核保」的能力缺口已在 `Insurance.on(UnderwritingResultReceivedEvent)` 保留说明。同期删除被 `PolicyProduct`/`InsuredSubject` 取代的 5 个旧实体：`entity/Subject`、`entity/Coverage`、`entity/InsuranceProduct`、`entity/PolicyItem`、`entity/insurance/InsuranceProduct`（互引孤岛、零外部引用）。
 5. ✅ **ProposalConvertedEvent 写侧已补齐**：新增 `ConvertProposalCommand` + `Proposal.handle(ConvertProposalCommand)`（仅 SUBMITTED 可转，发布 `ProposalConvertedEvent`）。读模型 `ProposalProjectionEventHandler` 投影已就绪，转换命令触发后自动生效。纯对象方法 `convertToApplication` 保留供非事件溯源构建。
 6. ✅ **表现层不再依赖领域命令**：`PolicyController` 等三个 Controller 的命令构造已下沉至 `*ApplicationService`（表现层只传 Request/api-DTO，不持有 domain command），并以 ArchUnit `webShouldNotDependOnDomainCommandsOrAggregates` 固化。
@@ -252,7 +255,12 @@ mvn -pl titanium-policy-domain test
     - 🔴 **分支位置即语义**：`premiumPlan` 分支**必须置于 `policyProducts` 的早返回之前**——「仅改缴费方式」的保全**不带险种段变更**（`policyProducts == null`），放在早返回之后会被整体跳过、读模型永不更新。**这正是 G7 的成因**。改投影方法时新增分支必须先核对早返回路径是否吞掉该事件形态。
     - 🔴 **维度区分**：`paymentMethod`（**缴费方式**：趸缴/期缴）与相邻列 `collectionMode`（**收费方式**：线下/线上/免费/先用后付/代扣）是**两个正交维度**——前者说「保费怎么缴」，后者说「钱怎么收进来」。字段注释与 `@Schema` 均已标注，勿混用。
     - **测试 +4**：`EndorsementProjectionEventHandlerTest` +1（无险种段变更时缴费方式仍入读模型，以 `verifyNoInteractions(productRepository)` **锁死分支顺序**）；`PolicyViewMapperTest` +3（新建，直接断言生成实现 `PolicyViewMapperImpl`）。
-    - 🔴 **可复用判据**：**映射器 `unmappedTargetPolicy = IGNORE` 时，映射源写错只会静默漏字段、不报编译错**——「新增读模型列」必须**直接测生成实现**，只测处理器（mock 掉 mapper）覆盖不到。同理，一条字段链路的闭环须**四处齐备**：目录 `executable`、领域模型有落脚点、写侧有执行器、**读侧有列 + 投影有分支**。
+17. 🔴 **`domain/port` 分包只做了一半：目录已拆、`package` 未拆（m6-908 侦察命中，2026-09-14）**：根规约 §3.4.13 要求 `domain/port` **按对端域拆子包、顶层清零**，并有 ArchUnit `portShouldNotContainFlatClasses` 在构建期固化（billing / maintenance / product 三域均已 `@Override` 启用）。本域实况：
+    - **目录已拆**（`billing` / `clause` / `customer` / `investment` / `payment` / `product` / `ruleengine` / `underwriting` 八个子包），**但 12 个端口类中 11 个的 `package` 声明仍是扁平的 `com.titanium.policy.port`**，仅 `product/PolicyCashValuePort` 用了对子包名 `com.titanium.policy.port.product`。
+    - **后果**：ArchUnit 断言基于**字节码包名**而非文件目录 —— 在这 11 个类眼中它们**仍在顶层**，§3.4.13 的「按对端域拆子包」在本域**形同虚设**。`PolicyArchitectureTest` 已启用的 6 条断言（`applicationMustNotDependOnApiDto` / `apiLayerUsesRequestResponseNotDto` / `webLayerUsesDtoVoNotRequest` / `apiContractImplMustResideInProviderPackage` / `controllerMustNotImplementApi` / `apiInterfacesMustBeNamedByAggregate`）**不含**本断言。
+    - **为何危险**：包名是**编译期契约** —— 后续新增端口若照抄相邻文件（放进 `port/xxx/` 目录但 `package` 仍写 `com.titanium.policy.port`）会持续复制该缺陷，而**编译通过、测试全绿**，无人察觉；跨模块 import 也全部指向扁平包名。
+    - **修复路径（属破坏性变更，须整体推进）**：① 11 个文件改 `package` 声明为对子包名；② 全域（domain / application / infrastructure / query / web / bootstrap + 测试）更新 import；③ `PolicyArchitectureTest` `@Override` 启用 `portShouldNotContainFlatClasses` 并转绿作为验收标志。**已立独立 harness 任务 m6-910 承接**，勿在无关联任务中顺手改。
+    - 🔴 **可复用判据**：「**目录重构 ≠ 包重构**」—— 凡以 ArchUnit 断言包结构的规约，**必须核对 `package` 声明而非目录树**；`git mv` 只搬文件、不换包名。
 
 ---
 

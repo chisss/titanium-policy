@@ -152,6 +152,13 @@ public record InsuredPartyList(
      * {@code customerId} 引用 customer 域客户主数据（单一事实来源）；姓名/证件为出单时点快照，
      * 便于展示与留痕，权威值以 customerId 指向的主数据为准。
      * </p>
+     * <p>
+     * 🔴 <b>本类即「保单为客户信息时点快照」的落地点，不订阅客户主题（2026-09-14 m6-908 判定）</b>：
+     * 姓名/证件/年龄/性别是<b>合同要素</b>且年龄性别参与费率计算，客户主数据变更后<b>不得静默改写</b>；
+     * 变更须走<b>保全批改</b>（{@code PolicyMaintenanceFieldExecutor} 体系，有字段码、有留痕、可审核）。
+     * 故 {@code customer-created/updated/status-changed/relationship-added} 四主题均不接入 policy，
+     * 判定依据见 {@code docs/技术文档/跨域事件目录-2026-09.md} §六.16。
+     * </p>
      */
     public record HolderInfo(
                              /*
