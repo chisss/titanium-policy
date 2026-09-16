@@ -54,8 +54,14 @@ public interface ProposalWebMapper {
      * <p>
      * 意向保额/意向保费与币种组装为 {@code Money}；DTO 未承载的字段留空。
      * </p>
+     * <p>
+     * 🔴 <b>留空的具体后果</b>：{@code CreateProposalRequest} 不含参与方与标的字段，故此处回落到
+     * {@code CreateProposalCommand} 的兼容构造器，{@code insuredPartyList}/{@code proposalSubjects}/{@code proposalLines}
+     * 均被置 {@code null}，聚合内两张清单初始化为空表 —— 该意向单因此<b>恒不可提交</b>
+     * （提交前置为「≥1 申请人 + ≥1 标的」）。详见台账 D-501-01 与 {@code ProposalApi} 类注释。
+     * </p>
      *
-     * @param dto 创建投保意向单 DTO
+     * @param dto 创建投保意向单请求（草稿级，不含参与方与标的）
      * @param tenantId 租户ID（请求头）
      * @return 创建投保意向单命令
      */
