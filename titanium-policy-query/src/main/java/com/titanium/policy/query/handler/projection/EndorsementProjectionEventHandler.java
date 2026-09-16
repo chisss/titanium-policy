@@ -7,6 +7,7 @@ import java.util.List;
 import org.axonframework.config.ProcessingGroup;
 import org.axonframework.eventhandling.EventHandler;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.titanium.common.jpa.BasePersistable;
@@ -57,7 +58,7 @@ public class EndorsementProjectionEventHandler {
      * 投影批改事件：写批单流水 + 刷新保单读模型版本
      */
     @EventHandler
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void on(PolicyEndorsedEvent event) {
         log.info("[读模型投影] 保单批改: policyId={}, endorsementNo={}, type={}", event.policyId(),
                 event.endorsementNo(), event.updateType().getCode());
@@ -82,7 +83,7 @@ public class EndorsementProjectionEventHandler {
 
     /** 投影正式保全应用事件：批单、业务版本和实际字段在同一事务刷新。 */
     @EventHandler
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void on(PolicyMaintenanceAppliedEvent event) {
         log.info("[读模型投影] Policy 保全应用: policyId={}, endorsementNo={}, requestId={}",
                 event.policyId(), event.endorsementNo(), event.requestId());
@@ -113,7 +114,7 @@ public class EndorsementProjectionEventHandler {
 
     /** 投影状态类保全的统一批单、版本和字段实际值。 */
     @EventHandler
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void on(PolicyMaintenanceStateAppliedEvent event) {
         log.info("[读模型投影] Policy 状态保全应用: policyId={}, endorsementNo={}, action={}",
                 event.policyId(), event.endorsementNo(), event.stateAction());

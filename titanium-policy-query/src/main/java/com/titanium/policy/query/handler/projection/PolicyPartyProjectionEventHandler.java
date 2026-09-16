@@ -7,6 +7,7 @@ import java.util.List;
 import org.axonframework.config.ProcessingGroup;
 import org.axonframework.eventhandling.EventHandler;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.titanium.policy.entity.insurance.InsuredPartyList;
@@ -46,7 +47,7 @@ public class PolicyPartyProjectionEventHandler {
      * 投影保单创建事件：拆解参与方清单，写入被保险人/受益人读模型
      */
     @EventHandler
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void on(PolicyCreatedEvent event) {
         InsuredPartyList partyList = event.insuredPartyList();
         if (partyList == null) {

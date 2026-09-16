@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import org.axonframework.config.ProcessingGroup;
 import org.axonframework.eventhandling.EventHandler;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.titanium.common.jpa.BasePersistable;
@@ -39,7 +40,7 @@ public class AnnuityPayoutPlanProjectionEventHandler {
      * 投影年金给付期启动事件：建立初始给付计划（已给付 0 期、状态给付中）
      */
     @EventHandler
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void on(AnnuityPayoutStartedEvent event) {
         log.info("[年金给付投影] 启动给付期: policyId={}, frequency={}", event.policyId(), event.frequency());
         AnnuityPayoutPlanView view = annuityRepository.findById(event.policyId())
@@ -59,7 +60,7 @@ public class AnnuityPayoutPlanProjectionEventHandler {
      * 投影年金逐期给付事件：推进已给付期数、下一给付日与给付状态
      */
     @EventHandler
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void on(AnnuityBenefitPaidEvent event) {
         log.info("[年金给付投影] 给付一期: policyId={}, 第{}期, status={}", event.policyId(), event.installmentNo(),
                 event.status());

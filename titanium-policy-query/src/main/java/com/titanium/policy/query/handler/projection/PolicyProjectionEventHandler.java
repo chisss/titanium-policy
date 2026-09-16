@@ -8,6 +8,7 @@ import java.util.function.Consumer;
 import org.axonframework.config.ProcessingGroup;
 import org.axonframework.eventhandling.EventHandler;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.titanium.common.jpa.BasePersistable;
@@ -66,7 +67,7 @@ public class PolicyProjectionEventHandler {
      * 投影保单创建事件：新建读模型记录
      */
     @EventHandler
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void on(PolicyCreatedEvent event) {
         log.info("[读模型投影] 保单创建: policyId={}, tenantId={}", event.policyId(), event.tenantId());
 
@@ -121,7 +122,7 @@ public class PolicyProjectionEventHandler {
      * 投影保单签发事件：记录签发时间
      */
     @EventHandler
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void on(PolicyIssuedEvent event) {
         applyUpdate(event.policyId(), event.tenantId(), "保单签发", view -> view.setIssueTime(event.issueTime()));
     }
@@ -130,7 +131,7 @@ public class PolicyProjectionEventHandler {
      * 投影保单生效事件
      */
     @EventHandler
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void on(PolicyActivatedEvent event) {
         applyStatus(event.policyId(), event.tenantId(), PolicyStatusCode.EFFECTIVE);
     }
@@ -139,7 +140,7 @@ public class PolicyProjectionEventHandler {
      * 投影保单暂停事件
      */
     @EventHandler
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void on(PolicySuspendedEvent event) {
         applyStatus(event.policyId(), event.tenantId(), PolicyStatusCode.SUSPENDED);
     }
@@ -148,7 +149,7 @@ public class PolicyProjectionEventHandler {
      * 投影保单恢复事件
      */
     @EventHandler
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void on(PolicyResumedEvent event) {
         applyStatus(event.policyId(), event.tenantId(), PolicyStatusCode.EFFECTIVE);
     }
@@ -157,7 +158,7 @@ public class PolicyProjectionEventHandler {
      * 投影保单终止事件
      */
     @EventHandler
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void on(PolicyTerminatedEvent event) {
         applyStatus(event.policyId(), event.tenantId(), PolicyStatusCode.TERMINATED);
     }
@@ -166,7 +167,7 @@ public class PolicyProjectionEventHandler {
      * 投影保单到期事件
      */
     @EventHandler
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void on(PolicyExpiredEvent event) {
         applyStatus(event.policyId(), event.tenantId(), PolicyStatusCode.EXPIRED);
     }
@@ -175,7 +176,7 @@ public class PolicyProjectionEventHandler {
      * 投影保单失效事件（宽限期满未缴费）
      */
     @EventHandler
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void on(PolicyLapsedEvent event) {
         applyStatus(event.policyId(), event.tenantId(), PolicyStatusCode.LAPSED);
     }
@@ -184,14 +185,14 @@ public class PolicyProjectionEventHandler {
      * 投影保单复效事件（补缴+核保通过后恢复生效）
      */
     @EventHandler
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void on(PolicyReinstatedEvent event) {
         applyStatus(event.policyId(), event.tenantId(), PolicyStatusCode.EFFECTIVE);
     }
 
     /** 状态类保全以统一权威事件刷新保单状态读模型。 */
     @EventHandler
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void on(PolicyMaintenanceStateAppliedEvent event) {
         applyStatus(event.policyId(), event.tenantId(), event.statusAfter());
     }
@@ -200,7 +201,7 @@ public class PolicyProjectionEventHandler {
      * 投影保单取消事件
      */
     @EventHandler
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void on(PolicyCancelledEvent event) {
         applyStatus(event.policyId(), event.tenantId(), PolicyStatusCode.CANCELLED);
     }
@@ -209,7 +210,7 @@ public class PolicyProjectionEventHandler {
      * 投影保单满期给付事件：记录满期金并将状态置为满期（EXPIRED）
      */
     @EventHandler
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void on(PolicyMaturedEvent event) {
         log.info("[读模型投影] 保单满期给付: policyId={}, 满期金={}", event.policyId(), event.maturityBenefit());
         applyUpdate(event.policyId(), event.tenantId(), "满期给付", view -> {
@@ -222,7 +223,7 @@ public class PolicyProjectionEventHandler {
      * 投影保费豁免事件：标记后续保费豁免，保单状态不变（持续有效）
      */
     @EventHandler
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void on(PremiumWaivedEvent event) {
         log.info("[读模型投影] 保费豁免: policyId={}, 原因={}", event.policyId(), event.reason());
         applyUpdate(event.policyId(), event.tenantId(), "保费豁免", view -> {
@@ -235,7 +236,7 @@ public class PolicyProjectionEventHandler {
      * 投影红利派发事件：按累计红利刷新读模型（红利派发不改保单状态）
      */
     @EventHandler
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void on(DividendDistributedEvent event) {
         log.info("[读模型投影] 红利派发: policyId={}, 累计红利={}", event.policyId(), event.accumulatedDividend());
         applyUpdate(event.policyId(), event.tenantId(), "红利派发", view -> {
@@ -245,7 +246,7 @@ public class PolicyProjectionEventHandler {
     }
 
     @EventHandler
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void on(InvestmentAccountLinkedEvent event) {
         log.info("[读模型投影] 投资账户挂接: policyId={}, accountId={}", event.policyId(),
                 event.investmentAccountId());
@@ -254,7 +255,7 @@ public class PolicyProjectionEventHandler {
     }
 
     @EventHandler
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void on(AccountValueUpdatedEvent event) {
         log.info("[读模型投影] 投资账户价值回写: policyId={}, accountId={}, 账户价值={}", event.policyId(),
                 event.accountId(), event.accountValue());

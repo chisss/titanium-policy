@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 import org.axonframework.config.ProcessingGroup;
 import org.axonframework.eventhandling.EventHandler;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.titanium.common.jpa.BasePersistable;
@@ -45,7 +46,7 @@ public class PolicyCollectionProjectionEventHandler {
      * 投影保单创建事件：落地收费方式与应收金额（免支付在出单时即为已收讫状态）。
      */
     @EventHandler
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void on(PolicyCreatedEvent event) {
         CollectionInfo collectionInfo = event.collectionInfo();
         if (collectionInfo == null) {
@@ -77,7 +78,7 @@ public class PolicyCollectionProjectionEventHandler {
      * 投影收费单据关联事件：回填真实账单ID与支付单ID。
      */
     @EventHandler
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void on(PremiumBillingAssociatedEvent event) {
         PolicyCollectionView view = policyCollectionViewRepository.findById(event.policyId())
                 .orElseThrow(() -> new IllegalStateException("收费投影缺少保单创建基线: policyId="
@@ -95,7 +96,7 @@ public class PolicyCollectionProjectionEventHandler {
      * 投影保费收讫事件：累计实收并推进收讫状态，同步保单主表冗余列。
      */
     @EventHandler
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void on(PremiumCollectedEvent event) {
         policyCollectionViewRepository.findById(event.policyId()).ifPresentOrElse(view -> {
             view.setCollectedAmount(amount(event.accumulatedAmount()));

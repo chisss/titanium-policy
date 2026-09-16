@@ -7,6 +7,7 @@ import java.util.List;
 import org.axonframework.config.ProcessingGroup;
 import org.axonframework.eventhandling.EventHandler;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.alibaba.fastjson2.JSON;
@@ -63,7 +64,7 @@ public class PolicyLineProjectionEventHandler {
      * 投影保单创建事件：拆解险种段列表，逐段落地段行、条款行、标的行、责任行。
      */
     @EventHandler
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void on(PolicyCreatedEvent event) {
         List<PolicyProduct> lines = event.policyProducts();
         if (lines == null || lines.isEmpty()) {

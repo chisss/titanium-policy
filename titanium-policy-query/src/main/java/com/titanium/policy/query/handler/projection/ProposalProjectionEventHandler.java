@@ -6,6 +6,7 @@ import java.util.function.Consumer;
 import org.axonframework.config.ProcessingGroup;
 import org.axonframework.eventhandling.EventHandler;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.titanium.common.jpa.BasePersistable;
@@ -50,7 +51,7 @@ public class ProposalProjectionEventHandler {
      * 投影意向单创建事件：新建读模型记录，初始状态 DRAFT
      */
     @EventHandler
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void on(ProposalCreatedEvent event) {
         log.info("[读模型投影] 意向单创建: proposalId={}, tenantId={}", event.proposalId(), event.tenantId());
 
@@ -84,7 +85,7 @@ public class ProposalProjectionEventHandler {
      * 投影意向单提交事件：状态置为已提交
      */
     @EventHandler
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void on(ProposalSubmittedEvent event) {
         applyUpdate(event.proposalId(), event.tenantId(), "意向单提交",
                 view -> view.setStatus(ProposalStatusCode.SUBMITTED));
@@ -94,7 +95,7 @@ public class ProposalProjectionEventHandler {
      * 投影意向单转投保单事件：状态置为已转投保单
      */
     @EventHandler
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void on(ProposalConvertedEvent event) {
         applyUpdate(event.proposalId(), event.tenantId(), "意向单转投保单",
                 view -> view.setStatus(ProposalStatusCode.CONVERTED_TO_APPLICATION));
@@ -104,7 +105,7 @@ public class ProposalProjectionEventHandler {
      * 投影意向单作废事件：状态置为作废
      */
     @EventHandler
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void on(ProposalVoidedEvent event) {
         applyUpdate(event.proposalId(), event.tenantId(), "意向单作废",
                 view -> view.setStatus(ProposalStatusCode.VOIDED));

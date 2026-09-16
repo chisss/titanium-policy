@@ -7,6 +7,7 @@ import java.util.function.Consumer;
 import org.axonframework.config.ProcessingGroup;
 import org.axonframework.eventhandling.EventHandler;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.titanium.metadata.enums.underwriting.UnderwritingEnum.ConclusionType;
@@ -35,7 +36,7 @@ public class IssuanceProgressProjectionEventHandler {
     private final IssuanceProgressViewRepository repository;
 
     @EventHandler
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void on(InsuranceCreatedEvent event) {
         if (hasNoIssuanceKey(event.bizNo())) {
             return;
@@ -51,7 +52,7 @@ public class IssuanceProgressProjectionEventHandler {
     }
 
     @EventHandler
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void on(InsuranceSubmittedForUnderwritingEvent event) {
         if (hasNoIssuanceKey(event.bizNo())) {
             return;
@@ -63,7 +64,7 @@ public class IssuanceProgressProjectionEventHandler {
     }
 
     @EventHandler
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void on(UnderwritingResultReceivedEvent event) {
         if (hasNoIssuanceKey(event.bizNo())) {
             return;
@@ -82,7 +83,7 @@ public class IssuanceProgressProjectionEventHandler {
     }
 
     @EventHandler
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void on(PolicyCreatedEvent event) {
         if (hasNoIssuanceKey(event.bizNo())) {
             return;
@@ -102,7 +103,7 @@ public class IssuanceProgressProjectionEventHandler {
     }
 
     @EventHandler
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void on(PremiumBillingAssociatedEvent event) {
         if (hasNoIssuanceKey(event.bizNo())) {
             return;
@@ -118,7 +119,7 @@ public class IssuanceProgressProjectionEventHandler {
     }
 
     @EventHandler
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void on(PolicyActivatedEvent event) {
         if (hasNoIssuanceKey(event.bizNo())) {
             return;

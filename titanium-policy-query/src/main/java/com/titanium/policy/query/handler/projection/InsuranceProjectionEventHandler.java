@@ -6,6 +6,7 @@ import java.util.function.Consumer;
 import org.axonframework.config.ProcessingGroup;
 import org.axonframework.eventhandling.EventHandler;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.titanium.common.jpa.BasePersistable;
@@ -14,6 +15,7 @@ import com.titanium.metadata.enums.product.ProductEnum.PaymentFrequency;
 import com.titanium.metadata.enums.underwriting.UnderwritingEnum.ConclusionType;
 import com.titanium.policy.common.enums.InsuranceStatusCode;
 import com.titanium.policy.entity.insurance.InsuranceLine;
+import com.titanium.policy.event.PolicyCreatedEvent;
 import com.titanium.policy.event.insurance.InsuranceCreatedEvent;
 import com.titanium.policy.event.insurance.InsuranceIssuedEvent;
 import com.titanium.policy.event.insurance.InsuranceSubmittedForUnderwritingEvent;
@@ -53,7 +55,7 @@ public class InsuranceProjectionEventHandler {
      * 投影投保单创建事件：新建读模型记录，初始状态 DRAFT
      */
     @EventHandler
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void on(InsuranceCreatedEvent event) {
         log.info("[读模型投影] 投保单创建: insuranceId={}, tenantId={}", event.insuranceId(), event.tenantId());
 
@@ -95,7 +97,7 @@ public class InsuranceProjectionEventHandler {
      * 投影提交核保事件：状态置为核保中，补齐币种
      */
     @EventHandler
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void on(InsuranceSubmittedForUnderwritingEvent event) {
         applyUpdate(event.insuranceId(), event.tenantId(), "提交核保", view -> {
             view.setStatus(InsuranceStatusCode.UNDERWRITING);
@@ -107,7 +109,7 @@ public class InsuranceProjectionEventHandler {
      * 投影核保结果回流事件：记录核保结论并映射投保单状态
      */
     @EventHandler
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void on(UnderwritingResultReceivedEvent event) {
         applyUpdate(event.insuranceId(), event.tenantId(), "核保结果回流", view -> {
             view.setUnderwritingId(event.underwritingId());
@@ -120,12 +122,36 @@ public class InsuranceProjectionEventHandler {
      * 投影承保出单事件：状态置为已承保并记录承保时间
      */
     @EventHandler
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void on(InsuranceIssuedEvent event) {
         applyUpdate(event.insuranceId(), event.tenantId(), "承保出单", view -> {
             view.setStatus(InsuranceStatusCode.ISSUED);
             view.setIssuedTime(event.issuedTime());
         });
+    }
+
+    /**
+     * 投影保单创建事件：回写投保单读模型的<b>总保费</b>（D-501-40）
+     * <p>
+     * 🔴 <b>为何由跨聚合事件回写</b>：投保单转单时（{@code ProposalIssuanceSaga}）保费尚未计算，命令只能传
+     * {@code exactPremium=null}，故 {@link InsuranceCreatedEvent} 的该字段<b>恒空</b>；而核保结果、承保出单两个
+     * 事件同样不携带保费 ⇒ {@code t_insurance_view.exact_premium} 自创建起<b>永久为空</b>，后台「投保单查询」
+     * 列表的总保费列恒显示 {@code -}。真实保费在出单时由定价链路算出并随 {@link PolicyCreatedEvent#premium()}
+     * 落库（同源的 {@code t_issuance_progress.payable_premium} 有值即为佐证），故在该事件上补一次回写——
+     * <b>不是「算不出」，是「链路没接上」</b>。
+     * </p>
+     * <p>
+     * 一步出单无投保单（{@code insuranceId} 为空）时直接跳过，避免无谓的「未找到读模型记录」告警噪音。
+     * </p>
+     */
+    @EventHandler
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void on(PolicyCreatedEvent event) {
+        if (event.insuranceId() == null || event.premium() == null) {
+            return;
+        }
+        applyUpdate(event.insuranceId(), event.tenantId(), "保单创建回写总保费",
+                view -> view.setExactPremium(event.premium().value()));
     }
 
     /**

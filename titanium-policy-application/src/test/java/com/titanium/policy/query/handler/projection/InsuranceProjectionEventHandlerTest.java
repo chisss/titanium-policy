@@ -3,6 +3,7 @@ package com.titanium.policy.query.handler.projection;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
@@ -22,6 +23,7 @@ import com.titanium.metadata.enums.product.ProductEnum.ProductCategory;
 import com.titanium.metadata.enums.product.ProductEnum.SalesChannel;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.entity.insurance.InsuranceLine;
+import com.titanium.policy.event.PolicyCreatedEvent;
 import com.titanium.policy.event.insurance.InsuranceCreatedEvent;
 import com.titanium.policy.query.mapper.InsuranceViewMapper;
 import com.titanium.policy.query.mapper.InsuranceViewMapperImpl;
@@ -133,5 +135,54 @@ class InsuranceProjectionEventHandlerTest {
         assertEquals(PaymentFrequency.ANNUAL, projected.getPaymentFrequency());
         assertEquals(20, projected.getPremiumPaymentYears());
         assertEquals(1, projected.getLineCount());
+    }
+
+    /**
+     * D-501-40：投保单转单时保费尚未计算，{@code InsuranceCreatedEvent.exactPremium} 恒空，
+     * 真实保费须由出单完成的 {@code PolicyCreatedEvent.premium()} 回写，否则后台列表总保费列恒显示 {@code -}。
+     */
+    @Test
+    void writesTotalPremiumFromPolicyCreatedEvent() {
+        InsuranceViewRepository repository = mock(InsuranceViewRepository.class);
+        InsuranceViewMapper mapper = new InsuranceViewMapperImpl();
+        when(repository.findByInsuranceIdAndTenantId("INSURANCE_001", "TENANT_001"))
+                .thenReturn(Optional.of(new InsuranceView()));
+
+        new InsuranceProjectionEventHandler(repository, mapper)
+                .on(policyCreatedEvent("INSURANCE_001", Money.of(new BigDecimal("1500.00"), "CNY")));
+
+        ArgumentCaptor<InsuranceView> captor = ArgumentCaptor.forClass(InsuranceView.class);
+        verify(repository).save(captor.capture());
+        assertEquals(new BigDecimal("1500.00"), captor.getValue().getExactPremium());
+    }
+
+    @Test
+    void ignoresPolicyCreatedEventOfDirectIssuanceWithoutInsuranceId() {
+        InsuranceViewRepository repository = mock(InsuranceViewRepository.class);
+        InsuranceViewMapper mapper = new InsuranceViewMapperImpl();
+
+        new InsuranceProjectionEventHandler(repository, mapper)
+                .on(policyCreatedEvent(null, Money.of(new BigDecimal("1500.00"), "CNY")));
+
+        verifyNoInteractions(repository);
+    }
+
+    @Test
+    void ignoresPolicyCreatedEventWithoutPremium() {
+        InsuranceViewRepository repository = mock(InsuranceViewRepository.class);
+        InsuranceViewMapper mapper = new InsuranceViewMapperImpl();
+
+        new InsuranceProjectionEventHandler(repository, mapper).on(policyCreatedEvent("INSURANCE_001", null));
+
+        verifyNoInteractions(repository);
+    }
+
+    /**
+     * 构造保单创建事件：仅保费与关联投保单ID对本用例有意义，其余字段留空。
+     */
+    private PolicyCreatedEvent policyCreatedEvent(String insuranceId, Money premium) {
+        return new PolicyCreatedEvent("POLICY_001", null, PolicyForm.INDIVIDUAL, "PRODUCT_001", insuranceId,
+                "PROPOSAL_001", null, null, null, null, null, premium, null, List.of(), null, null, null, null, null,
+                null, "TENANT_001");
     }
 }

@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import org.axonframework.config.ProcessingGroup;
 import org.axonframework.eventhandling.EventHandler;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.titanium.policy.event.SubPolicyLinkedEvent;
@@ -34,7 +35,7 @@ public class PolicyRelationProjectionEventHandler {
      * 投影子保单挂载事件到父子关系读模型
      */
     @EventHandler
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void on(SubPolicyLinkedEvent event) {
         log.info("[父子关系投影] 挂载子保单: parent={}, child={}", event.parentPolicyId(), event.childPolicyId());
         PolicyRelationView view = relationRepository.findById(event.childPolicyId())
