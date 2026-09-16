@@ -420,6 +420,11 @@ public class PolicyQueryServiceImpl implements PolicyQueryService {
                 PolicyEnum.PolicyStatus statusEnum = PolicyEnum.PolicyStatus.fromCode(status);
                 if (statusEnum != null) {
                     predicates.add(cb.equal(root.get("policyStatus"), statusEnum));
+                } else {
+                    // 🔴 未知码 ⇒ 空集（D-501-66）：静默丢弃条件会返回全表，
+                    // 界面表现为「按某状态筛选却列出全部」，比报错更隐蔽
+                    log.warn("[保单查询] 状态码未识别，按空集返回: status={}", status);
+                    predicates.add(cb.disjunction());
                 }
             }
             if (effectiveDateStart != null) {
