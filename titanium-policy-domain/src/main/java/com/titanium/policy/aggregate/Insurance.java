@@ -158,14 +158,40 @@ public class Insurance extends BaseAggregate {
     @CommandHandler
     public void handle(ReceiveUnderwritingResultCommand command) {
         requireSameTenant(command.tenantId());
+        UnderwritingResult result = command.underwritingResult();
         if (this.status.statusCode() != InsuranceStatusCode.UNDERWRITING) {
+            // 🔴 幂等分支（D-501-15）：跨域事件的重投与迟到是分布式常态（消费者重启、位点回退、
+            // 上游重发），同一份结论再次到达时状态已越过 UNDERWRITING。此时「已按同一核保单号落过
+            // 同一结论」是重投而非非法调用，按幂等成功处理（不发事件、不改状态）。
+            // 修复前一律抛异常，异常逃逸到消费端后零间隔重试 10 次仍无法自愈，最终消息被静默丢弃。
+            if (isRedeliveredResult(result)) {
+                return;
+            }
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION",
                     "Only applications in underwriting can receive results");
         }
-        UnderwritingResult result = command.underwritingResult();
         AggregateLifecycle.apply(new UnderwritingResultReceivedEvent(this.insuranceId, result.underwritingId(),
                 result.resultCode(), result.underwritingOpinion(), result.underwriterId(), result.underwritingTime(),
                 result.condition(), this.tenantId, result.extraPremiumRatio(), this.bizNo));
+    }
+
+    /**
+     * 判定本次结论是否为已落库同一结论的重投/迟到投递。
+     * <p>
+     * 判据是「核保单号一致 <b>且</b> 结论一致」：前者标识同一份核保决定，后者确认结论未被改判。
+     * 二者缺一即非重投——例如同一投保单换了新的核保单号（重新核保），或同号结论被上游改判，
+     * 都属需要暴露的真实异常，不得按幂等静默吞掉。
+     * </p>
+     *
+     * @param incoming 本次到达的核保结论
+     * @return 属重投返回 {@code true}
+     */
+    private boolean isRedeliveredResult(UnderwritingResult incoming) {
+        return incoming != null
+                && incoming.underwritingId() != null
+                && this.underwritingResult != null
+                && incoming.underwritingId().equals(this.underwritingResult.underwritingId())
+                && incoming.resultCode() == this.underwritingResult.resultCode();
     }
 
     /**
