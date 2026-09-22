@@ -8,6 +8,7 @@ import java.util.Optional;
 import org.axonframework.modelling.command.AggregateStreamCreationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -55,6 +56,57 @@ public class PolicyExceptionHandler {
             "BUSINESS_RULE_VIOLATION", PolicyErrorCode.POLICY_RULE_VIOLATION,
             "ILLEGAL_STATE_TRANSITION", PolicyErrorCode.POLICY_STATUS_TRANSITION_ILLEGAL,
             "POLICY_FIELD_CATALOG_INVALID", SystemErrorCode.PARAM_INVALID);
+
+    /** 规范化租户头名（与 {@code TenantApiInterceptor}、{@code TenantFeignRequestInterceptor} 一致） */
+    private static final String TENANT_HEADER = "X-Tenant-Id";
+
+    /**
+     * 「按 id 取详情」未命中时的统一拒绝（R8-05）。
+     * <p>
+     * 🔴 <b>为何文案把两种成因合二为一</b>：读模型查询一律带租户维度
+     * （{@code findByXxxIdAndTenantId}），未命中时无法区分「该 id 根本不存在」与
+     * 「存在但不属于当前租户」。这两种成因**不得分开报**——分开即等于提供侧信道：
+     * 攻击者可逐个枚举 id，凭 403/404 的差异探测哪些 id 在别处真实存在。
+     * 故隔离行为维持不变（仍是 404 + 相同的 body），只把「排除法线索」明说出来。</p>
+     * <p>
+     * 🔴 <b>为何不能继续返回空 body</b>：调用方（admin BFF）拿不到任何线索，只能回落到
+     * 硬编码的「资源不存在」，运维据此排查时无从分辨「id 拼错了」与「租户错配」；
+     * 而这两者的处置完全不同（前者改请求，后者查租户上下文）。</p>
+     *
+     * @param errorCode  本域 {@code *_NOT_EXIST} 业务码（statusFor 据此映射 404）
+     * @param resourceId 请求的资源标识，回显以便与调用方手上的 id 直接对照
+     */
+    public static DomainException notFoundInTenant(BaseErrorCode errorCode, String resourceId) {
+        return new DomainException(errorCode,
+                errorCode.getMessage() + "，或不在当前租户可见范围内: " + resourceId);
+    }
+
+    /**
+     * 处理请求头缺失异常（R8-05）。
+     * <p>
+     * 🔴 <b>此前缺 {@code X-Tenant-Id} 会得到 500</b>：{@code @RequestHeader} 缺失时 Spring 抛
+     * {@link MissingRequestHeaderException}，本类无对应处理器，被下面的
+     * {@code @ExceptionHandler(Exception.class)} 兜成 500 + SYSTEM_ERROR
+     * （实测响应体 {@code {"code":"10000000","message":"Required request header 'X-Tenant-Id' ..."}}）。
+     * 调用方看到 500 会去查服务端故障，而真相是**自己的请求少了个头**。</p>
+     * <p>
+     * 🔴 <b>为何 {@code statusFor} 里早有 TENANT_HEADER_MISSING → 400 却仍发生</b>：那行映射此前的
+     * 唯一经由是 {@code TenantApiInterceptor}（抛 {@code DomainException(TENANT_HEADER_MISSING)}），
+     * 而该拦截器只挂在 {@code /api/v1/**}（Feign 契约入口）与 {@code /admin/**}，
+     * <b>不覆盖 {@code /web/v1/**}</b>——前端入口因此从来走不到那条映射。本处理器把这条缺口补上，
+     * 使两个入口对同一个缺失头给出同样的 400 + TENANT_HEADER_MISSING。</p>
+     * <p>
+     * 缺其它头（{@code X-Operator-Id} 等）归为参数错误 400 + PARAM_INVALID。
+     * </p>
+     */
+    @ExceptionHandler(MissingRequestHeaderException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMissingRequestHeader(MissingRequestHeaderException exception) {
+        BaseErrorCode errorCode = TENANT_HEADER.equalsIgnoreCase(exception.getHeaderName())
+                ? SystemErrorCode.TENANT_HEADER_MISSING
+                : SystemErrorCode.PARAM_INVALID;
+        return ResponseEntity.status(statusFor(errorCode))
+                .body(ApiResponse.error(errorCode, exception.getMessage()));
+    }
 
     /**
      * 处理领域异常（业务规则违反、状态流转非法、字段目录校验等，均继承 {@link DomainException}）

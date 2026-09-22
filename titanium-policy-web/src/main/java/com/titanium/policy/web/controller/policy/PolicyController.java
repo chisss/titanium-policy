@@ -1,9 +1,11 @@
 package com.titanium.policy.web.controller.policy;
 
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.data.domain.Page;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,6 +18,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.titanium.metadata.errorcode.PolicyErrorCode;
+import com.titanium.metadata.exception.DomainException;
 import com.titanium.policy.api.response.policy.PolicyStatisticsResponse;
 import com.titanium.policy.application.command.policy.PolicyApplicationService;
 import com.titanium.policy.application.query.PolicyAppQueryService;
@@ -40,6 +44,7 @@ import com.titanium.policy.web.dto.maintenance.StartAnnuityPayoutDTO;
 import com.titanium.policy.web.dto.maintenance.TerminatePolicyDTO;
 import com.titanium.policy.web.dto.maintenance.WaivePremiumDTO;
 import com.titanium.policy.web.dto.policy.PolicyReasonDTO;
+import com.titanium.policy.web.handler.PolicyExceptionHandler;
 import com.titanium.policy.web.mapper.PolicyStatisticsWebMapper;
 import com.titanium.policy.web.mapper.PolicyWebMapper;
 import com.titanium.policy.web.response.policy.PolicyDetailVO;
@@ -104,6 +109,12 @@ public class PolicyController {
 
     /**
      * 获取保单详情
+     * <p>
+     * 🔴 未命中时抛 {@link DomainException} 而非返回空 body 的 404（R8-05）：读模型按
+     * {@code policyId + tenantId} 查，查不到既可能是「保单不存在」也可能是「租户错配」，
+     * 空 body 让调用方无从分辨；文案由 {@link PolicyExceptionHandler#notFoundInTenant} 统一给出，
+     * 两种成因仍合并表述（分开报会成为探测 id 是否存在的侧信道）。
+     * </p>
      *
      * @param policyId 保单ID
      * @param tenantId 租户ID
@@ -113,7 +124,8 @@ public class PolicyController {
     public ResponseEntity<PolicyDetailVO> getPolicy(@PathVariable("policyId") String policyId,
                                                     @RequestHeader("X-Tenant-Id") String tenantId) {
         return policyAppQueryService.findById(new FindPolicyByIdQuery(policyId, tenantId)).map(policyWebMapper::toVO)
-                .map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
+                .map(ResponseEntity::ok)
+                .orElseThrow(() -> PolicyExceptionHandler.notFoundInTenant(PolicyErrorCode.POLICY_NOT_EXIST, policyId));
     }
 
     /**
@@ -166,17 +178,33 @@ public class PolicyController {
             @RequestParam(value = "insuredName", required = false) String insuredName,
             @RequestParam(value = "productCode", required = false) String productCode,
             @RequestParam(value = "status", required = false) String status,
+            @RequestParam(value = "effectiveDateStart", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime effectiveDateStart,
+            @RequestParam(value = "effectiveDateEnd", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime effectiveDateEnd,
+            @RequestParam(value = "expiryDateStart", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime expiryDateStart,
+            @RequestParam(value = "expiryDateEnd", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime expiryDateEnd,
             @RequestParam(value = "page", defaultValue = "0") int page,
             @RequestParam(value = "size", defaultValue = "10") int size,
             @RequestHeader("X-Tenant-Id") String tenantId) {
         List<PolicyDetailVO> policies = policyAppQueryService
-                .findByConditions(policyNo, policyHolderName, insuredName, productCode, status, tenantId, page, size)
+                .findByConditions(policyNo, policyHolderName, insuredName, productCode, status,
+                        effectiveDateStart, effectiveDateEnd, expiryDateStart, expiryDateEnd, tenantId, page, size)
                 .stream().map(policyWebMapper::toVO).toList();
         return ResponseEntity.ok(policies);
     }
 
     /**
      * 多条件分页查询保单，返回完整分页元数据。
+     * <p>
+     * 生效/止期四个区间端点（{@code effectiveDateStart/End}、{@code expiryDateStart/End}）取
+     * ISO 日期时间串（如 {@code 2026-09-01T00:00:00}），由前端「高级搜索」的日期区间展开为两键传入；
+     * 传空即不参与过滤。读侧谓词早已就绪（{@code PolicyQueryServiceImpl#buildSpecification}），
+     * 此前断在本方法未声明这四个参数——下游 Spring 对未声明的查询参数**静默忽略**，
+     * 表现为「加了条件，条数不变、无任何报错」。
+     * </p>
      */
     @GetMapping("/page")
     public ResponseEntity<Page<PolicyDetailVO>> pagePolicies(
@@ -185,11 +213,20 @@ public class PolicyController {
             @RequestParam(value = "insuredName", required = false) String insuredName,
             @RequestParam(value = "productCode", required = false) String productCode,
             @RequestParam(value = "status", required = false) String status,
+            @RequestParam(value = "effectiveDateStart", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime effectiveDateStart,
+            @RequestParam(value = "effectiveDateEnd", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime effectiveDateEnd,
+            @RequestParam(value = "expiryDateStart", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime expiryDateStart,
+            @RequestParam(value = "expiryDateEnd", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime expiryDateEnd,
             @RequestParam(value = "page", defaultValue = "0") int page,
             @RequestParam(value = "size", defaultValue = "10") int size,
             @RequestHeader("X-Tenant-Id") String tenantId) {
         Page<PolicyDetailVO> policies = policyAppQueryService
-                .findPageByConditions(policyNo, policyHolderName, insuredName, productCode, status, tenantId, page, size)
+                .findPageByConditions(policyNo, policyHolderName, insuredName, productCode, status,
+                        effectiveDateStart, effectiveDateEnd, expiryDateStart, expiryDateEnd, tenantId, page, size)
                 .map(policyWebMapper::toVO);
         return ResponseEntity.ok(policies);
     }

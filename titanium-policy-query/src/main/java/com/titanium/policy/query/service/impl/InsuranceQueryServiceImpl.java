@@ -6,6 +6,7 @@ import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -65,7 +66,9 @@ public class InsuranceQueryServiceImpl implements InsuranceQueryService {
                                                                      String productId, String status, String tenantId,
                                                                      int page, int size) {
         Specification<InsuranceView> spec = buildSpec(insuranceNo, holderId, productId, status, tenantId);
-        Pageable pageable = PageRequest.of(Math.max(page, 0), size <= 0 ? 20 : size);
+        // 默认排序：创建时间倒序 + 主键第二排序键（同一秒创建的多行顺序仍然确定，分页不重不漏）
+        Sort sort = Sort.by(Sort.Direction.DESC, "createTime").and(Sort.by("insuranceId"));
+        Pageable pageable = PageRequest.of(Math.max(page, 0), size <= 0 ? 20 : size, sort);
         return insuranceViewRepository.findAll(spec, pageable).map(this::toQueryResult);
     }
 
@@ -92,7 +95,10 @@ public class InsuranceQueryServiceImpl implements InsuranceQueryService {
                     InsuranceStatusCode statusEnum = InsuranceStatusCode.valueOf(status);
                     predicates.add(cb.equal(root.get("status"), statusEnum));
                 } catch (IllegalArgumentException e) {
-                    log.warn("无效的投保单状态值: {}", status);
+                    // 🔴 未知码 ⇒ 空集（D-501-66）：静默丢弃条件会返回全表，
+                    // 界面表现为「按某状态筛选却列出全部」，比报错更隐蔽
+                    log.warn("[投保单查询] 状态码未识别，按空集返回: status={}", status);
+                    predicates.add(cb.disjunction());
                 }
             }
             return cb.and(predicates.toArray(new Predicate[0]));

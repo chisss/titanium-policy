@@ -16,10 +16,13 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.titanium.metadata.errorcode.PolicyErrorCode;
+import com.titanium.metadata.exception.DomainException;
 import com.titanium.policy.application.command.proposal.ProposalApplicationService;
 import com.titanium.policy.application.query.ProposalAppQueryService;
 import com.titanium.policy.command.CreateProposalCommand;
 import com.titanium.policy.web.dto.issuance.CreateProposalDTO;
+import com.titanium.policy.web.handler.PolicyExceptionHandler;
 import com.titanium.policy.web.mapper.ProposalWebMapper;
 import com.titanium.policy.web.response.proposal.ProposalVO;
 
@@ -65,6 +68,11 @@ public class ProposalController {
 
     /**
      * 获取投保意向单详情
+     * <p>
+     * 🔴 未命中时抛 {@link DomainException} 而非返回空 body 的 404（R8-05），同
+     * {@code PolicyController#getPolicy}：查不到既可能是「该意向单不存在」也可能是「租户错配」，
+     * 空 body 让调用方无从分辨；两种成因仍合并表述（分开报会成为探测 id 是否存在的侧信道）。
+     * </p>
      *
      * @param proposalId 投保意向单ID
      * @param tenantId 租户ID
@@ -75,7 +83,8 @@ public class ProposalController {
                                                   @RequestHeader("X-Tenant-Id") String tenantId) {
         Optional<ProposalVO> vo = proposalAppQueryService.findById(proposalId, tenantId)
                 .map(proposalWebMapper::toVO);
-        return vo.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
+        return vo.map(ResponseEntity::ok).orElseThrow(
+                () -> PolicyExceptionHandler.notFoundInTenant(PolicyErrorCode.PROPOSAL_NOT_EXIST, proposalId));
     }
 
     /**

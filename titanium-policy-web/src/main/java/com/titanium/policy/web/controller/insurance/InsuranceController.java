@@ -16,10 +16,13 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.titanium.metadata.errorcode.PolicyErrorCode;
+import com.titanium.metadata.exception.DomainException;
 import com.titanium.policy.application.command.insurance.InsuranceApplicationService;
 import com.titanium.policy.application.query.InsuranceAppQueryService;
 import com.titanium.policy.command.ConvertProposalToInsuranceCommand;
 import com.titanium.policy.web.dto.issuance.ConvertToInsuranceDTO;
+import com.titanium.policy.web.handler.PolicyExceptionHandler;
 import com.titanium.policy.web.mapper.InsuranceWebMapper;
 import com.titanium.policy.web.response.insurance.InsuranceVO;
 
@@ -66,6 +69,11 @@ public class InsuranceController {
 
     /**
      * 获取投保单详情
+     * <p>
+     * 🔴 未命中时抛 {@link DomainException} 而非返回空 body 的 404（R8-05），同
+     * {@code PolicyController#getPolicy}：查不到既可能是「该投保单不存在」也可能是「租户错配」，
+     * 空 body 让调用方无从分辨；两种成因仍合并表述（分开报会成为探测 id 是否存在的侧信道）。
+     * </p>
      *
      * @param insuranceId 投保单ID
      * @param tenantId 租户ID
@@ -76,7 +84,8 @@ public class InsuranceController {
                                                     @RequestHeader("X-Tenant-Id") String tenantId) {
         Optional<InsuranceVO> vo = insuranceAppQueryService.findById(insuranceId, tenantId)
                 .map(insuranceWebMapper::toVO);
-        return vo.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
+        return vo.map(ResponseEntity::ok).orElseThrow(
+                () -> PolicyExceptionHandler.notFoundInTenant(PolicyErrorCode.INSURANCE_NOT_EXIST, insuranceId));
     }
 
     /**

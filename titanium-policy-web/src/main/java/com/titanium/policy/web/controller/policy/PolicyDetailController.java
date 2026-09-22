@@ -11,12 +11,14 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.titanium.metadata.enums.customer.CustomerEnum.InsuranceRole;
+import com.titanium.metadata.errorcode.PolicyErrorCode;
 import com.titanium.policy.application.query.PolicyLineAppQueryService;
 import com.titanium.policy.query.result.PolicyCoverageQueryResult;
 import com.titanium.policy.query.result.PolicyFullDetailQueryResult;
 import com.titanium.policy.query.result.PolicyProductQueryResult;
 import com.titanium.policy.query.result.PolicyQueryResult;
 import com.titanium.policy.query.result.PolicySubjectQueryResult;
+import com.titanium.policy.web.handler.PolicyExceptionHandler;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -49,7 +51,7 @@ public class PolicyDetailController {
      *
      * @param policyId 保单ID
      * @param tenantId 租户ID
-     * @return 保单全景；保单不存在时 404
+     * @return 保单全景；保单不存在或不在当前租户可见范围内时 404（带业务码）
      */
     @Operation(summary = "保单全景查询", description = "一次返回保单全部维度，后台详情页专用")
     @GetMapping("/{policyId}/full-detail")
@@ -57,7 +59,7 @@ public class PolicyDetailController {
                                                                     @RequestHeader("X-Tenant-Id") String tenantId) {
         return policyLineAppQueryService.findFullDetail(policyId, tenantId)
                 .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+                .orElseThrow(() -> PolicyExceptionHandler.notFoundInTenant(PolicyErrorCode.POLICY_NOT_EXIST, policyId));
     }
 
     /**

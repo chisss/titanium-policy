@@ -1,6 +1,8 @@
 package com.titanium.policy.query.service.impl;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -55,6 +57,13 @@ import lombok.extern.slf4j.Slf4j;
 public class PolicyLineQueryServiceImpl implements PolicyLineQueryService {
 
     private static final String MAIN_PRODUCT_CATEGORY = "MAIN";
+
+    /**
+     * 默认排序：创建时间倒序 + 主键第二排序键（同一秒创建的多行顺序仍然确定，分页窗口落在确定顺序上）
+     */
+    private static final Comparator<PolicyView> CREATE_TIME_DESC_THEN_POLICY_ID = Comparator
+            .comparing(PolicyView::getCreateTime, Comparator.nullsLast(Comparator.<LocalDateTime>reverseOrder()))
+            .thenComparing(PolicyView::getPolicyId);
 
     private final PolicyViewRepository            policyViewRepository;
     private final PolicyProductViewRepository     policyProductViewRepository;
@@ -154,14 +163,19 @@ public class PolicyLineQueryServiceImpl implements PolicyLineQueryService {
         if (policyIds.isEmpty()) {
             return List.of();
         }
-        // 内存分页：单客户名下保单量级有限（个人客户通常 < 100 张），避免三源 union 的复杂分页 SQL
-        List<String> paged = policyIds.stream().skip((long) page * size).limit(size).toList();
-        List<PolicyQueryResult> results = new ArrayList<>();
-        for (String policyId : paged) {
-            policyViewRepository.findByPolicyIdAndTenantId(policyId, tenantId)
-                    .map(view -> assembleCustomerPolicy(view, tenantId))
-                    .ifPresent(results::add);
-        }
+        // 内存分页：单客户名下保单量级有限（个人客户通常 < 100 张），避免三源 union 的复杂分页 SQL。
+        // 🔴 三个角色的数据源各自无序，故先取回全部候选保单并按「创建时间倒序 + 主键第二排序键」显式排序，
+        // 再做 skip/limit —— 否则分页窗口落在无确定顺序的集合上，跨页会重复/漏行（正确性缺陷）。
+        List<PolicyView> orderedViews = policyIds.stream()
+                .map(policyId -> policyViewRepository.findByPolicyIdAndTenantId(policyId, tenantId))
+                .flatMap(Optional::stream)
+                .sorted(CREATE_TIME_DESC_THEN_POLICY_ID)
+                .toList();
+        List<PolicyQueryResult> results = orderedViews.stream()
+                .skip((long) page * size)
+                .limit(size)
+                .map(view -> assembleCustomerPolicy(view, tenantId))
+                .collect(Collectors.toCollection(ArrayList::new));
         log.info("按客户角色查保单: customerId={}, 角色={}, 命中={}, 返回={}", customerId, role, policyIds.size(),
                 results.size());
         return results;

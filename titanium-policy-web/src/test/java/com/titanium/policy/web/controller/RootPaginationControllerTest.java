@@ -3,8 +3,10 @@ package com.titanium.policy.web.controller;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
@@ -43,17 +45,43 @@ class RootPaginationControllerTest {
         PolicyWebMapper mapper = mock(PolicyWebMapper.class);
         PolicyQueryResult result = new PolicyQueryResult();
         PolicyDetailVO vo = new PolicyDetailVO();
-        when(queryService.findPageByConditions(null, null, null, null, null, TENANT_ID, 1, 10))
-                .thenReturn(new PageImpl<>(List.of(result), PageRequest.of(1, 10), 31));
+        when(queryService.findPageByConditions(null, null, null, null, null, null, null, null, null, TENANT_ID, 1,
+                10)).thenReturn(new PageImpl<>(List.of(result), PageRequest.of(1, 10), 31));
         when(mapper.toVO(result)).thenReturn(vo);
         PolicyController controller = new PolicyController(mock(PolicyApplicationService.class), queryService,
                 mapper, mock(PolicyStatisticsWebMapper.class));
 
-        ResponseEntity<Page<PolicyDetailVO>> response = controller.pagePolicies(null, null, null, null, null, 1, 10,
-                TENANT_ID);
+        ResponseEntity<Page<PolicyDetailVO>> response = controller.pagePolicies(null, null, null, null, null, null,
+                null, null, null, 1, 10, TENANT_ID);
 
         assertEquals(31, response.getBody().getTotalElements());
         assertSame(vo, response.getBody().getContent().getFirst());
+    }
+
+    /**
+     * 🔴 控制器四个日期区间必须透传到应用门面 —— 与门面层「不得写死 null」是**同族缺陷的两个位点**
+     * （控制器加参数却忘了传下去，同样表现为「加了日期条件、条数不变、无任何报错」）。
+     * 断言用 {@code verify} 逐参锁定，避免桩写宽松后恒绿。
+     */
+    @Test
+    void policyDateRangesArePassedThroughToQueryFacade() {
+        PolicyAppQueryService queryService = mock(PolicyAppQueryService.class);
+        PolicyWebMapper mapper = mock(PolicyWebMapper.class);
+        LocalDateTime effectiveStart = LocalDateTime.of(2026, 9, 1, 0, 0, 0);
+        LocalDateTime effectiveEnd = LocalDateTime.of(2026, 9, 30, 23, 59, 59);
+        LocalDateTime expiryStart = LocalDateTime.of(2027, 1, 1, 0, 0, 0);
+        LocalDateTime expiryEnd = LocalDateTime.of(2027, 12, 31, 23, 59, 59);
+        when(queryService.findPageByConditions("POL", null, null, null, null, effectiveStart, effectiveEnd,
+                expiryStart, expiryEnd, TENANT_ID, 0, 10))
+                .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 10), 0));
+        PolicyController controller = new PolicyController(mock(PolicyApplicationService.class), queryService,
+                mapper, mock(PolicyStatisticsWebMapper.class));
+
+        controller.pagePolicies("POL", null, null, null, null, effectiveStart, effectiveEnd, expiryStart, expiryEnd,
+                0, 10, TENANT_ID);
+
+        verify(queryService).findPageByConditions("POL", null, null, null, null, effectiveStart, effectiveEnd,
+                expiryStart, expiryEnd, TENANT_ID, 0, 10);
     }
 
     @Test

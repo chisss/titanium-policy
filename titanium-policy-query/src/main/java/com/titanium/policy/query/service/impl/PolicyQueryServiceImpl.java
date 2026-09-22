@@ -15,6 +15,7 @@ import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -349,7 +350,9 @@ public class PolicyQueryServiceImpl implements PolicyQueryService {
                                                                         int page, int size) {
         Specification<PolicyView> spec = buildSpecification(policyNo, policyHolderName, insuredName, productCode,
                 status, effectiveDateStart, effectiveDateEnd, expiryDateStart, expiryDateEnd, tenantId);
-        Pageable pageable = PageRequest.of(Math.max(page, 0), normalizeSize(size));
+        // 默认排序：创建时间倒序 + 主键第二排序键（同一秒创建的多行顺序仍然确定，分页不重不漏）
+        Sort sort = Sort.by(Sort.Direction.DESC, "createTime").and(Sort.by("policyId"));
+        Pageable pageable = PageRequest.of(Math.max(page, 0), normalizeSize(size), sort);
         return policyViewRepository.findAll(spec, pageable).map(this::toQueryResult);
     }
 

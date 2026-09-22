@@ -1,5 +1,6 @@
 package com.titanium.policy.application.query;
 
+import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -86,8 +87,7 @@ public class PolicyAppQueryService {
      * 多条件分页查询保单（读模型）
      * <p>
      * 面向后台/端上组合检索：保单号/投保人姓名/被保险人姓名/产品编码/状态任意组合。读门面只表达「要查什么」，
-     * 构造读侧查询 record 经 QueryGateway 派发到读侧处理器，查询 {@code PolicyView} 读模型。生效/止期区间
-     * 由本重载暂不透出，统一置空由读侧按存在性忽略。
+     * 构造读侧查询 record 经 QueryGateway 派发到读侧处理器，查询 {@code PolicyView} 读模型。
      * </p>
      *
      * @param policyNo 保单号（可空）
@@ -95,29 +95,43 @@ public class PolicyAppQueryService {
      * @param insuredName 被保险人姓名（可空）
      * @param productCode 产品编码（可空）
      * @param status 保单状态（可空）
+     * @param effectiveDateStart 生效日期区间起（含，可空）
+     * @param effectiveDateEnd 生效日期区间止（含，可空）
+     * @param expiryDateStart 止期日期区间起（含，可空）
+     * @param expiryDateEnd 止期日期区间止（含，可空）
      * @param tenantId 租户ID
      * @param page 页码（从0开始）
      * @param size 每页条数
      * @return 保单查询结果列表
      */
     public List<PolicyQueryResult> findByConditions(String policyNo, String policyHolderName, String insuredName,
-                                                    String productCode, String status, String tenantId, int page,
-                                                    int size) {
+                                                    String productCode, String status,
+                                                    LocalDateTime effectiveDateStart, LocalDateTime effectiveDateEnd,
+                                                    LocalDateTime expiryDateStart, LocalDateTime expiryDateEnd,
+                                                    String tenantId, int page, int size) {
         return queryGateway.query(
                 new FindPoliciesByMultipleConditionsQuery(policyNo, policyHolderName, insuredName, productCode, status,
-                        null, null, null, null, tenantId, page, size),
+                        effectiveDateStart, effectiveDateEnd, expiryDateStart, expiryDateEnd, tenantId, page, size),
                 ResponseTypes.multipleInstancesOf(PolicyQueryResult.class)).join();
     }
 
     /**
      * 多条件分页查询保单，并保留总条数等分页元数据。
+     *
+     * <p>🔴 四个日期区间端点是**具名参数透传**，不得回退为 {@code null} 硬编码：读侧谓词早已就绪，
+     * 断点只在「门面不透出」，症状是「加了日期条件、条数不变、无任何报错」（Spring 对未声明的
+     * 查询参数静默忽略）。</p>
      */
     public Page<PolicyQueryResult> findPageByConditions(String policyNo, String policyHolderName, String insuredName,
-                                                        String productCode, String status, String tenantId, int page,
-                                                        int size) {
+                                                        String productCode, String status,
+                                                        LocalDateTime effectiveDateStart,
+                                                        LocalDateTime effectiveDateEnd,
+                                                        LocalDateTime expiryDateStart, LocalDateTime expiryDateEnd,
+                                                        String tenantId, int page, int size) {
         // Axon 4.10 无法以 InstanceResponseType 匹配实现 Iterable 的 Page，分页查询直调读模型服务。
         return policyQueryService.findPoliciesPageByMultipleConditions(policyNo, policyHolderName, insuredName,
-                productCode, status, null, null, null, null, tenantId, page, size);
+                productCode, status, effectiveDateStart, effectiveDateEnd, expiryDateStart, expiryDateEnd, tenantId,
+                page, size);
     }
 
     /**
