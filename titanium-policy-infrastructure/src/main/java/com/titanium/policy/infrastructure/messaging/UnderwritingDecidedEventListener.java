@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 
 import com.alibaba.fastjson2.JSONObject;
 
+import com.titanium.common.context.RequestContextHolder;
 import com.titanium.metadata.enums.underwriting.UnderwritingEnum.ConclusionType;
 import com.titanium.metadata.topic.CrossDomainTopics;
 import com.titanium.policy.application.command.insurance.InsuranceApplicationService;
@@ -54,6 +55,12 @@ public class UnderwritingDecidedEventListener {
             log.warn("[核保回流] 事件缺少 policyId，忽略: underwritingId={}", underwritingId);
             return;
         }
+        String tenantId = message.tenantId();
+        if (tenantId == null || tenantId.isBlank()) {
+            log.error("[核保回流] 事件缺少租户，已跳过: insuranceId={}, underwritingId={}",
+                    insuranceId, underwritingId);
+            return;
+        }
 
         ConclusionType resultCode = parseConclusion(message.conclusionType());
         UnderwritingResult result = new UnderwritingResult(underwritingId, resultCode, message.decidedBy(),
@@ -61,7 +68,13 @@ public class UnderwritingDecidedEventListener {
 
         log.info("[核保回流] 异步回写核保结论: insuranceId={}, underwritingId={}, 结论={}", insuranceId,
                 underwritingId, resultCode);
-        insuranceApplicationService.receiveUnderwritingResult(insuranceId, result, message.tenantId());
+        // 本方法运行在 Kafka 监听线程（无 Web 请求上下文）。核保结论回流链路的终点是出单 Saga，
+        // 该 Saga 会经 product/billing/payment 等域的 Feign 客户端出站（路径均 /api/v1/** 强制准入，
+        // 缺租户头即 400）。故须在**派发命令之前**按消息载荷建立身份作用域：Axon 的消息分发/处理
+        // 拦截器据此把身份带到下游事件线程，出站 Feign 才能自动补齐 X-Tenant-Id。
+        // 作用域退出即还原，不污染线程池复用的消费线程。
+        RequestContextHolder.runAsTenant(tenantId,
+                () -> insuranceApplicationService.receiveUnderwritingResult(insuranceId, result, tenantId));
     }
 
     /** 核保结论 code → 枚举，非法/缺失时按延期处理，避免异常逃逸阻断消费 */

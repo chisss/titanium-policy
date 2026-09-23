@@ -5,10 +5,10 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.titanium.common.context.RequestContextHolder;
 import com.titanium.policy.api.request.issuance.SubmitIssuanceRequest;
 import com.titanium.policy.api.response.issuance.IssuanceResponse;
 import com.titanium.policy.application.command.issuance.PolicyIssuanceApplicationService;
@@ -51,13 +51,12 @@ public class PolicyIssuanceController {
      * </p>
      *
      * @param request  出单请求
-     * @param tenantId 租户ID
      * @return 出单结果（受理失败时 HTTP 200 + success=false + 拒绝原因，业务失败非传输失败）
      */
     @Operation(summary = "提交出单", description = "产品驱动路由一/二/三步出单，支持一单多险")
     @PostMapping
-    public ResponseEntity<IssuanceResponse> submitIssuance(@Valid @RequestBody SubmitIssuanceRequest request,
-                                                          @RequestHeader("X-Tenant-Id") String tenantId) {
+    public ResponseEntity<IssuanceResponse> submitIssuance(@Valid @RequestBody SubmitIssuanceRequest request) {
+        String tenantId = RequestContextHolder.requireTenantId();
         log.info("[出单] 收到出单请求: bizNo={}, 险种段数={}", request.getBizNo(),
                 request.getPlanLines() != null ? request.getPlanLines().size() : 0);
         IssuanceRequest domainRequest = issuanceRequestAssembler.toDomainRequest(request, tenantId);
@@ -69,13 +68,12 @@ public class PolicyIssuanceController {
      * 查询出单进度
      *
      * @param bizNo    业务流水号
-     * @param tenantId 租户ID
      * @return 出单进度；流水号不存在时 204
      */
     @Operation(summary = "查询出单进度", description = "两步/三步出单为异步长流程，据此轮询当前阶段")
     @GetMapping("/{bizNo}")
-    public ResponseEntity<IssuanceResponse> getIssuanceProgress(@PathVariable("bizNo") String bizNo,
-                                                                @RequestHeader("X-Tenant-Id") String tenantId) {
+    public ResponseEntity<IssuanceResponse> getIssuanceProgress(@PathVariable String bizNo) {
+        String tenantId = RequestContextHolder.requireTenantId();
         return policyIssuanceApplicationService.getIssuanceProgress(bizNo, tenantId)
                 .map(issuanceRequestAssembler::toResponse)
                 .map(ResponseEntity::ok)

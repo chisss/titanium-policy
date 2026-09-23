@@ -383,18 +383,17 @@ public class IssuanceSagaTest {
      */
     private static class StubProductServicePort implements ProductServicePort {
         @Override
-        public ProductBasicInfo getProductBasicInfo(String productId, String tenantId) {
+        public ProductBasicInfo getProductBasicInfo(String productId) {
             return new ProductBasicInfo(productId, productId, "测试产品", "V1.0", null, "EFFECTIVE");
         }
 
         @Override
-        public com.titanium.metadata.enums.product.ProductEnum.IssuanceMode getIssuanceMode(String productId,
-                                                                                            String tenantId) {
+        public com.titanium.metadata.enums.product.ProductEnum.IssuanceMode getIssuanceMode(String productId) {
             return com.titanium.metadata.enums.product.ProductEnum.IssuanceMode.TWO_STEP;
         }
 
         @Override
-        public ProductIssueRules getIssueRules(String productId, String tenantId) {
+        public ProductIssueRules getIssueRules(String productId) {
             return new ProductIssueRules(0, 65, null, null, null, null, List.of(), List.of(), List.of(), 30, 15, null,
                     false, List.of(), List.of(), null, List.of(), null, null, false, false);
         }
@@ -457,13 +456,12 @@ public class IssuanceSagaTest {
      */
     private static class StubInvestmentAccountPort implements InvestmentAccountPort {
         @Override
-        public String openAccount(String policyId, PolicyForm form, com.titanium.metadata.valueobject.Money premium,
-                                  String tenantId) {
+        public String openAccount(String policyId, PolicyForm form, com.titanium.metadata.valueobject.Money premium) {
             return "ACC_001";
         }
 
         @Override
-        public com.titanium.metadata.valueobject.Money accountValue(String accountId, String tenantId) {
+        public com.titanium.metadata.valueobject.Money accountValue(String accountId) {
             return null;
         }
     }

@@ -104,7 +104,7 @@ public class IssuanceOrchestrator {
             return IssuanceResult.rejected(request.bizNo(),
                     RuleDecision.rejected(PolicyErrorCode.ISSUANCE_MAIN_PRODUCT_MISSING));
         }
-        IssuanceMode mode = productServicePort.getIssuanceMode(mainProductId, request.tenantId());
+        IssuanceMode mode = productServicePort.getIssuanceMode(mainProductId);
         log.info("产品驱动出单: bizNo={}, 主险产品={}, 由产品配置决定出单模式={}", request.bizNo(), mainProductId, mode);
         IssuanceProcessConfig config = IssuanceProcessConfig.forMode(mode, mainProductId);
         return orchestrate(config, request);
@@ -257,7 +257,7 @@ public class IssuanceOrchestrator {
         if (request.policyForm() != null) {
             return request.policyForm();
         }
-        ProductIssueRules rules = productServicePort.getIssueRules(request.mainProductId(), request.tenantId());
+        ProductIssueRules rules = productServicePort.getIssueRules(request.mainProductId());
         return rules != null ? rules.policyForm() : null;
     }
 
@@ -265,7 +265,7 @@ public class IssuanceOrchestrator {
      * 保单期间：等待期与犹豫期取主险产品投保条件配置（此前 policy 域完全未消费该配置）。
      */
     private PolicyPeriod buildPolicyPeriod(IssuanceRequest request) {
-        ProductIssueRules rules = productServicePort.getIssueRules(request.mainProductId(), request.tenantId());
+        ProductIssueRules rules = productServicePort.getIssueRules(request.mainProductId());
         // ProductIssueRules 的等待期/犹豫期是可选配置，保持 Integer 以便 PolicyPeriod.of 做空值归零。
         Integer waitingPeriodDays = rules != null ? rules.waitingPeriodDays() : null;
         Integer hesitationPeriodDays = rules != null ? rules.hesitationPeriodDays() : null;

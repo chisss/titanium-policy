@@ -132,8 +132,7 @@ public class PolicyIssuanceApplicationService {
         }
 
         // ⑤ 解析一次产品出单配置，基线与后续编排共用，避免重复远程取数造成配置漂移。
-        IssuanceMode issuanceMode = productServicePort.getIssuanceMode(resolvedRequest.mainProductId(),
-                resolvedRequest.tenantId());
+        IssuanceMode issuanceMode = productServicePort.getIssuanceMode(resolvedRequest.mainProductId());
         IssuanceProcessConfig processConfig = IssuanceProcessConfig.forMode(issuanceMode,
                 resolvedRequest.mainProductId());
 
@@ -195,7 +194,7 @@ public class PolicyIssuanceApplicationService {
             if (line.productId() == null || rules.containsKey(line.productId())) {
                 continue;
             }
-            ProductIssueRules productRules = productServicePort.getIssueRules(line.productId(), request.tenantId());
+            ProductIssueRules productRules = productServicePort.getIssueRules(line.productId());
             if (productRules == null) {
                 throw new IllegalStateException("产品未配置投保规则: " + line.productId());
             }

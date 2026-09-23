@@ -30,10 +30,10 @@ class PolicyProductAssemblerTest {
         ClauseServicePort clauseServicePort = mock(ClauseServicePort.class);
         when(productServicePort.getClauseRefs(org.mockito.ArgumentMatchers.anyString(),
                 org.mockito.ArgumentMatchers.anyString())).thenReturn(List.of());
-        when(productServicePort.getProductBasicInfo("PRODUCT_1", "TENANT_001"))
+        when(productServicePort.getProductBasicInfo("PRODUCT_1"))
                 .thenReturn(new ProductBasicInfo("PRODUCT_1", "P001", "产品域主险名", "V1.0", null,
                         "EFFECTIVE"));
-        when(productServicePort.getProductBasicInfo("PRODUCT_2", "TENANT_001"))
+        when(productServicePort.getProductBasicInfo("PRODUCT_2"))
                 .thenReturn(new ProductBasicInfo("PRODUCT_2", "P002", "产品域附加险名", "V2.0", null,
                         "EFFECTIVE"));
         PolicyProductAssembler assembler = new PolicyProductAssembler(productServicePort, clauseServicePort,
@@ -58,8 +58,8 @@ class PolicyProductAssemblerTest {
         assertEquals("V2.0", riderProduct.productVersion());
         assertEquals("PLAN_RIDER", riderProduct.pricingPlanVersion());
         assertEquals(Money.of(new BigDecimal("1000.00"), "CNY"), assembler.sumPremium(products));
-        verify(productServicePort).getProductBasicInfo("PRODUCT_1", "TENANT_001");
-        verify(productServicePort).getProductBasicInfo("PRODUCT_2", "TENANT_001");
+        verify(productServicePort).getProductBasicInfo("PRODUCT_1");
+        verify(productServicePort).getProductBasicInfo("PRODUCT_2");
     }
 
     @Test
@@ -77,7 +77,7 @@ class PolicyProductAssemblerTest {
 
         assertEquals("投保段主险名", product.productName());
         assertNull(product.productVersion());
-        verify(productServicePort).getProductBasicInfo("PRODUCT_1", "TENANT_001");
+        verify(productServicePort).getProductBasicInfo("PRODUCT_1");
     }
 
     private InsuranceLine line(String lineId, int lineNo, ProductCategory category, String parentLineId,

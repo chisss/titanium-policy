@@ -11,11 +11,11 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.titanium.common.context.RequestContextHolder;
 import com.titanium.metadata.errorcode.PolicyErrorCode;
 import com.titanium.metadata.exception.DomainException;
 import com.titanium.policy.application.command.insurance.InsuranceApplicationService;
@@ -55,12 +55,11 @@ public class InsuranceController {
      * 从投保意向单创建投保单
      *
      * @param request 转换请求
-     * @param tenantId 租户ID
      * @return 响应结果
      */
     @PostMapping("/from-proposal")
-    public ResponseEntity<String> convertFromProposal(@RequestBody ConvertToInsuranceDTO request,
-                                                      @RequestHeader("X-Tenant-Id") String tenantId) {
+    public ResponseEntity<String> convertFromProposal(@RequestBody ConvertToInsuranceDTO request) {
+        String tenantId = RequestContextHolder.requireTenantId();
         // 协议转换：HTTP Request → 领域命令，收敛到同一应用层门面
         ConvertProposalToInsuranceCommand command = insuranceWebMapper.toCommand(request, tenantId);
         String insuranceId = insuranceApplicationService.convertFromProposal(command);
@@ -76,12 +75,11 @@ public class InsuranceController {
      * </p>
      *
      * @param insuranceId 投保单ID
-     * @param tenantId 租户ID
      * @return 投保单详情
      */
     @GetMapping("/{insuranceId}")
-    public ResponseEntity<InsuranceVO> getInsurance(@PathVariable String insuranceId,
-                                                    @RequestHeader("X-Tenant-Id") String tenantId) {
+    public ResponseEntity<InsuranceVO> getInsurance(@PathVariable String insuranceId) {
+        String tenantId = RequestContextHolder.requireTenantId();
         Optional<InsuranceVO> vo = insuranceAppQueryService.findById(insuranceId, tenantId)
                 .map(insuranceWebMapper::toVO);
         return vo.map(ResponseEntity::ok).orElseThrow(
@@ -100,18 +98,17 @@ public class InsuranceController {
      * @param status      投保单状态（可空）
      * @param page        页码（从0开始）
      * @param size        每页条数
-     * @param tenantId    租户ID
      * @return 投保单列表
      */
     @GetMapping
     public ResponseEntity<List<InsuranceVO>> listInsurances(
-            @RequestParam(value = "insuranceNo", required = false) String insuranceNo,
-            @RequestParam(value = "holderId", required = false) String holderId,
-            @RequestParam(value = "productId", required = false) String productId,
-            @RequestParam(value = "status", required = false) String status,
-            @RequestParam(value = "page", defaultValue = "0") int page,
-            @RequestParam(value = "size", defaultValue = "20") int size,
-            @RequestHeader("X-Tenant-Id") String tenantId) {
+            @RequestParam(required = false) String insuranceNo,
+            @RequestParam(required = false) String holderId,
+            @RequestParam(required = false) String productId,
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        String tenantId = RequestContextHolder.requireTenantId();
         List<InsuranceVO> insurances = insuranceAppQueryService
                 .findByConditions(insuranceNo, holderId, productId, status, tenantId, page, size)
                 .stream()
@@ -125,13 +122,13 @@ public class InsuranceController {
      */
     @GetMapping("/page")
     public ResponseEntity<Page<InsuranceVO>> pageInsurances(
-            @RequestParam(value = "insuranceNo", required = false) String insuranceNo,
-            @RequestParam(value = "holderId", required = false) String holderId,
-            @RequestParam(value = "productId", required = false) String productId,
-            @RequestParam(value = "status", required = false) String status,
-            @RequestParam(value = "page", defaultValue = "0") int page,
-            @RequestParam(value = "size", defaultValue = "20") int size,
-            @RequestHeader("X-Tenant-Id") String tenantId) {
+            @RequestParam(required = false) String insuranceNo,
+            @RequestParam(required = false) String holderId,
+            @RequestParam(required = false) String productId,
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        String tenantId = RequestContextHolder.requireTenantId();
         Page<InsuranceVO> insurances = insuranceAppQueryService
                 .findPageByConditions(insuranceNo, holderId, productId, status, tenantId, page, size)
                 .map(insuranceWebMapper::toVO);
@@ -142,12 +139,11 @@ public class InsuranceController {
      * 提交核保
      *
      * @param insuranceId 投保单ID
-     * @param tenantId 租户ID
      * @return 响应结果
      */
     @PutMapping("/{insuranceId}/underwriting")
-    public ResponseEntity<Void> submitUnderwriting(@PathVariable String insuranceId,
-                                                   @RequestHeader("X-Tenant-Id") String tenantId) {
+    public ResponseEntity<Void> submitUnderwriting(@PathVariable String insuranceId) {
+        String tenantId = RequestContextHolder.requireTenantId();
         insuranceApplicationService.submitUnderwriting(insuranceId, tenantId);
         return ResponseEntity.noContent().build();
     }
@@ -156,12 +152,11 @@ public class InsuranceController {
      * 触发承保流程
      *
      * @param insuranceId 投保单ID
-     * @param tenantId 租户ID
      * @return 响应结果
      */
     @PutMapping("/{insuranceId}/underwrite")
-    public ResponseEntity<Void> triggerUnderwriting(@PathVariable String insuranceId,
-                                                    @RequestHeader("X-Tenant-Id") String tenantId) {
+    public ResponseEntity<Void> triggerUnderwriting(@PathVariable String insuranceId) {
+        String tenantId = RequestContextHolder.requireTenantId();
         insuranceApplicationService.submitUnderwriting(insuranceId, tenantId);
         return ResponseEntity.noContent().build();
     }

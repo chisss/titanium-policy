@@ -5,6 +5,7 @@ import org.springframework.stereotype.Component;
 
 import com.alibaba.fastjson2.JSONObject;
 
+import com.titanium.common.context.RequestContextHolder;
 import com.titanium.metadata.enums.BusinessDomainType;
 import com.titanium.metadata.topic.CrossDomainTopics;
 import com.titanium.policy.application.orchestration.payment.PremiumCollectionResultOrchestrator;
@@ -74,10 +75,21 @@ public class PaymentPaidListener {
                 return;
             }
 
+            if (message.tenantId() == null || message.tenantId().isBlank()) {
+                log.error("[保费收讫-入站] 消息缺少租户，跳过实收回写: policyId={}, paymentNo={}",
+                        message.businessId(), message.paymentNo());
+                return;
+            }
+
             PremiumCollectionNotice notice = policyPaymentResultMapper.toNotice(message);
             log.info("[保费收讫-入站] 回写保费实收: policyId={}, paymentNo={}, 金额={}", notice.policyId(),
                     notice.paymentNo(), notice.collectedAmount());
-            premiumCollectionResultOrchestrator.onPaymentSucceeded(notice);
+            // 本方法运行在 Kafka 监听线程（无 Web 请求上下文）：先按消息载荷建立身份作用域，使实收
+            // 回写派发的命令及其下游 Axon 事件线程继承该身份（生效链路会经出单 Saga 调 billing/
+            // payment/product 的 Feign，路径均 /api/v1/** 强制准入，缺租户头即 400）；
+            // 作用域退出即还原，不污染线程池复用线程。
+            RequestContextHolder.runAsTenant(message.tenantId(),
+                    () -> premiumCollectionResultOrchestrator.onPaymentSucceeded(notice));
 
         } catch (Exception e) {
             // 重复投递（实收已记账）与保单不存在等场景重试不可能成功，记录但不阻塞消费，避免 Kafka 无限重试。

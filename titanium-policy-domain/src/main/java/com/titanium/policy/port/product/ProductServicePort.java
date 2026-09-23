@@ -39,10 +39,9 @@ public interface ProductServicePort {
      * 取产品基本信息（编码/名称/版本/险种分类/状态）。
      *
      * @param productId 产品ID
-     * @param tenantId  租户ID
      * @return 产品基本信息；产品不存在时返回 null
      */
-    ProductBasicInfo getProductBasicInfo(String productId, String tenantId);
+    ProductBasicInfo getProductBasicInfo(String productId);
 
     /**
      * 取产品配置的出单模式（产品驱动出单的类型化契约）。
@@ -51,19 +50,17 @@ public interface ProductServicePort {
      * </p>
      *
      * @param productId 产品ID
-     * @param tenantId  租户ID
      * @return 出单模式
      */
-    IssuanceMode getIssuanceMode(String productId, String tenantId);
+    IssuanceMode getIssuanceMode(String productId);
 
     /**
      * 取产品投保规则（一次取全，避免出单受理阶段多次远程调用）。
      *
      * @param productId 产品ID
-     * @param tenantId  租户ID
      * @return 产品投保规则；产品未配置时返回 null
      */
-    ProductIssueRules getIssueRules(String productId, String tenantId);
+    ProductIssueRules getIssueRules(String productId);
 
     /**
      * 取产品绑定的条款关联（条款ID + 版本 + 是否主条款）。

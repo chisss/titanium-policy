@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 
 import com.alibaba.fastjson2.JSONObject;
 
+import com.titanium.common.context.RequestContextHolder;
 import com.titanium.metadata.topic.CrossDomainTopics;
 import com.titanium.policy.application.orchestration.maintenance.context.MaintenanceWriteBackContext;
 import com.titanium.policy.application.orchestration.maintenance.strategy.MaintenanceWriteBackStrategy;
@@ -67,24 +68,33 @@ public class MaintenanceExecutedEventListener {
             log.warn("保全执行事件缺少 policyId/maintenanceType，跳过回写, payload={}", payload);
             return;
         }
+        if (message.tenantId() == null || message.tenantId().isBlank()) {
+            log.error("保全执行事件缺少租户，跳过回写, policyId={}", message.policyId());
+            return;
+        }
 
         MaintenanceWriteBackContext context = new MaintenanceWriteBackContext(message.policyId(), message.updatedBy(),
                 message.executionDetails(), message.tenantId(), message.maintenanceType(), message.effectiveTime(),
                 message.maintenanceIdValue());
 
         // 状态类保全：精确类型策略（Suspend/Resume/Terminate/Reinstate）
-        MaintenanceWriteBackStrategy strategy = strategyRegistry.get(message.maintenanceType());
+        MaintenanceWriteBackStrategy matchedStrategy = strategyRegistry.get(message.maintenanceType());
         // 数据/要素类批改：回退到统一批改策略
-        if (strategy == null && PolicyDataUpdateType.byMaintenanceType(message.maintenanceType()) != null) {
-            strategy = strategyRegistry.get(ENDORSEMENT_STRATEGY_KEY);
+        if (matchedStrategy == null && PolicyDataUpdateType.byMaintenanceType(message.maintenanceType()) != null) {
+            matchedStrategy = strategyRegistry.get(ENDORSEMENT_STRATEGY_KEY);
         }
-        if (strategy == null) {
+        if (matchedStrategy == null) {
             log.info("保全类型 {} 无匹配回写策略，跳过, policyId={}", message.maintenanceType(), message.policyId());
             return;
         }
+        // lambda 捕获要求 effectively final，此处起别名供作用域内使用（原变量在回退分支被重新赋值）
+        MaintenanceWriteBackStrategy strategy = matchedStrategy;
 
         try {
-            strategy.writeBack(context);
+            // 本方法运行在 Kafka 监听线程（无 Web 请求上下文）：先按消息载荷建立身份作用域，使回写
+            // 策略派发的保单命令及其下游 Axon 事件线程继承该身份（出站 Feign 路径均 /api/v1/**
+            // 强制准入，缺租户头即 400）；作用域退出即还原，不污染线程池复用线程。
+            RequestContextHolder.runAsTenant(context.tenantId(), () -> strategy.writeBack(context));
             log.info("保全回写完成, type={}, policyId={}", message.maintenanceType(), message.policyId());
         } catch (Exception e) {
             // 幂等保护：保单状态已达目标态（重复投递）等场景会抛业务异常，记录但不阻塞消费

@@ -127,7 +127,7 @@ public class PolicyProductAssembler {
                                        PremiumCalculationReference calculationReference) {
         List<ClauseSnapshot> clauseSnapshots = new ArrayList<>();
         List<CoverageSnapshot> coverageSnapshots = new ArrayList<>();
-        ProductBasicInfo product = productServicePort.getProductBasicInfo(insuranceLine.productId(), tenantId);
+        ProductBasicInfo product = productServicePort.getProductBasicInfo(insuranceLine.productId());
 
         for (ProductClauseRef ref : productServicePort.getClauseRefs(insuranceLine.productId(),
                 tenantId)) {

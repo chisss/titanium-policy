@@ -2,7 +2,6 @@ package com.titanium.policy.infrastructure.adapter.payment;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -33,7 +32,7 @@ class PaymentServiceAdapterTest {
     void setUp() {
         paymentApi = mock(PaymentApi.class);
         adapter = new PaymentServiceAdapter(paymentApi);
-        when(paymentApi.createPaymentOrder(any(), eq(TENANT_ID)))
+        when(paymentApi.createPaymentOrder(any()))
                 .thenReturn(ApiResponse.success(paymentOrder()));
     }
 
@@ -58,7 +57,7 @@ class PaymentServiceAdapterTest {
 
         ArgumentCaptor<CreatePaymentOrderRequest> requestCaptor =
                 ArgumentCaptor.forClass(CreatePaymentOrderRequest.class);
-        verify(paymentApi).createPaymentOrder(requestCaptor.capture(), eq(TENANT_ID));
+        verify(paymentApi).createPaymentOrder(requestCaptor.capture());
         assertEquals(expectedChannel, requestCaptor.getValue().getPaymentMethod());
     }
 

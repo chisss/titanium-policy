@@ -39,7 +39,7 @@ public class RuleEngineServiceAdapter implements RuleEngineServicePort {
     public RuleEngineDecision executeRule(String ruleSetCode, Map<String, Object> variables, String tenantId,
                                           String businessId) {
         log.info("执行规则, ruleSetCode={}, tenantId={}, businessId={}", ruleSetCode, tenantId, businessId);
-        ApiResponse<RuleExecutionResultResponse> response = ruleEngineApi.execute(ruleSetCode, variables, tenantId,
+        ApiResponse<RuleExecutionResultResponse> response = ruleEngineApi.execute(ruleSetCode, variables,
                 businessId, BUSINESS_TYPE);
         if (response == null || !response.isSuccess() || response.getData() == null) {
             String message = response != null ? response.getMessage() : "无响应";
@@ -62,7 +62,7 @@ public class RuleEngineServiceAdapter implements RuleEngineServicePort {
     public boolean validateRule(String ruleSetCode, Map<String, Object> variables, String tenantId,
                                 String businessId) {
         log.info("验证规则, ruleSetCode={}, tenantId={}, businessId={}", ruleSetCode, tenantId, businessId);
-        ApiResponse<ValidationResultResponse> response = ruleEngineApi.validate(ruleSetCode, variables, tenantId,
+        ApiResponse<ValidationResultResponse> response = ruleEngineApi.validate(ruleSetCode, variables,
                 businessId, BUSINESS_TYPE);
         if (response == null || !response.isSuccess() || response.getData() == null) {
             String message = response != null ? response.getMessage() : "无响应";

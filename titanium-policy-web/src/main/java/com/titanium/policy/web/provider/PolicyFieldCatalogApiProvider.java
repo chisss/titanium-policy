@@ -6,6 +6,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.titanium.common.context.RequestContextHolder;
 import com.titanium.metadata.response.ApiResponse;
 import com.titanium.policy.api.PolicyFieldCatalogApi;
 import com.titanium.policy.api.response.fieldcatalog.PolicyFieldCatalogResponse;
@@ -27,10 +28,9 @@ public class PolicyFieldCatalogApiProvider implements PolicyFieldCatalogApi {
     private final PolicyFieldCatalogWebMapper mapper;
 
     @Override
-    public ApiResponse<PolicyFieldCatalogResponse> getCurrentCatalog(
-            String tenantId, String productType, String policyType, LocalDate businessDate) {
+    public ApiResponse<PolicyFieldCatalogResponse> getCurrentCatalog(String productType, String policyType, LocalDate businessDate) {
         PolicyFieldCatalogCriteria criteria =
-                new PolicyFieldCatalogCriteria(tenantId, productType, policyType, businessDate);
+                new PolicyFieldCatalogCriteria(RequestContextHolder.requireTenantId(), productType, policyType, businessDate);
         PolicyFieldCatalog catalog = applicationService.getCurrentCatalog(criteria);
         return ApiResponse.success(mapper.toResponse(criteria, catalog));
     }

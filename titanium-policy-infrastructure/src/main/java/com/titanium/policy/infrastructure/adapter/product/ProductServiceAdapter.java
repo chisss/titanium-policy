@@ -56,8 +56,8 @@ public class ProductServiceAdapter implements ProductServicePort {
     private final ProductTemplateApi productTemplateApi;
 
     @Override
-    public ProductBasicInfo getProductBasicInfo(String productId, String tenantId) {
-        ProductResponse product = fetchProduct(productId, tenantId);
+    public ProductBasicInfo getProductBasicInfo(String productId) {
+        ProductResponse product = fetchProduct(productId);
         if (product == null) {
             return null;
         }
@@ -67,14 +67,14 @@ public class ProductServiceAdapter implements ProductServicePort {
     }
 
     @Override
-    public IssuanceMode getIssuanceMode(String productId, String tenantId) {
-        ProductResponse product = fetchProduct(productId, tenantId);
+    public IssuanceMode getIssuanceMode(String productId) {
+        ProductResponse product = fetchProduct(productId);
         IssuanceProcessConfigResponse config = product != null ? product.getIssuanceProcessConfig() : null;
         if (config != null && config.issuanceMode() != null) {
             log.info("产品出单模式: productId={}, mode={}, source=PRODUCT", productId, config.issuanceMode());
             return config.issuanceMode();
         }
-        ProductTemplateResponse template = fetchTemplate(productId, tenantId);
+        ProductTemplateResponse template = fetchTemplate(productId);
         if (template == null || template.getIssuanceMode() == null) {
             throw new IllegalStateException(String.format("产品[%s]及其模板均未配置出单流程，无法决定出单模式", productId));
         }
@@ -83,8 +83,8 @@ public class ProductServiceAdapter implements ProductServicePort {
     }
 
     @Override
-    public ProductIssueRules getIssueRules(String productId, String tenantId) {
-        ProductResponse product = fetchProduct(productId, tenantId);
+    public ProductIssueRules getIssueRules(String productId) {
+        ProductResponse product = fetchProduct(productId);
         if (product == null) {
             return null;
         }
@@ -94,7 +94,7 @@ public class ProductServiceAdapter implements ProductServicePort {
         PolicyFormConfigResponse formConfig = product.getPolicyFormConfig();
         UnderwritingConfigResponse underwriting = product.getUnderwritingConfig();
         IssuanceProcessConfigResponse issuance = product.getIssuanceProcessConfig();
-        ProductTemplateResponse template = fetchTemplate(productId, tenantId);
+        ProductTemplateResponse template = fetchTemplate(productId);
         ProductTemplateResponse.PolicyStructureConfigDTO structure = template != null
                 ? template.getPolicyStructure() : null;
         SubjectType subjectType = structure != null ? structure.getSubjectType() : inferSubjectType(product.getInsuranceType());
@@ -163,7 +163,7 @@ public class ProductServiceAdapter implements ProductServicePort {
     @Override
     public List<ProductClauseRef> getClauseRefs(String productId, String tenantId) {
         ApiResponse<List<ProductClauseResponse>> response = productApi
-                .getProductClauses(productId, tenantId);
+                .getProductClauses(productId);
         if (response == null || !response.isSuccess() || response.getData() == null) {
             log.warn("产品未绑定条款或查询失败: productId={}, tenantId={}", productId, tenantId);
             return List.of();
@@ -177,8 +177,8 @@ public class ProductServiceAdapter implements ProductServicePort {
     /**
      * 取产品详情并解包 {@link ApiResponse}（失败返回 null 由调用方按语义决定兜底）。
      */
-    private ProductResponse fetchProduct(String productId, String tenantId) {
-        ApiResponse<ProductResponse> response = productApi.getProductById(productId, tenantId);
+    private ProductResponse fetchProduct(String productId) {
+        ApiResponse<ProductResponse> response = productApi.getProductById(productId);
         if (response == null || !response.isSuccess()) {
             log.error("获取产品详情失败: productId={}, error={}", productId,
                     response != null ? response.getMessage() : "响应为空");
@@ -188,8 +188,8 @@ public class ProductServiceAdapter implements ProductServicePort {
     }
 
     /** 产品实例未覆盖行为时，读取其绑定模板的默认行为。 */
-    private ProductTemplateResponse fetchTemplate(String productId, String tenantId) {
-        ApiResponse<ProductTemplateResponse> response = productTemplateApi.getByProductId(productId, tenantId);
+    private ProductTemplateResponse fetchTemplate(String productId) {
+        ApiResponse<ProductTemplateResponse> response = productTemplateApi.getByProductId(productId);
         if (response == null || !response.isSuccess()) {
             log.error("获取产品模板失败: productId={}, error={}", productId,
                     response != null ? response.getMessage() : "响应为空");

@@ -41,7 +41,7 @@ public class PolicyCashValueAdapter implements PolicyCashValuePort {
         try {
             // businessTime 传 null：由产品域按当前时间定位适用策略版本
             response = productSurrenderValueApi.queryCashValue(productId, policyYear, customerPayable,
-                    policyEffectiveDate, valuationDate, null, tenantId);
+                    policyEffectiveDate, valuationDate, null);
         } catch (RuntimeException exception) {
             log.error("查询产品现金价值失败: tenantId={}, productId={}, policyYear={}", tenantId, productId, policyYear,
                     exception);

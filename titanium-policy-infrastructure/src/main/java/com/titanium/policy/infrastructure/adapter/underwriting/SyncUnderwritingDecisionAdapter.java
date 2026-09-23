@@ -55,18 +55,18 @@ public class SyncUnderwritingDecisionAdapter implements UnderwritingDecisionGate
 
         // 1. 创建核保单（透传险种编码供核保域按产品配置决策——UW-4）
         ResponseEntity<UnderwritingResponse> createdResponse = underwritingApi.createUnderwriting(
-                buildCreateRequest(request), request.tenantId());
+                buildCreateRequest(request));
         UnderwritingResponse created = requireSuccessfulBody(createdResponse, "创建核保", request);
         String underwritingId = requireUnderwritingId(created, "创建核保", request);
 
         // 2. 提交结构化核保输入（被保人风险要素 → 富核保评分依据），替代旧金额兜底
         ResponseEntity<UnderwritingResponse> submittedResponse = underwritingApi.submitInput(underwritingId,
-                buildInputRequest(request), request.tenantId());
+                buildInputRequest(request));
         requireSuccessfulBody(submittedResponse, "提交核保输入", request);
 
         // 3. 触发核保决策（核保域基于已提交输入产出富结论/风险等级/加费）
         ResponseEntity<UnderwritingResponse> decidedResponse = underwritingApi.decide(underwritingId,
-                buildDecideRequest(request), request.tenantId());
+                buildDecideRequest(request));
         UnderwritingResponse decided = requireSuccessfulBody(decidedResponse, "触发核保决策", request);
         String decidedUnderwritingId = requireUnderwritingId(decided, "核保决策", request);
 

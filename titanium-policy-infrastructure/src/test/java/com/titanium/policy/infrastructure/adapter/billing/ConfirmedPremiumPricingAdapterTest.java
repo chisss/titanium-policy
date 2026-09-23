@@ -37,7 +37,7 @@ class ConfirmedPremiumPricingAdapterTest {
 
     @Test
     void translatesPolicyConfirmationToProductContract() {
-        when(api.confirm(eq("PRODUCT-1"), any(), eq("TENANT-1")))
+        when(api.confirm(eq("PRODUCT-1"), any()))
                 .thenReturn(ApiResponse.success(response()));
 
         var result = adapter.confirm(request());
@@ -45,7 +45,7 @@ class ConfirmedPremiumPricingAdapterTest {
         assertEquals("CALC-1", result.calculationId());
         assertEquals(new BigDecimal("1200.00"), result.totalPremium());
         ArgumentCaptor<PremiumCalculationRequest> captor = ArgumentCaptor.forClass(PremiumCalculationRequest.class);
-        verify(api).confirm(eq("PRODUCT-1"), captor.capture(), eq("TENANT-1"));
+        verify(api).confirm(eq("PRODUCT-1"), captor.capture());
         assertEquals("ISSUANCE_CONFIRM", captor.getValue().purpose());
         assertEquals("V3", captor.getValue().productVersion());
         assertEquals("CHANNEL-1", captor.getValue().channelId());
@@ -55,7 +55,7 @@ class ConfirmedPremiumPricingAdapterTest {
 
     @Test
     void failsClosedWhenProductDoesNotReturnCalculation() {
-        when(api.confirm(eq("PRODUCT-1"), any(), eq("TENANT-1"))).thenReturn(ApiResponse.success(null));
+        when(api.confirm(eq("PRODUCT-1"), any())).thenReturn(ApiResponse.success(null));
 
         assertThrows(BusinessException.class, () -> adapter.confirm(request()));
     }

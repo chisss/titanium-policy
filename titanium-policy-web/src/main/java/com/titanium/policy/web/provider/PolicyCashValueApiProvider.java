@@ -6,6 +6,7 @@ import java.util.Optional;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.titanium.common.context.RequestContextHolder;
 import com.titanium.metadata.errorcode.PolicyErrorCode;
 import com.titanium.metadata.response.ApiResponse;
 import com.titanium.policy.api.PolicyCashValueApi;
@@ -30,9 +31,8 @@ public class PolicyCashValueApiProvider implements PolicyCashValueApi {
     private final PolicyCashValueQueryAppService policyCashValueQueryAppService;
 
     @Override
-    public ApiResponse<PolicyCashValueResponse> getCashValue(String policyId, LocalDate valuationDate,
-            String tenantId) {
-        Optional<PolicyCashValue> cashValue = policyCashValueQueryAppService.query(tenantId, policyId, valuationDate);
+    public ApiResponse<PolicyCashValueResponse> getCashValue(String policyId, LocalDate valuationDate) {
+        Optional<PolicyCashValue> cashValue = policyCashValueQueryAppService.query(RequestContextHolder.requireTenantId(), policyId, valuationDate);
         // 保单缺失、要素不全或产品域无适用策略：返回业务码失败（非 HTTP 错误），调用方据此降级
         return cashValue
                 .map(value -> ApiResponse

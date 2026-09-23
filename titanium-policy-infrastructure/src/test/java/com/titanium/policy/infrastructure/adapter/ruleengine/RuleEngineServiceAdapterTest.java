@@ -38,7 +38,7 @@ class RuleEngineServiceAdapterTest {
 
     @Test
     void mapsPassDecisionToTrue() {
-        when(ruleEngineApi.execute(RULE_SET_CODE, Map.of(), TENANT_ID, BUSINESS_ID, BUSINESS_TYPE))
+        when(ruleEngineApi.execute(RULE_SET_CODE, Map.of(), BUSINESS_ID, BUSINESS_TYPE))
                 .thenReturn(ApiResponse.success(result(RuleDecision.PASS)));
 
         assertEquals(RuleEngineDecision.PASS, adapter.executeRule(RULE_SET_CODE, Map.of(), TENANT_ID, BUSINESS_ID));
@@ -46,7 +46,7 @@ class RuleEngineServiceAdapterTest {
 
     @Test
     void mapsRejectDecisionToFalse() {
-        when(ruleEngineApi.execute(RULE_SET_CODE, Map.of(), TENANT_ID, BUSINESS_ID, BUSINESS_TYPE))
+        when(ruleEngineApi.execute(RULE_SET_CODE, Map.of(), BUSINESS_ID, BUSINESS_TYPE))
                 .thenReturn(ApiResponse.success(result(RuleDecision.REJECT)));
 
         assertEquals(RuleEngineDecision.REJECT, adapter.executeRule(RULE_SET_CODE, Map.of(), TENANT_ID, BUSINESS_ID));
@@ -54,7 +54,7 @@ class RuleEngineServiceAdapterTest {
 
     @Test
     void mapsReferDecisionWithoutTreatingItAsRejection() {
-        when(ruleEngineApi.execute(RULE_SET_CODE, Map.of(), TENANT_ID, BUSINESS_ID, BUSINESS_TYPE))
+        when(ruleEngineApi.execute(RULE_SET_CODE, Map.of(), BUSINESS_ID, BUSINESS_TYPE))
                 .thenReturn(ApiResponse.success(result(RuleDecision.REFER)));
 
         assertEquals(RuleEngineDecision.REFER, adapter.executeRule(RULE_SET_CODE, Map.of(), TENANT_ID, BUSINESS_ID));

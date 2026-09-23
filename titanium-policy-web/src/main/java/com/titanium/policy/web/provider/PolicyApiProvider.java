@@ -5,6 +5,7 @@ import java.util.List;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.titanium.common.context.RequestContextHolder;
 import com.titanium.common.exception.BusinessException;
 import com.titanium.metadata.enums.billing.BillingEnum.PaymentMethod;
 import com.titanium.metadata.errorcode.PolicyErrorCode;
@@ -67,9 +68,7 @@ public class PolicyApiProvider implements PolicyApi {
     @Override
     public ApiResponse<PolicyMaintenanceApplicationResponse> applyMaintenance(
             String policyId,
-            ApplyPolicyMaintenanceRequest request,
-            String operatorId,
-            String tenantId) {
+            ApplyPolicyMaintenanceRequest request) {
         ApplyPolicyMaintenanceCommand command = new ApplyPolicyMaintenanceCommand(
                 policyId, request.requestId(), request.maintenanceCaseId(), request.expectedPolicyVersion(),
                 request.requestPayloadHash(), request.proposedSnapshotHash(), request.effectiveTimeType(),
@@ -80,38 +79,38 @@ public class PolicyApiProvider implements PolicyApi {
                         .toList(),
                 request.stateAction(), request.stateReason(), request.terminationReason(),
                 toRetroactiveEvidence(request.retroactiveEvidence()),
-                operatorId, tenantId);
+                RequestContextHolder.getOperatorId(), RequestContextHolder.requireTenantId());
         return ApiResponse.success(toResponse(policyApplicationService.applyMaintenance(command)));
     }
 
     @Override
-    public ApiResponse<String> createPolicy(CreatePolicyRequest dto, String tenantId) {
+    public ApiResponse<String> createPolicy(CreatePolicyRequest dto) {
         // 协议转换：远程 DTO → 领域命令，收敛到同一应用层门面
-        CreatePolicyCommand command = policyWebMapper.toCommand(dto, tenantId);
+        CreatePolicyCommand command = policyWebMapper.toCommand(dto, RequestContextHolder.requireTenantId());
         String policyId = policyApplicationService.createPolicy(command);
         return ApiResponse.success(policyId);
     }
 
     @Override
-    public ApiResponse<String> createPolicyDirectly(CreatePolicyRequest dto, String tenantId) {
+    public ApiResponse<String> createPolicyDirectly(CreatePolicyRequest dto) {
         // 一步出单：DTO → 一步出单命令，收敛到 application 门面
-        CreatePolicyDirectlyCommand command = policyWebMapper.toDirectCommand(dto, tenantId);
+        CreatePolicyDirectlyCommand command = policyWebMapper.toDirectCommand(dto, RequestContextHolder.requireTenantId());
         String policyId = policyApplicationService.createPolicyDirectly(command);
         return ApiResponse.success(policyId);
     }
 
     @Override
-    public ApiResponse<PolicyResponse> getPolicy(String policyId, String tenantId) {
+    public ApiResponse<PolicyResponse> getPolicy(String policyId) {
         // 读：构造 FindPolicyByIdQuery 交读门面派发（QueryGateway → PolicyView），未命中返回 404 码
-        return policyAppQueryService.findById(new FindPolicyByIdQuery(policyId, tenantId))
+        return policyAppQueryService.findById(new FindPolicyByIdQuery(policyId, RequestContextHolder.requireTenantId()))
                 .map(policyWebMapper::toResponse)
                 .map(ApiResponse::success)
                 .orElseGet(() -> ApiResponse.error(PolicyErrorCode.POLICY_NOT_EXIST, "保单不存在: " + policyId));
     }
 
     @Override
-    public ApiResponse<PolicyStatusResponse> getPolicyStatus(String policyId, String tenantId) {
-        return policyAppQueryService.findById(new FindPolicyByIdQuery(policyId, tenantId))
+    public ApiResponse<PolicyStatusResponse> getPolicyStatus(String policyId) {
+        return policyAppQueryService.findById(new FindPolicyByIdQuery(policyId, RequestContextHolder.requireTenantId()))
                 .map(policyWebMapper::toStatusResponse)
                 .map(ApiResponse::success)
                 .orElseGet(() -> ApiResponse.error(PolicyErrorCode.POLICY_NOT_EXIST, "保单不存在: " + policyId));
@@ -119,10 +118,9 @@ public class PolicyApiProvider implements PolicyApi {
 
     @Override
     public ApiResponse<PolicyMaintenanceSnapshotResponse> getMaintenanceSnapshot(
-            String policyId,
-            String tenantId) {
+            String policyId) {
         try {
-            return policyAppQueryService.findMaintenanceSnapshot(policyId, tenantId)
+            return policyAppQueryService.findMaintenanceSnapshot(policyId, RequestContextHolder.requireTenantId())
                     .map(policyWebMapper::toMaintenanceSnapshotResponse)
                     .map(ApiResponse::success)
                     .orElseGet(() -> ApiResponse.error(
@@ -133,57 +131,55 @@ public class PolicyApiProvider implements PolicyApi {
     }
 
     @Override
-    public ApiResponse<List<PolicyEndorsementResponse>> getEndorsements(String policyId, String tenantId) {
-        return ApiResponse.success(policyAppQueryService.findEndorsements(policyId, tenantId).stream()
+    public ApiResponse<List<PolicyEndorsementResponse>> getEndorsements(String policyId) {
+        return ApiResponse.success(policyAppQueryService.findEndorsements(policyId, RequestContextHolder.requireTenantId()).stream()
                 .map(this::toEndorsementResponse)
                 .toList());
     }
 
     @Override
-    public ApiResponse<Void> issuePolicy(String policyId, String operatorId, String tenantId) {
-        policyApplicationService.issuePolicy(policyId, operatorId, tenantId);
+    public ApiResponse<Void> issuePolicy(String policyId) {
+        policyApplicationService.issuePolicy(policyId, RequestContextHolder.getOperatorId(), RequestContextHolder.requireTenantId());
         return ApiResponse.success();
     }
 
     @Override
-    public ApiResponse<Void> activatePolicy(String policyId, String tenantId) {
-        policyApplicationService.activatePolicy(policyId, tenantId);
+    public ApiResponse<Void> activatePolicy(String policyId) {
+        policyApplicationService.activatePolicy(policyId, RequestContextHolder.requireTenantId());
         return ApiResponse.success();
     }
 
     @Override
     public ApiResponse<Void> recordPremiumCollection(
             String policyId,
-            RecordPremiumCollectionRequest request,
-            String operatorId,
-            String tenantId) {
+            RecordPremiumCollectionRequest request) {
         policyApplicationService.recordPremiumCollection(new RecordPremiumCollectionCommand(
                 policyId, request.paymentId(), request.paymentNo(),
                 Money.of(request.collectedAmount(), request.currency()),
                 PaymentMethod.fromCode(request.paymentMethod()), request.collectedTime(),
-                operatorId, tenantId));
+                RequestContextHolder.getOperatorId(), RequestContextHolder.requireTenantId()));
         return ApiResponse.success();
     }
 
     @Override
-    public ApiResponse<Void> writeBackAccountValue(String policyId, AccountValueWriteBackRequest dto, String tenantId) {
+    public ApiResponse<Void> writeBackAccountValue(String policyId, AccountValueWriteBackRequest dto) {
         // 协议转换：投资域回写请求 → 更新账户价值命令，收敛到 application 门面
         policyApplicationService.updateAccountValue(policyId, dto.getAccountId(), dto.getAccountValue(),
-                dto.getCurrency(), tenantId);
+                dto.getCurrency(), RequestContextHolder.requireTenantId());
         return ApiResponse.success();
     }
 
     @Override
-    public ApiResponse<List<PolicyClauseResponse>> getPolicyClauses(String policyId, String tenantId) {
-        List<PolicyClauseResponse> clauses = policyLineAppQueryService.findClauses(policyId, tenantId).stream()
+    public ApiResponse<List<PolicyClauseResponse>> getPolicyClauses(String policyId) {
+        List<PolicyClauseResponse> clauses = policyLineAppQueryService.findClauses(policyId, RequestContextHolder.requireTenantId()).stream()
                 .map(policyWebMapper::toClauseResponse)
                 .toList();
         return ApiResponse.success(clauses);
     }
 
     @Override
-    public ApiResponse<List<PolicyBeneficiaryResponse>> getBeneficiaries(String policyId, String tenantId) {
-        List<PolicyBeneficiaryResponse> beneficiaries = policyAppQueryService.findBeneficiaries(policyId, tenantId)
+    public ApiResponse<List<PolicyBeneficiaryResponse>> getBeneficiaries(String policyId) {
+        List<PolicyBeneficiaryResponse> beneficiaries = policyAppQueryService.findBeneficiaries(policyId, RequestContextHolder.requireTenantId())
                 .stream()
                 .map(policyWebMapper::toBeneficiaryResponse)
                 .toList();

@@ -9,10 +9,14 @@ import static org.mockito.Mockito.when;
 
 import java.util.Optional;
 
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
+import com.titanium.common.context.RequestContext;
+import com.titanium.common.context.RequestContextHolder;
 import com.titanium.metadata.errorcode.PolicyErrorCode;
 import com.titanium.metadata.exception.DomainException;
 import com.titanium.metadata.response.ApiResponse;
@@ -60,6 +64,18 @@ class DetailEndpointNotFoundContractTest {
 
     private final PolicyExceptionHandler exceptionHandler = new PolicyExceptionHandler();
 
+    @BeforeEach
+    void setUp() {
+        // m18：租户改由请求上下文承载，四个详情端点不再以 @RequestHeader 形参接收
+        RequestContextHolder.set(RequestContext.ofTenant(TENANT_ID));
+    }
+
+    @AfterEach
+    void tearDown() {
+        // 线程池复用线程上残留身份会造成跨用例串台
+        RequestContextHolder.clear();
+    }
+
     @Test
     void policyDetailShouldRejectWithDiagnosableNotFound() {
         PolicyAppQueryService queryService = mock(PolicyAppQueryService.class);
@@ -68,7 +84,7 @@ class DetailEndpointNotFoundContractTest {
                 mock(PolicyWebMapper.class), mock(PolicyStatisticsWebMapper.class));
 
         DomainException thrown = assertThrows(DomainException.class,
-                () -> controller.getPolicy(POLICY_ID, TENANT_ID));
+                () -> controller.getPolicy(POLICY_ID));
 
         assertDiagnosableNotFound(thrown, PolicyErrorCode.POLICY_NOT_EXIST, POLICY_ID);
     }
@@ -80,7 +96,7 @@ class DetailEndpointNotFoundContractTest {
         PolicyDetailController controller = new PolicyDetailController(queryService);
 
         DomainException thrown = assertThrows(DomainException.class,
-                () -> controller.getFullDetail(POLICY_ID, TENANT_ID));
+                () -> controller.getFullDetail(POLICY_ID));
 
         assertDiagnosableNotFound(thrown, PolicyErrorCode.POLICY_NOT_EXIST, POLICY_ID);
     }
@@ -93,7 +109,7 @@ class DetailEndpointNotFoundContractTest {
                 queryService, mock(InsuranceWebMapper.class));
 
         DomainException thrown = assertThrows(DomainException.class,
-                () -> controller.getInsurance(POLICY_ID, TENANT_ID));
+                () -> controller.getInsurance(POLICY_ID));
 
         assertDiagnosableNotFound(thrown, PolicyErrorCode.INSURANCE_NOT_EXIST, POLICY_ID);
     }
@@ -106,7 +122,7 @@ class DetailEndpointNotFoundContractTest {
                 queryService, mock(ProposalWebMapper.class));
 
         DomainException thrown = assertThrows(DomainException.class,
-                () -> controller.getProposal(POLICY_ID, TENANT_ID));
+                () -> controller.getProposal(POLICY_ID));
 
         assertDiagnosableNotFound(thrown, PolicyErrorCode.PROPOSAL_NOT_EXIST, POLICY_ID);
     }

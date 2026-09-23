@@ -5,6 +5,7 @@ import org.springframework.stereotype.Component;
 
 import com.alibaba.fastjson2.JSONObject;
 
+import com.titanium.common.context.RequestContextHolder;
 import com.titanium.metadata.topic.CrossDomainTopics;
 import com.titanium.policy.application.orchestration.lifecycle.BillingLapseOrchestrator;
 import com.titanium.policy.infrastructure.messaging.inbound.BillingLapseNotificationMessage;
@@ -60,11 +61,19 @@ public class BillingLapseNotificationListener {
                 log.warn("[计费失效-入站] 通知缺少 policyId，跳过保单失效, payload={}", payload);
                 return;
             }
+            if (tenantId == null || tenantId.isBlank()) {
+                log.error("[计费失效-入站] 通知缺少租户，跳过保单失效, policyId={}", policyId);
+                return;
+            }
 
             log.info("[计费失效-入站] 收到计费失效通知, policyId={}, reason={}, 触发保单失效", policyId, reason);
 
-            // 发命令编排下沉 application 层，infra 监听器只做消息接入与防腐翻译
-            billingLapseOrchestrator.lapseOnBillingNotification(policyId, reason, tenantId);
+            // 发命令编排下沉 application 层，infra 监听器只做消息接入与防腐翻译。
+            // 本方法运行在 Kafka 监听线程（无 Web 请求上下文）：先按消息载荷建立身份作用域，使失效
+            // 链路派发的命令及其下游 Axon 事件线程继承该身份（出站 Feign /api/v1/** 强制准入，
+            // 缺租户头即 400）；作用域退出即还原，不污染线程池复用线程。
+            RequestContextHolder.runAsTenant(tenantId,
+                    () -> billingLapseOrchestrator.lapseOnBillingNotification(policyId, reason, tenantId));
 
             log.info("[计费失效-入站] 保单失效命令已发送, policyId={}", policyId);
 

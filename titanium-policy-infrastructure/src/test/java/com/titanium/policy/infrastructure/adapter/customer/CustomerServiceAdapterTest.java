@@ -28,7 +28,7 @@ class CustomerServiceAdapterTest {
                 .gender(CustomerGender.MALE)
                 .phoneNumber("13800138000")
                 .build();
-        when(customerApi.getCustomer("CUSTOMER_001", "TENANT_001")).thenReturn(response);
+        when(customerApi.getCustomer("CUSTOMER_001")).thenReturn(response);
 
         Optional<CustomerIdentitySnapshot> identity = new CustomerServiceAdapter(customerApi)
                 .findCustomerIdentity("CUSTOMER_001", "TENANT_001");
@@ -44,7 +44,7 @@ class CustomerServiceAdapterTest {
     @Test
     void returnsEmptyWhenCustomerDoesNotExist() {
         CustomerApi customerApi = mock(CustomerApi.class);
-        when(customerApi.getCustomer("MISSING", "TENANT_001")).thenReturn(null);
+        when(customerApi.getCustomer("MISSING")).thenReturn(null);
 
         Optional<CustomerIdentitySnapshot> identity = new CustomerServiceAdapter(customerApi)
                 .findCustomerIdentity("MISSING", "TENANT_001");

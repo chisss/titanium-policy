@@ -3,6 +3,7 @@ package com.titanium.policy.web.provider;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.titanium.common.context.RequestContextHolder;
 import com.titanium.metadata.errorcode.PolicyErrorCode;
 import com.titanium.metadata.response.ApiResponse;
 import com.titanium.policy.api.InsuranceApi;
@@ -36,25 +37,25 @@ public class InsuranceApiProvider implements InsuranceApi {
     private final InsuranceWebMapper          insuranceWebMapper;
 
     @Override
-    public ApiResponse<String> convertFromProposal(ConvertToInsuranceRequest dto, String tenantId) {
+    public ApiResponse<String> convertFromProposal(ConvertToInsuranceRequest dto) {
         // 协议转换：远程 DTO → 领域命令，收敛到同一应用层门面
-        ConvertProposalToInsuranceCommand command = insuranceWebMapper.toCommand(dto, tenantId);
+        ConvertProposalToInsuranceCommand command = insuranceWebMapper.toCommand(dto, RequestContextHolder.requireTenantId());
         String insuranceId = insuranceApplicationService.convertFromProposal(command);
         return ApiResponse.success(insuranceId);
     }
 
     @Override
-    public ApiResponse<InsuranceResponse> getInsurance(String insuranceId, String tenantId) {
+    public ApiResponse<InsuranceResponse> getInsurance(String insuranceId) {
         // 走读模型（QueryGateway → InsuranceView），命中组装为对外 DTO，未命中返回 404 码
-        return insuranceAppQueryService.findById(insuranceId, tenantId)
+        return insuranceAppQueryService.findById(insuranceId, RequestContextHolder.requireTenantId())
                 .map(insuranceWebMapper::toResponse)
                 .map(ApiResponse::success)
                 .orElseGet(() -> ApiResponse.error(PolicyErrorCode.INSURANCE_NOT_EXIST, "投保单不存在: " + insuranceId));
     }
 
     @Override
-    public ApiResponse<Void> submitUnderwriting(String insuranceId, String tenantId) {
-        insuranceApplicationService.submitUnderwriting(insuranceId, tenantId);
+    public ApiResponse<Void> submitUnderwriting(String insuranceId) {
+        insuranceApplicationService.submitUnderwriting(insuranceId, RequestContextHolder.requireTenantId());
         return ApiResponse.success();
     }
 }

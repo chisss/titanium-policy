@@ -49,7 +49,7 @@ public class PremiumCalculationAdapter implements PremiumCalculationGateway {
         );
 
         ApiResponse<PremiumCalculationResponse> response =
-                premiumCalculationApi.calculatePremium(apiRequest, request.tenantId());
+                premiumCalculationApi.calculatePremium(apiRequest);
 
         if (response == null || !response.isSuccess() || response.getData() == null) {
             throw new RuntimeException("billing 保费计算失败: productId=" + request.productId()

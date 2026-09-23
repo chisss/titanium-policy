@@ -30,7 +30,7 @@ public class CustomerServiceAdapter implements CustomerServicePort {
     @Override
     public boolean isCustomerExists(String customerId, String tenantId) {
         try {
-            return customerApi.isCustomerExists(customerId, tenantId);
+            return customerApi.isCustomerExists(customerId);
         } catch (FeignException exception) {
             log.warn("客户存在性查询失败: customerId={}, tenantId={}, status={}", customerId, tenantId,
                     exception.status(), exception);
@@ -41,7 +41,7 @@ public class CustomerServiceAdapter implements CustomerServicePort {
     @Override
     public Optional<CustomerIdentitySnapshot> findCustomerIdentity(String customerId, String tenantId) {
         try {
-            CustomerResponse customer = customerApi.getCustomer(customerId, tenantId);
+            CustomerResponse customer = customerApi.getCustomer(customerId);
             if (customer == null) {
                 return Optional.empty();
             }
@@ -65,7 +65,7 @@ public class CustomerServiceAdapter implements CustomerServicePort {
                     .phoneNumber(identity.phoneNumber())
                     .operatorId(identity.operatorId())
                     .build();
-            return customerApi.resolveCustomer(request, tenantId);
+            return customerApi.resolveCustomer(request);
         } catch (FeignException exception) {
             log.warn("客户服务调用失败: tenantId={}, status={}", tenantId, exception.status(), exception);
             throw new IllegalStateException("客户服务调用失败", exception);

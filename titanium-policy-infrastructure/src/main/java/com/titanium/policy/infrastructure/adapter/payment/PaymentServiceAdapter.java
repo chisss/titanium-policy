@@ -53,7 +53,7 @@ public class PaymentServiceAdapter implements PaymentServicePort {
             apiRequest.setPaymentMethod(toPaymentMethod(request));
             apiRequest.setDescription(request.description());
 
-            ApiResponse<PaymentOrderResponse> response = paymentApi.createPaymentOrder(apiRequest, request.tenantId());
+            ApiResponse<PaymentOrderResponse> response = paymentApi.createPaymentOrder(apiRequest);
             if (response == null || !response.isSuccess() || response.getData() == null) {
                 String reason = response != null ? response.getMessage() : "支付域响应为空";
                 log.error("创建保费支付单失败: policyId={}, 原因={}", request.policyId(), reason);
@@ -73,9 +73,9 @@ public class PaymentServiceAdapter implements PaymentServicePort {
     }
 
     @Override
-    public PaymentOrderResult queryPaymentStatus(String paymentOrderId, String tenantId) {
+    public PaymentOrderResult queryPaymentStatus(String paymentOrderId) {
         try {
-            ApiResponse<PaymentOrderResponse> response = paymentApi.getPaymentOrder(paymentOrderId, tenantId);
+            ApiResponse<PaymentOrderResponse> response = paymentApi.getPaymentOrder(paymentOrderId);
             if (response == null || !response.isSuccess() || response.getData() == null) {
                 return PaymentOrderResult.failed(response != null ? response.getMessage() : "支付域响应为空");
             }
@@ -88,12 +88,12 @@ public class PaymentServiceAdapter implements PaymentServicePort {
     }
 
     @Override
-    public void cancelPaymentOrder(String paymentOrderId, String reason, String tenantId) {
+    public void cancelPaymentOrder(String paymentOrderId, String reason) {
         try {
             CancelPaymentRequest request = new CancelPaymentRequest();
             request.setCancelReason(reason);
             request.setCancelledBy(POLICY_SYSTEM_OPERATOR);
-            paymentApi.cancelPayment(paymentOrderId, request, tenantId);
+            paymentApi.cancelPayment(paymentOrderId, request);
             log.info("支付单已取消: paymentOrderId={}, 原因={}", paymentOrderId, reason);
         } catch (Exception ex) {
             log.error("取消支付单异常（需人工核查，避免重复收款）: paymentOrderId={}", paymentOrderId, ex);

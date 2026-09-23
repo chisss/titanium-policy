@@ -56,12 +56,12 @@ class SyncUnderwritingDecisionAdapterTest {
 
         ArgumentCaptor<CreateUnderwritingRequest> createCaptor =
                 ArgumentCaptor.forClass(CreateUnderwritingRequest.class);
-        verify(underwritingApi).createUnderwriting(createCaptor.capture(), eq(TENANT_ID));
+        verify(underwritingApi).createUnderwriting(createCaptor.capture());
         assertEquals(SUM_INSURED, createCaptor.getValue().getAmount());
 
         ArgumentCaptor<SubmitUnderwritingInputApiRequest> inputCaptor =
                 ArgumentCaptor.forClass(SubmitUnderwritingInputApiRequest.class);
-        verify(underwritingApi).submitInput(eq(UNDERWRITING_ID), inputCaptor.capture(), eq(TENANT_ID));
+        verify(underwritingApi).submitInput(eq(UNDERWRITING_ID), inputCaptor.capture());
         assertNull(inputCaptor.getValue().getFinancialAssessment());
     }
 
@@ -73,12 +73,12 @@ class SyncUnderwritingDecisionAdapterTest {
 
         ArgumentCaptor<CreateUnderwritingRequest> createCaptor =
                 ArgumentCaptor.forClass(CreateUnderwritingRequest.class);
-        verify(underwritingApi).createUnderwriting(createCaptor.capture(), eq(TENANT_ID));
+        verify(underwritingApi).createUnderwriting(createCaptor.capture());
         assertEquals(SUM_INSURED, createCaptor.getValue().getAmount());
 
         ArgumentCaptor<SubmitUnderwritingInputApiRequest> inputCaptor =
                 ArgumentCaptor.forClass(SubmitUnderwritingInputApiRequest.class);
-        verify(underwritingApi).submitInput(eq(UNDERWRITING_ID), inputCaptor.capture(), eq(TENANT_ID));
+        verify(underwritingApi).submitInput(eq(UNDERWRITING_ID), inputCaptor.capture());
         assertNull(inputCaptor.getValue().getFinancialAssessment());
     }
 
@@ -102,7 +102,7 @@ class SyncUnderwritingDecisionAdapterTest {
 
     @Test
     void rejectsNonSuccessfulCreateResponse() {
-        when(underwritingApi.createUnderwriting(any(), eq(TENANT_ID)))
+        when(underwritingApi.createUnderwriting(any()))
                 .thenReturn(ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(new UnderwritingResponse()));
 
         assertFailureContains("创建核保", () -> adapter.requestDecision(request(new BigDecimal("1200.00"))));
@@ -111,7 +111,7 @@ class SyncUnderwritingDecisionAdapterTest {
     @Test
     void rejectsEmptyCreateResponseBody() {
         ResponseEntity<UnderwritingResponse> emptyResponse = ResponseEntity.ok().build();
-        when(underwritingApi.createUnderwriting(any(), eq(TENANT_ID))).thenReturn(emptyResponse);
+        when(underwritingApi.createUnderwriting(any())).thenReturn(emptyResponse);
 
         assertFailureContains("创建核保响应体为空",
                 () -> adapter.requestDecision(request(new BigDecimal("1200.00"))));
@@ -121,7 +121,7 @@ class SyncUnderwritingDecisionAdapterTest {
     void rejectsBlankCreatedUnderwritingId() {
         UnderwritingResponse created = new UnderwritingResponse();
         created.setUnderwritingId(" ");
-        when(underwritingApi.createUnderwriting(any(), eq(TENANT_ID))).thenReturn(ResponseEntity.ok(created));
+        when(underwritingApi.createUnderwriting(any())).thenReturn(ResponseEntity.ok(created));
 
         assertFailureContains("核保单ID为空", () -> adapter.requestDecision(request(new BigDecimal("1200.00"))));
     }
@@ -129,7 +129,7 @@ class SyncUnderwritingDecisionAdapterTest {
     @Test
     void rejectsNonSuccessfulSubmitInputResponse() {
         stubCreatedResponse();
-        when(underwritingApi.submitInput(eq(UNDERWRITING_ID), any(), eq(TENANT_ID)))
+        when(underwritingApi.submitInput(eq(UNDERWRITING_ID), any()))
                 .thenReturn(ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(new UnderwritingResponse()));
 
         assertFailureContains("提交核保输入", () -> adapter.requestDecision(request(new BigDecimal("1200.00"))));
@@ -138,7 +138,7 @@ class SyncUnderwritingDecisionAdapterTest {
     @Test
     void rejectsNonSuccessfulDecisionResponse() {
         stubCreatedAndSubmittedResponses();
-        when(underwritingApi.decide(eq(UNDERWRITING_ID), any(), eq(TENANT_ID)))
+        when(underwritingApi.decide(eq(UNDERWRITING_ID), any()))
                 .thenReturn(ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(new UnderwritingResponse()));
 
         assertFailureContains("触发核保决策", () -> adapter.requestDecision(request(new BigDecimal("1200.00"))));
@@ -148,7 +148,7 @@ class SyncUnderwritingDecisionAdapterTest {
     void rejectsEmptyDecisionResponseBody() {
         stubCreatedAndSubmittedResponses();
         ResponseEntity<UnderwritingResponse> emptyResponse = ResponseEntity.ok().build();
-        when(underwritingApi.decide(eq(UNDERWRITING_ID), any(), eq(TENANT_ID))).thenReturn(emptyResponse);
+        when(underwritingApi.decide(eq(UNDERWRITING_ID), any())).thenReturn(emptyResponse);
 
         assertFailureContains("核保决策响应体为空",
                 () -> adapter.requestDecision(request(new BigDecimal("1200.00"))));
@@ -172,20 +172,19 @@ class SyncUnderwritingDecisionAdapterTest {
 
     private void stubSuccessfulWorkflow(UnderwritingResponse decided) {
         stubCreatedAndSubmittedResponses();
-        when(underwritingApi.decide(eq(UNDERWRITING_ID), any(DecideUnderwritingApiRequest.class), eq(TENANT_ID)))
+        when(underwritingApi.decide(eq(UNDERWRITING_ID), any(DecideUnderwritingApiRequest.class)))
                 .thenReturn(ResponseEntity.ok(decided));
     }
 
     private void stubCreatedAndSubmittedResponses() {
         stubCreatedResponse();
-        when(underwritingApi.submitInput(eq(UNDERWRITING_ID), any(SubmitUnderwritingInputApiRequest.class),
-                eq(TENANT_ID))).thenReturn(ResponseEntity.ok(new UnderwritingResponse()));
+        when(underwritingApi.submitInput(eq(UNDERWRITING_ID), any(SubmitUnderwritingInputApiRequest.class))).thenReturn(ResponseEntity.ok(new UnderwritingResponse()));
     }
 
     private void stubCreatedResponse() {
         UnderwritingResponse created = new UnderwritingResponse();
         created.setUnderwritingId(UNDERWRITING_ID);
-        when(underwritingApi.createUnderwriting(any(CreateUnderwritingRequest.class), eq(TENANT_ID)))
+        when(underwritingApi.createUnderwriting(any(CreateUnderwritingRequest.class)))
                 .thenReturn(ResponseEntity.ok(created));
     }
 

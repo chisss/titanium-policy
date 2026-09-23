@@ -5,6 +5,7 @@ import org.springframework.stereotype.Component;
 
 import com.alibaba.fastjson2.JSONObject;
 
+import com.titanium.common.context.RequestContextHolder;
 import com.titanium.metadata.topic.CrossDomainTopics;
 import com.titanium.policy.application.orchestration.lifecycle.DeathBenefitTerminationOrchestrator;
 import com.titanium.policy.infrastructure.messaging.inbound.DisabilityBenefitSettledMessage;
@@ -59,11 +60,20 @@ public class DisabilityBenefitSettledEventListener {
         }
         // claim 域事件未贯穿 operatorId，以系统账号兜底，保单按 policyId 强一致路由
         String operatorId = "claim-disability-settlement";
+        String tenantId = message.tenantId();
+        if (tenantId == null || tenantId.isBlank()) {
+            log.error("[全残给付-入站] 事件缺少租户，跳过保单终止, policyId={}", policyId);
+            return;
+        }
 
         log.info("[全残给付-入站] 收到全残给付结算, policyId={}, 触发保单终止", policyId);
         try {
-            terminationOrchestrator.terminateOnBenefitSettled(policyId, operatorId, message.tenantId(),
-                    TERMINATION_DESCRIPTION);
+            // 本方法运行在 Kafka 监听线程（无 Web 请求上下文）：先按消息载荷建立身份作用域，使终止
+            // 链路派发的命令及其下游 Axon 事件线程继承该身份（终止编排会调 policy 自身用例与跨域
+            // 客户端，/api/v1/** 缺租户头即 400）；作用域退出即还原，不污染线程池复用线程。
+            RequestContextHolder.runAsTenant(tenantId, () ->
+                    terminationOrchestrator.terminateOnBenefitSettled(policyId, operatorId, tenantId,
+                            TERMINATION_DESCRIPTION));
         } catch (Exception e) {
             // 幂等保护：保单已达终态（重复投递）会抛业务异常，记录但不阻塞消费
             log.error("[全残给付-入站] 保单终止失败, policyId={}, 原因={}", policyId, e.getMessage());

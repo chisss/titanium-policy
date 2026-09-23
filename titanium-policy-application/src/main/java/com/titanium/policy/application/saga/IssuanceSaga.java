@@ -206,7 +206,7 @@ public class IssuanceSaga {
             return;
         }
         try {
-            ProductIssueRules rules = productServicePort.getIssueRules(main.productId(), tenantId);
+            ProductIssueRules rules = productServicePort.getIssueRules(main.productId());
             if (rules != null) {
                 this.waitingPeriodDays = rules.waitingPeriodDays() != null ? rules.waitingPeriodDays() : 0;
                 this.hesitationPeriodDays = rules.hesitationPeriodDays() != null ? rules.hesitationPeriodDays() : 0;
@@ -354,7 +354,7 @@ public class IssuanceSaga {
         // 投连/万能保单：出单后经 InvestmentAccountPort 开立投资账户并挂接到保单（账户失败不阻断出单，待补偿）
         if (policyForm != null && policyForm.isInvestmentLinked()) {
             try {
-                String accountId = investmentAccountPort.openAccount(policyId, policyForm, payablePremium, tenantId);
+                String accountId = investmentAccountPort.openAccount(policyId, policyForm, payablePremium);
                 if (accountId != null) {
                     commandGateway.sendAndWait(
                             new LinkInvestmentAccountCommand(policyId, accountId, PolicyConstants.POLICY_SYSTEM,

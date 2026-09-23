@@ -90,12 +90,12 @@ class PolicyIssuanceApplicationServiceTest {
         request = request();
         when(progressRepository.findByBizNoAndTenantId(BIZ_NO, TENANT_ID)).thenReturn(Optional.empty());
         when(customerResolver.resolve(request)).thenReturn(request);
-        when(productServicePort.getIssuanceMode(PRODUCT_ID, TENANT_ID)).thenReturn(IssuanceMode.THREE_STEP);
+        when(productServicePort.getIssuanceMode(PRODUCT_ID)).thenReturn(IssuanceMode.THREE_STEP);
     }
 
     @Test
     void rejectsIssuanceWhenProductRuleServiceFails() {
-        when(productServicePort.getIssueRules(PRODUCT_ID, TENANT_ID))
+        when(productServicePort.getIssueRules(PRODUCT_ID))
                 .thenThrow(new IllegalStateException("product service unavailable"));
 
         IssuanceResult result = service.submitIssuance(request);
@@ -105,7 +105,7 @@ class PolicyIssuanceApplicationServiceTest {
 
     @Test
     void rejectsIssuanceWhenProductRulesAreMissing() {
-        when(productServicePort.getIssueRules(PRODUCT_ID, TENANT_ID)).thenReturn(null);
+        when(productServicePort.getIssueRules(PRODUCT_ID)).thenReturn(null);
 
         IssuanceResult result = service.submitIssuance(request);
 
@@ -132,7 +132,7 @@ class PolicyIssuanceApplicationServiceTest {
         IssuanceProgressView existing = acceptedProgress();
         when(progressRepository.findByBizNoAndTenantId(BIZ_NO, TENANT_ID))
                 .thenReturn(Optional.empty(), Optional.of(existing));
-        when(productServicePort.getIssueRules(PRODUCT_ID, TENANT_ID)).thenReturn(unrestrictedRules());
+        when(productServicePort.getIssueRules(PRODUCT_ID)).thenReturn(unrestrictedRules());
         when(eligibilityDomainService.validate(eq(request), any())).thenReturn(RuleDecision.accepted());
         org.mockito.Mockito.doThrow(new DataIntegrityViolationException("uk_issuance_biz"))
                 .when(progressBaselineWriter).save(eq(request), any());
@@ -154,7 +154,7 @@ class PolicyIssuanceApplicationServiceTest {
         projectedProgress.setPolicyId("POLICY_001");
         when(progressRepository.findByBizNoAndTenantId(BIZ_NO, TENANT_ID))
                 .thenReturn(Optional.empty(), Optional.of(staleBaseline), Optional.of(projectedProgress));
-        when(productServicePort.getIssueRules(PRODUCT_ID, TENANT_ID)).thenReturn(unrestrictedRules());
+        when(productServicePort.getIssueRules(PRODUCT_ID)).thenReturn(unrestrictedRules());
         when(eligibilityDomainService.validate(eq(request), any())).thenReturn(RuleDecision.accepted());
         when(issuanceOrchestrator.orchestrate(IssuanceProcessConfig.threeStep(PRODUCT_ID), request))
                 .thenReturn(orchestrated);
@@ -172,8 +172,8 @@ class PolicyIssuanceApplicationServiceTest {
 
     @Test
     void acceptedBaselinePersistsProductIssuanceMode() {
-        when(productServicePort.getIssueRules(PRODUCT_ID, TENANT_ID)).thenReturn(unrestrictedRules());
-        when(productServicePort.getIssuanceMode(PRODUCT_ID, TENANT_ID)).thenReturn(IssuanceMode.THREE_STEP);
+        when(productServicePort.getIssueRules(PRODUCT_ID)).thenReturn(unrestrictedRules());
+        when(productServicePort.getIssuanceMode(PRODUCT_ID)).thenReturn(IssuanceMode.THREE_STEP);
         when(eligibilityDomainService.validate(eq(request), any())).thenReturn(RuleDecision.accepted());
         when(issuanceOrchestrator.orchestrate(IssuanceProcessConfig.threeStep(PRODUCT_ID), request))
                 .thenReturn(successfulResult());
@@ -229,7 +229,7 @@ class PolicyIssuanceApplicationServiceTest {
     @Test
     void unexpectedOrchestrationFailureIsPropagatedWithoutWritingRejectedProgress() {
         IllegalStateException failure = new IllegalStateException("command gateway unavailable");
-        when(productServicePort.getIssueRules(PRODUCT_ID, TENANT_ID)).thenReturn(unrestrictedRules());
+        when(productServicePort.getIssueRules(PRODUCT_ID)).thenReturn(unrestrictedRules());
         when(eligibilityDomainService.validate(eq(request), any())).thenReturn(RuleDecision.accepted());
         when(issuanceOrchestrator.orchestrate(IssuanceProcessConfig.threeStep(PRODUCT_ID), request))
                 .thenThrow(failure);
@@ -247,7 +247,7 @@ class PolicyIssuanceApplicationServiceTest {
     void synchronousOrchestrationRejectionMarksUntouchedBaselineRejected() {
         IssuanceResult rejected = IssuanceResult.rejected(BIZ_NO,
                 RuleDecision.rejected(PolicyErrorCode.ISSUANCE_RISK_REJECTED, "基础自动核保"));
-        when(productServicePort.getIssueRules(PRODUCT_ID, TENANT_ID)).thenReturn(unrestrictedRules());
+        when(productServicePort.getIssueRules(PRODUCT_ID)).thenReturn(unrestrictedRules());
         when(eligibilityDomainService.validate(eq(request), any())).thenReturn(RuleDecision.accepted());
         when(issuanceOrchestrator.orchestrate(IssuanceProcessConfig.threeStep(PRODUCT_ID), request))
                 .thenReturn(rejected);
@@ -263,7 +263,7 @@ class PolicyIssuanceApplicationServiceTest {
     void orchestrationFailureWithoutPartialResultReleasesUntouchedBaseline() {
         IssuanceOrchestrationException failure = new IssuanceOrchestrationException("首个命令执行失败", null,
                 new IllegalStateException("command gateway unavailable"));
-        when(productServicePort.getIssueRules(PRODUCT_ID, TENANT_ID)).thenReturn(unrestrictedRules());
+        when(productServicePort.getIssueRules(PRODUCT_ID)).thenReturn(unrestrictedRules());
         when(eligibilityDomainService.validate(eq(request), any())).thenReturn(RuleDecision.accepted());
         when(issuanceOrchestrator.orchestrate(IssuanceProcessConfig.threeStep(PRODUCT_ID), request))
                 .thenThrow(failure);
@@ -281,7 +281,7 @@ class PolicyIssuanceApplicationServiceTest {
         IssuanceResult partialResult = successfulResult();
         IssuanceOrchestrationException failure = new IssuanceOrchestrationException("后续命令执行失败", partialResult,
                 new IllegalStateException("command gateway unavailable"));
-        when(productServicePort.getIssueRules(PRODUCT_ID, TENANT_ID)).thenReturn(unrestrictedRules());
+        when(productServicePort.getIssueRules(PRODUCT_ID)).thenReturn(unrestrictedRules());
         when(eligibilityDomainService.validate(eq(request), any())).thenReturn(RuleDecision.accepted());
         when(issuanceOrchestrator.orchestrate(IssuanceProcessConfig.threeStep(PRODUCT_ID), request))
                 .thenThrow(failure);

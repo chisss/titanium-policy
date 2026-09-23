@@ -11,11 +11,11 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.titanium.common.context.RequestContextHolder;
 import com.titanium.metadata.errorcode.PolicyErrorCode;
 import com.titanium.metadata.exception.DomainException;
 import com.titanium.policy.application.command.proposal.ProposalApplicationService;
@@ -54,12 +54,11 @@ public class ProposalController {
      * 创建投保意向单
      *
      * @param request 创建请求
-     * @param tenantId 租户ID
      * @return 意向单ID
      */
     @PostMapping
-    public ResponseEntity<String> createProposal(@RequestBody CreateProposalDTO request,
-                                                 @RequestHeader("X-Tenant-Id") String tenantId) {
+    public ResponseEntity<String> createProposal(@RequestBody CreateProposalDTO request) {
+        String tenantId = RequestContextHolder.requireTenantId();
         // 协议转换：HTTP Request → 领域命令，收敛到同一应用层门面
         CreateProposalCommand command = proposalWebMapper.toCommand(request, tenantId);
         String proposalId = proposalApplicationService.createProposal(command);
@@ -75,12 +74,11 @@ public class ProposalController {
      * </p>
      *
      * @param proposalId 投保意向单ID
-     * @param tenantId 租户ID
      * @return 投保意向单详情
      */
     @GetMapping("/{proposalId}")
-    public ResponseEntity<ProposalVO> getProposal(@PathVariable("proposalId") String proposalId,
-                                                  @RequestHeader("X-Tenant-Id") String tenantId) {
+    public ResponseEntity<ProposalVO> getProposal(@PathVariable String proposalId) {
+        String tenantId = RequestContextHolder.requireTenantId();
         Optional<ProposalVO> vo = proposalAppQueryService.findById(proposalId, tenantId)
                 .map(proposalWebMapper::toVO);
         return vo.map(ResponseEntity::ok).orElseThrow(
@@ -99,18 +97,17 @@ public class ProposalController {
      * @param status      意向单状态（可空）
      * @param page        页码（从0开始）
      * @param size        每页条数
-     * @param tenantId    租户ID
      * @return 意向单列表
      */
     @GetMapping
     public ResponseEntity<List<ProposalVO>> listProposals(
-            @RequestParam(value = "proposalNo", required = false) String proposalNo,
-            @RequestParam(value = "customerId", required = false) String customerId,
-            @RequestParam(value = "productCode", required = false) String productCode,
-            @RequestParam(value = "status", required = false) String status,
-            @RequestParam(value = "page", defaultValue = "0") int page,
-            @RequestParam(value = "size", defaultValue = "20") int size,
-            @RequestHeader("X-Tenant-Id") String tenantId) {
+            @RequestParam(required = false) String proposalNo,
+            @RequestParam(required = false) String customerId,
+            @RequestParam(required = false) String productCode,
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        String tenantId = RequestContextHolder.requireTenantId();
         List<ProposalVO> proposals = proposalAppQueryService
                 .findByConditions(proposalNo, customerId, productCode, status, tenantId, page, size)
                 .stream()
@@ -124,13 +121,13 @@ public class ProposalController {
      */
     @GetMapping("/page")
     public ResponseEntity<Page<ProposalVO>> pageProposals(
-            @RequestParam(value = "proposalNo", required = false) String proposalNo,
-            @RequestParam(value = "customerId", required = false) String customerId,
-            @RequestParam(value = "productCode", required = false) String productCode,
-            @RequestParam(value = "status", required = false) String status,
-            @RequestParam(value = "page", defaultValue = "0") int page,
-            @RequestParam(value = "size", defaultValue = "20") int size,
-            @RequestHeader("X-Tenant-Id") String tenantId) {
+            @RequestParam(required = false) String proposalNo,
+            @RequestParam(required = false) String customerId,
+            @RequestParam(required = false) String productCode,
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        String tenantId = RequestContextHolder.requireTenantId();
         Page<ProposalVO> proposals = proposalAppQueryService
                 .findPageByConditions(proposalNo, customerId, productCode, status, tenantId, page, size)
                 .map(proposalWebMapper::toVO);
@@ -141,12 +138,11 @@ public class ProposalController {
      * 提交投保意向单
      *
      * @param proposalId 投保意向单ID
-     * @param tenantId 租户ID
      * @return 响应结果
      */
     @PutMapping("/{proposalId}/submit")
-    public ResponseEntity<Void> submitProposal(@PathVariable("proposalId") String proposalId,
-                                               @RequestHeader("X-Tenant-Id") String tenantId) {
+    public ResponseEntity<Void> submitProposal(@PathVariable String proposalId) {
+        String tenantId = RequestContextHolder.requireTenantId();
         proposalApplicationService.submitProposal(proposalId, "提交投保意向单", tenantId);
         return ResponseEntity.noContent().build();
     }

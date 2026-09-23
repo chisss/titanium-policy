@@ -6,7 +6,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 
 import com.titanium.metadata.response.ApiResponse;
 import com.titanium.policy.api.request.issuance.ConvertToInsuranceRequest;
@@ -31,32 +30,26 @@ public interface InsuranceApi {
      * 从投保意向单转投保单（跨服务发起）
      *
      * @param dto 转换 DTO
-     * @param tenantId 租户ID
      * @return 投保单ID
      */
     @PostMapping("/from-proposal")
-    ApiResponse<String> convertFromProposal(@RequestBody ConvertToInsuranceRequest dto,
-                                            @RequestHeader("X-Tenant-Id") String tenantId);
+    ApiResponse<String> convertFromProposal(@RequestBody ConvertToInsuranceRequest dto);
 
     /**
      * 获取投保单详情（跨域集成用）
      *
      * @param insuranceId 投保单ID
-     * @param tenantId 租户ID
      * @return 投保单详情，不存在时 code=404
      */
     @GetMapping("/{insuranceId}")
-    ApiResponse<InsuranceResponse> getInsurance(@PathVariable("insuranceId") String insuranceId,
-                                           @RequestHeader("X-Tenant-Id") String tenantId);
+    ApiResponse<InsuranceResponse> getInsurance(@PathVariable String insuranceId);
 
     /**
      * 提交核保
      *
      * @param insuranceId 投保单ID
-     * @param tenantId 租户ID
      * @return 空响应
      */
     @PutMapping("/{insuranceId}/underwriting")
-    ApiResponse<Void> submitUnderwriting(@PathVariable("insuranceId") String insuranceId,
-                                         @RequestHeader("X-Tenant-Id") String tenantId);
+    ApiResponse<Void> submitUnderwriting(@PathVariable String insuranceId);
 }

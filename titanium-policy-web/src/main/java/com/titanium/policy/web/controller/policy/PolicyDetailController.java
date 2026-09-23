@@ -5,11 +5,11 @@ import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.titanium.common.context.RequestContextHolder;
 import com.titanium.metadata.enums.customer.CustomerEnum.InsuranceRole;
 import com.titanium.metadata.errorcode.PolicyErrorCode;
 import com.titanium.policy.application.query.PolicyLineAppQueryService;
@@ -50,13 +50,12 @@ public class PolicyDetailController {
      * </p>
      *
      * @param policyId 保单ID
-     * @param tenantId 租户ID
      * @return 保单全景；保单不存在或不在当前租户可见范围内时 404（带业务码）
      */
     @Operation(summary = "保单全景查询", description = "一次返回保单全部维度，后台详情页专用")
     @GetMapping("/{policyId}/full-detail")
-    public ResponseEntity<PolicyFullDetailQueryResult> getFullDetail(@PathVariable("policyId") String policyId,
-                                                                    @RequestHeader("X-Tenant-Id") String tenantId) {
+    public ResponseEntity<PolicyFullDetailQueryResult> getFullDetail(@PathVariable String policyId) {
+        String tenantId = RequestContextHolder.requireTenantId();
         return policyLineAppQueryService.findFullDetail(policyId, tenantId)
                 .map(ResponseEntity::ok)
                 .orElseThrow(() -> PolicyExceptionHandler.notFoundInTenant(PolicyErrorCode.POLICY_NOT_EXIST, policyId));
@@ -71,15 +70,14 @@ public class PolicyDetailController {
      *
      * @param policyId    保单ID
      * @param withDetails 是否装配段内条款/标的/责任明细（缺省 false，减少查询开销）
-     * @param tenantId    租户ID
      * @return 险种段列表
      */
     @Operation(summary = "查询保单险种段", description = "一单多险的段清单，可选是否装配段内明细")
     @GetMapping("/{policyId}/lines")
     public ResponseEntity<List<PolicyProductQueryResult>> getLines(
-            @PathVariable("policyId") String policyId,
-            @RequestParam(value = "withDetails", defaultValue = "false") boolean withDetails,
-            @RequestHeader("X-Tenant-Id") String tenantId) {
+            @PathVariable String policyId,
+            @RequestParam(defaultValue = "false") boolean withDetails) {
+        String tenantId = RequestContextHolder.requireTenantId();
         return ResponseEntity.ok(policyLineAppQueryService.findLines(policyId, withDetails, tenantId));
     }
 
@@ -90,13 +88,12 @@ public class PolicyDetailController {
      * </p>
      *
      * @param policyId 保单ID
-     * @param tenantId 租户ID
      * @return 责任列表
      */
     @Operation(summary = "查询保单保险责任", description = "理赔定责依据，含免赔与赔付比例")
     @GetMapping("/{policyId}/coverages")
-    public ResponseEntity<List<PolicyCoverageQueryResult>> getCoverages(@PathVariable("policyId") String policyId,
-                                                                       @RequestHeader("X-Tenant-Id") String tenantId) {
+    public ResponseEntity<List<PolicyCoverageQueryResult>> getCoverages(@PathVariable String policyId) {
+        String tenantId = RequestContextHolder.requireTenantId();
         return ResponseEntity.ok(policyLineAppQueryService.findCoverages(policyId, tenantId));
     }
 
@@ -108,13 +105,12 @@ public class PolicyDetailController {
      * </p>
      *
      * @param policyId 保单ID
-     * @param tenantId 租户ID
      * @return 标的列表
      */
     @Operation(summary = "查询保单标的", description = "含各险种特有的类型化属性包")
     @GetMapping("/{policyId}/subjects")
-    public ResponseEntity<List<PolicySubjectQueryResult>> getSubjects(@PathVariable("policyId") String policyId,
-                                                                     @RequestHeader("X-Tenant-Id") String tenantId) {
+    public ResponseEntity<List<PolicySubjectQueryResult>> getSubjects(@PathVariable String policyId) {
+        String tenantId = RequestContextHolder.requireTenantId();
         return ResponseEntity.ok(policyLineAppQueryService.findSubjects(policyId, tenantId));
     }
 
@@ -129,17 +125,16 @@ public class PolicyDetailController {
      * @param role       保险角色码（POLICY_HOLDER/INSURED/BENEFICIARY；可空）
      * @param page       页码（0 起）
      * @param size       每页条数
-     * @param tenantId   租户ID
      * @return 保单列表
      */
     @Operation(summary = "按客户角色查保单", description = "支持投保人/被保险人/受益人三种角色维度")
     @GetMapping("/by-customer/{customerId}")
     public ResponseEntity<List<PolicyQueryResult>> getByCustomerRole(
-            @PathVariable("customerId") String customerId,
-            @RequestParam(value = "role", required = false) String role,
-            @RequestParam(value = "page", defaultValue = "0") int page,
-            @RequestParam(value = "size", defaultValue = "20") int size,
-            @RequestHeader("X-Tenant-Id") String tenantId) {
+            @PathVariable String customerId,
+            @RequestParam(required = false) String role,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        String tenantId = RequestContextHolder.requireTenantId();
         InsuranceRole insuranceRole = role != null ? InsuranceRole.fromCode(role) : null;
         return ResponseEntity
                 .ok(policyLineAppQueryService.findByCustomerRole(customerId, insuranceRole, tenantId, page, size));

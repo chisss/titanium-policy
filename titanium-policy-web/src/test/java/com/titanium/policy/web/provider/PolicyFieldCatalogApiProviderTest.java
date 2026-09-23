@@ -6,14 +6,28 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.LocalDate;
 
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import com.titanium.common.context.RequestContextHolder;
 import com.titanium.metadata.response.ApiResponse;
 import com.titanium.policy.api.response.fieldcatalog.PolicyFieldCatalogResponse;
 import com.titanium.policy.application.query.PolicyFieldCatalogApplicationService;
 import com.titanium.policy.web.mapper.PolicyFieldCatalogWebMapperImpl;
 
 class PolicyFieldCatalogApiProviderTest {
+
+    @BeforeEach
+    void setUp() {
+        // 契约实现已改为从请求上下文取租户（不再由入参显式传递），故测试须先建立租户上下文
+        RequestContextHolder.setTenantId("tenant-1");
+    }
+
+    @AfterEach
+    void tearDown() {
+        RequestContextHolder.clear();
+    }
 
     @Test
     void shouldEchoQueryContextAndReturnImmutableCatalogEvidence() {
@@ -22,7 +36,7 @@ class PolicyFieldCatalogApiProviderTest {
         LocalDate businessDate = LocalDate.of(2026, 8, 24);
 
         ApiResponse<PolicyFieldCatalogResponse> response =
-                provider.getCurrentCatalog("tenant-1", "LIFE", "INDIVIDUAL", businessDate);
+                provider.getCurrentCatalog("LIFE", "INDIVIDUAL", businessDate);
 
         assertTrue(response.isSuccess());
         assertEquals("tenant-1", response.getData().tenantId());

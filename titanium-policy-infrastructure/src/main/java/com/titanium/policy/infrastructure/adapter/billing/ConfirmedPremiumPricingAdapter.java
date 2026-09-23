@@ -48,7 +48,7 @@ public class ConfirmedPremiumPricingAdapter implements ConfirmedPremiumPricingPo
                                 adjustment.reason(), adjustment.ruleVersion()))
                         .toList(), channelId(snapshot), policyYear(snapshot));
         ApiResponse<PremiumCalculationResponse> response = productPremiumCalculationApi.confirm(
-                request.productId(), apiRequest, request.tenantId());
+                request.productId(), apiRequest);
         PremiumCalculationResponse data = response != null ? response.getData() : null;
         log.info("Product 确认保费响应: productId={}, bizNo={}, success={}, status={}, purpose={}, productVersion={}, pricingPlanVersion={}, resultHash={}",
                 request.productId(), request.bizNo(), response != null && response.isSuccess(),

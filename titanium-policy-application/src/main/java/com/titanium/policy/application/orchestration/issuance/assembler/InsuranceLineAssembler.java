@@ -85,8 +85,7 @@ public class InsuranceLineAssembler {
                                        Map<Integer, String> lineIdByNo) {
         String lineId = lineIdByNo.get(planLine.lineNo());
         String parentLineId = planLine.parentLineNo() != null ? lineIdByNo.get(planLine.parentLineNo()) : null;
-        ProductBasicInfo product = productServicePort.getProductBasicInfo(planLine.productId(),
-                request.tenantId());
+        ProductBasicInfo product = productServicePort.getProductBasicInfo(planLine.productId());
 
         return new InsuranceLine(lineId, planLine.lineNo(), planLine.productCategory(), parentLineId,
                 planLine.productId(), product != null ? product.productCode() : null,

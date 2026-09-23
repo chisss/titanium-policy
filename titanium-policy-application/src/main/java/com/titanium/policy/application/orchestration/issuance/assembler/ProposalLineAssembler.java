@@ -52,7 +52,7 @@ public class ProposalLineAssembler {
         List<ProposalLine> lines = new ArrayList<>();
         for (IssuancePlanLine planLine : planLines) {
             ProductBasicInfo product = productServicePort
-                    .getProductBasicInfo(planLine.productId(), request.tenantId());
+                    .getProductBasicInfo(planLine.productId());
             lines.add(new ProposalLine(UUID.randomUUID().toString(), planLine.lineNo(), planLine.productCategory(),
                     planLine.parentLineNo(), planLine.productId(),
                     product != null ? product.productCode() : null,

@@ -8,7 +8,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 
 import com.titanium.metadata.response.ApiResponse;
 import com.titanium.policy.api.request.issuance.CreatePolicyRequest;
@@ -43,131 +42,105 @@ public interface PolicyApi {
     /** 立即应用保全案件的结构化合同变更。 */
     @PostMapping("/{policyId}/maintenance-applications")
     ApiResponse<PolicyMaintenanceApplicationResponse> applyMaintenance(
-            @PathVariable("policyId") String policyId,
-            @Valid @RequestBody ApplyPolicyMaintenanceRequest request,
-            @RequestHeader("X-Operator-Id") String operatorId,
-            @RequestHeader("X-Tenant-Id") String tenantId);
+            @PathVariable String policyId,
+            @Valid @RequestBody ApplyPolicyMaintenanceRequest request);
 
     /**
      * 创建保单（从投保单创建）
      *
      * @param dto 创建保单 DTO
-     * @param tenantId 租户ID
      * @return 保单ID
      */
     @PostMapping
-    ApiResponse<String> createPolicy(@RequestBody CreatePolicyRequest dto,
-                                     @RequestHeader("X-Tenant-Id") String tenantId);
+    ApiResponse<String> createPolicy(@RequestBody CreatePolicyRequest dto);
 
     /**
      * 一步出单（直接创建并签发）
      *
      * @param dto 创建保单 DTO
-     * @param tenantId 租户ID
      * @return 保单ID
      */
     @PostMapping("/direct")
-    ApiResponse<String> createPolicyDirectly(@RequestBody CreatePolicyRequest dto,
-                                             @RequestHeader("X-Tenant-Id") String tenantId);
+    ApiResponse<String> createPolicyDirectly(@RequestBody CreatePolicyRequest dto);
 
     /**
      * 获取保单详情（跨域集成用）
      *
      * @param policyId 保单ID
-     * @param tenantId 租户ID
      * @return 保单详情，不存在时 code=404
      */
     @GetMapping("/{policyId}")
-    ApiResponse<PolicyResponse> getPolicy(@PathVariable("policyId") String policyId,
-                                     @RequestHeader("X-Tenant-Id") String tenantId);
+    ApiResponse<PolicyResponse> getPolicy(@PathVariable String policyId);
 
     /**
      * 查询保单状态（跨域集成用，返回保单原生状态码）
      *
      * @param policyId 保单ID
-     * @param tenantId 租户ID
      * @return 保单状态，不存在时 code=404
      */
     @GetMapping("/{policyId}/status")
-    ApiResponse<PolicyStatusResponse> getPolicyStatus(@PathVariable("policyId") String policyId,
-                                                 @RequestHeader("X-Tenant-Id") String tenantId);
+    ApiResponse<PolicyStatusResponse> getPolicyStatus(@PathVariable String policyId);
 
     /** 查询保全建案使用的不可变 Policy 基准快照。 */
     @GetMapping("/{policyId}/maintenance-snapshot")
     ApiResponse<PolicyMaintenanceSnapshotResponse> getMaintenanceSnapshot(
-            @PathVariable("policyId") String policyId,
-            @RequestHeader("X-Tenant-Id") String tenantId);
+            @PathVariable String policyId);
 
     /** 查询保单租户隔离的批改历史，供跨域影响分析取证。 */
     @GetMapping("/{policyId}/endorsements")
     ApiResponse<List<PolicyEndorsementResponse>> getEndorsements(
-            @PathVariable("policyId") String policyId,
-            @RequestHeader("X-Tenant-Id") String tenantId);
+            @PathVariable String policyId);
 
     /**
      * 签发保单
      *
      * @param policyId 保单ID
-     * @param operatorId 操作人ID
-     * @param tenantId 租户ID
      * @return 空响应
      */
     @PutMapping("/{policyId}/issue")
-    ApiResponse<Void> issuePolicy(@PathVariable("policyId") String policyId,
-                                  @RequestHeader("X-Operator-Id") String operatorId,
-                                  @RequestHeader("X-Tenant-Id") String tenantId);
+    ApiResponse<Void> issuePolicy(@PathVariable String policyId);
 
     /**
      * 激活保单
      *
      * @param policyId 保单ID
-     * @param tenantId 租户ID
      * @return 空响应
      */
     @PutMapping("/{policyId}/activate")
-    ApiResponse<Void> activatePolicy(@PathVariable("policyId") String policyId,
-                                     @RequestHeader("X-Tenant-Id") String tenantId);
+    ApiResponse<Void> activatePolicy(@PathVariable String policyId);
 
     /** Payment 或 Billing 回写已核验的保费收讫事实。 */
     @PostMapping("/{policyId}/collections")
     ApiResponse<Void> recordPremiumCollection(
-            @PathVariable("policyId") String policyId,
-            @Valid @RequestBody RecordPremiumCollectionRequest request,
-            @RequestHeader("X-Operator-Id") String operatorId,
-            @RequestHeader("X-Tenant-Id") String tenantId);
+            @PathVariable String policyId,
+            @Valid @RequestBody RecordPremiumCollectionRequest request);
 
     /**
      * 回写投资账户价值（investment 域调用，投连/万能保单账户价值变更后回写）
      *
      * @param policyId 保单ID
      * @param dto 账户价值回写 DTO
-     * @param tenantId 租户ID
      * @return 空响应
      */
     @PutMapping("/{policyId}/account-value")
-    ApiResponse<Void> writeBackAccountValue(@PathVariable("policyId") String policyId,
-                                            @RequestBody AccountValueWriteBackRequest dto,
-                                            @RequestHeader("X-Tenant-Id") String tenantId);
+    ApiResponse<Void> writeBackAccountValue(@PathVariable String policyId,
+                                            @RequestBody AccountValueWriteBackRequest dto);
 
     /**
      * 查询保单条款快照列表（claim 域责任校验 CLAIM-4 的条款定位来源）
      *
      * @param policyId 保单ID
-     * @param tenantId 租户ID
      * @return 条款快照列表（无条款时为空列表）
      */
     @GetMapping("/{policyId}/clauses")
-    ApiResponse<List<PolicyClauseResponse>> getPolicyClauses(@PathVariable("policyId") String policyId,
-                                                             @RequestHeader("X-Tenant-Id") String tenantId);
+    ApiResponse<List<PolicyClauseResponse>> getPolicyClauses(@PathVariable String policyId);
 
     /**
      * 查询保单受益人主数据（claim 域身故给付 CLAIM-4 的受益人比对基准）
      *
      * @param policyId 保单ID
-     * @param tenantId 租户ID
      * @return 受益人列表（按受益顺位升序，无受益人时为空列表）
      */
     @GetMapping("/{policyId}/beneficiaries")
-    ApiResponse<List<PolicyBeneficiaryResponse>> getBeneficiaries(@PathVariable("policyId") String policyId,
-                                                                  @RequestHeader("X-Tenant-Id") String tenantId);
+    ApiResponse<List<PolicyBeneficiaryResponse>> getBeneficiaries(@PathVariable String policyId);
 }

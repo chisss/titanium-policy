@@ -3,6 +3,7 @@ package com.titanium.policy.web.provider;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.titanium.common.context.RequestContextHolder;
 import com.titanium.metadata.errorcode.PolicyErrorCode;
 import com.titanium.metadata.response.ApiResponse;
 import com.titanium.policy.api.PolicyIssuanceApi;
@@ -37,8 +38,8 @@ public class PolicyIssuanceApiProvider implements PolicyIssuanceApi {
     private final IssuanceRequestAssembler         issuanceRequestAssembler;
 
     @Override
-    public ApiResponse<IssuanceResponse> submitIssuance(SubmitIssuanceRequest request, String tenantId) {
-        IssuanceRequest domainRequest = issuanceRequestAssembler.toDomainRequest(request, tenantId);
+    public ApiResponse<IssuanceResponse> submitIssuance(SubmitIssuanceRequest request) {
+        IssuanceRequest domainRequest = issuanceRequestAssembler.toDomainRequest(request, RequestContextHolder.requireTenantId());
         IssuanceResult result = policyIssuanceApplicationService.submitIssuance(domainRequest);
         IssuanceResponse response = issuanceRequestAssembler.toResponse(result);
         // 受理失败（要素校验/风控/模式不支持）以业务码返回，非 HTTP 错误——业务码 ≠ HTTP 状态码
@@ -48,8 +49,8 @@ public class PolicyIssuanceApiProvider implements PolicyIssuanceApi {
     }
 
     @Override
-    public ApiResponse<IssuanceResponse> getIssuanceProgress(String bizNo, String tenantId) {
-        return policyIssuanceApplicationService.getIssuanceProgress(bizNo, tenantId)
+    public ApiResponse<IssuanceResponse> getIssuanceProgress(String bizNo) {
+        return policyIssuanceApplicationService.getIssuanceProgress(bizNo, RequestContextHolder.requireTenantId())
                 .map(issuanceRequestAssembler::toResponse)
                 .map(ApiResponse::success)
                 .orElseGet(() -> ApiResponse.error(PolicyErrorCode.POLICY_NOT_EXIST, "出单流水号不存在: " + bizNo));

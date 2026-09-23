@@ -6,7 +6,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 
 import com.titanium.metadata.response.ApiResponse;
 import com.titanium.policy.api.request.issuance.CreateProposalRequest;
@@ -46,23 +45,19 @@ public interface ProposalApi {
      * </p>
      *
      * @param dto 创建投保意向单请求（草稿级，不含参与方与标的）
-     * @param tenantId 租户ID
      * @return 意向单ID
      */
     @PostMapping
-    ApiResponse<String> createProposal(@RequestBody CreateProposalRequest dto,
-                                       @RequestHeader("X-Tenant-Id") String tenantId);
+    ApiResponse<String> createProposal(@RequestBody CreateProposalRequest dto);
 
     /**
      * 获取投保意向单详情（跨域集成用）
      *
      * @param proposalId 意向单ID
-     * @param tenantId 租户ID
      * @return 意向单详情，不存在时 code=404
      */
     @GetMapping("/{proposalId}")
-    ApiResponse<ProposalResponse> getProposal(@PathVariable("proposalId") String proposalId,
-                                         @RequestHeader("X-Tenant-Id") String tenantId);
+    ApiResponse<ProposalResponse> getProposal(@PathVariable String proposalId);
 
     /**
      * 提交投保意向单
@@ -79,10 +74,8 @@ public interface ProposalApi {
      * </p>
      *
      * @param proposalId 意向单ID
-     * @param tenantId 租户ID
      * @return 空响应
      */
     @PutMapping("/{proposalId}/submit")
-    ApiResponse<Void> submitProposal(@PathVariable("proposalId") String proposalId,
-                                     @RequestHeader("X-Tenant-Id") String tenantId);
+    ApiResponse<Void> submitProposal(@PathVariable String proposalId);
 }

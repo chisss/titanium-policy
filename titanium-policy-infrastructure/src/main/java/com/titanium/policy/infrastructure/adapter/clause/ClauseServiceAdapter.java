@@ -43,7 +43,7 @@ public class ClauseServiceAdapter implements ClauseServicePort {
     @Override
     public ClauseSnapshot fetchClauseSnapshot(String clauseId, boolean isMainClause, String tenantId) {
         try {
-            ClauseResponse response = clauseApi.getClauseById(clauseId, tenantId);
+            ClauseResponse response = clauseApi.getClauseById(clauseId);
             if (response == null) {
                 log.warn("条款不存在，无法装配条款快照: clauseId={}, tenantId={}", clauseId, tenantId);
                 return null;
@@ -60,7 +60,7 @@ public class ClauseServiceAdapter implements ClauseServicePort {
     @Override
     public List<CoverageSnapshot> fetchCoverageSnapshots(String clauseId, String tenantId) {
         try {
-            List<CoverageResponse> coverages = clauseApi.getCoveragesByClauseId(clauseId, tenantId);
+            List<CoverageResponse> coverages = clauseApi.getCoveragesByClauseId(clauseId);
             if (coverages == null || coverages.isEmpty()) {
                 log.warn("条款下无保险责任，保单将无责任明细: clauseId={}, tenantId={}", clauseId, tenantId);
                 return List.of();

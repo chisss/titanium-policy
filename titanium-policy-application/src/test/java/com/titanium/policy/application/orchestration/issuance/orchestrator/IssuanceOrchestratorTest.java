@@ -108,9 +108,9 @@ class IssuanceOrchestratorTest {
                 premiumCollectionOrchestrator,
                 new PremiumScheduleOrchestrator(billingServicePort));
         when(riskAssessmentExecutor.execute(any(), any())).thenReturn(true);
-        when(productServicePort.getProductBasicInfo(PRODUCT_ID, TENANT_ID))
+        when(productServicePort.getProductBasicInfo(PRODUCT_ID))
                 .thenReturn(new ProductBasicInfo(PRODUCT_ID, "P001", "测试产品", "V1", null, "EFFECTIVE"));
-        when(productServicePort.getIssueRules(PRODUCT_ID, TENANT_ID)).thenReturn(issueRules());
+        when(productServicePort.getIssueRules(PRODUCT_ID)).thenReturn(issueRules());
         when(confirmedPremiumPricingPort.confirm(any()))
                 .thenReturn(new ConfirmedPremiumResult(
                         "CALC_001", "CONFIRMED", "ISSUANCE_CONFIRM", PRODUCT_ID, "V1", "CNY",
@@ -141,7 +141,7 @@ class IssuanceOrchestratorTest {
 
     @Test
     void threeStepCreatesProposalThenImmediatelySubmitsProposal() {
-        when(productServicePort.getProductBasicInfo(PRODUCT_ID, TENANT_ID))
+        when(productServicePort.getProductBasicInfo(PRODUCT_ID))
                 .thenReturn(new ProductBasicInfo(PRODUCT_ID, "P001", "测试产品", "V1",
                         InsuranceProductType.TERM_LIFE, "EFFECTIVE"));
 
@@ -229,7 +229,7 @@ class IssuanceOrchestratorTest {
     @Test
     void oneStepTreatsMissingOptionalPeriodConfigAsZero() {
         when(productServicePort.getClauseRefs(PRODUCT_ID, TENANT_ID)).thenReturn(List.of());
-        when(productServicePort.getIssueRules(PRODUCT_ID, TENANT_ID))
+        when(productServicePort.getIssueRules(PRODUCT_ID))
                 .thenReturn(new ProductIssueRules(0, 65, null, null, null, null, List.of(), List.of(), List.of(),
                         null, null, null, false, List.of(), List.of(), null, List.of(), null, null, false, false));
         when(premiumCollectionOrchestrator.collect(any(), any(), any(), any(), any(LocalDate.class), any(), anyList()))

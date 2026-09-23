@@ -117,7 +117,7 @@ class BillingServiceAdapterTest {
         assertEquals(LocalDate.of(2026, 8, 13), actual.getFirstDueDate());
         assertEquals("SYSTEM_ISSUANCE", actual.getOperatedBy());
         assertEquals("TENANT_001", actual.getTenantId());
-        verify(billingAccountApi, never()).getBillingAccountByPolicyId(any(), any());
+        verify(billingAccountApi, never()).getBillingAccountByPolicyId(any());
     }
 
     @Test

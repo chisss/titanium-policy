@@ -37,7 +37,7 @@ public class InvestmentAccountAdapter implements InvestmentAccountPort {
     private final InvestmentAccountApi investmentAccountApi;
 
     @Override
-    public String openAccount(String policyId, PolicyForm form, Money initialPremium, String tenantId) {
+    public String openAccount(String policyId, PolicyForm form, Money initialPremium) {
         String currency = initialPremium != null ? initialPremium.currency() : CurrencyEnum.CNY.getCode();
         CreateAccountRequest request = new CreateAccountRequest();
         request.setPolicyId(policyId);
@@ -56,7 +56,7 @@ public class InvestmentAccountAdapter implements InvestmentAccountPort {
     }
 
     @Override
-    public Money accountValue(String accountId, String tenantId) {
+    public Money accountValue(String accountId) {
         ApiResponse<InvestmentAccountQueryResult> response = investmentAccountApi.getAccount(accountId);
         if (response == null || !response.isSuccess() || response.getData() == null) {
             log.warn("查询投资账户价值失败: accountId={}", accountId);

@@ -9,12 +9,16 @@ import static org.mockito.Mockito.when;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 
+import com.titanium.common.context.RequestContext;
+import com.titanium.common.context.RequestContextHolder;
 import com.titanium.policy.application.command.insurance.InsuranceApplicationService;
 import com.titanium.policy.application.command.policy.PolicyApplicationService;
 import com.titanium.policy.application.command.proposal.ProposalApplicationService;
@@ -39,6 +43,18 @@ class RootPaginationControllerTest {
 
     private static final String TENANT_ID = "TENANT_001";
 
+    @BeforeEach
+    void setUp() {
+        // m18：租户改由请求上下文承载，控制器不再以 @RequestHeader 形参接收
+        RequestContextHolder.set(RequestContext.ofTenant(TENANT_ID));
+    }
+
+    @AfterEach
+    void tearDown() {
+        // 线程池复用线程上残留身份会造成跨用例串台
+        RequestContextHolder.clear();
+    }
+
     @Test
     void policyPageMappingKeepsTotalElements() {
         PolicyAppQueryService queryService = mock(PolicyAppQueryService.class);
@@ -52,7 +68,7 @@ class RootPaginationControllerTest {
                 mapper, mock(PolicyStatisticsWebMapper.class));
 
         ResponseEntity<Page<PolicyDetailVO>> response = controller.pagePolicies(null, null, null, null, null, null,
-                null, null, null, 1, 10, TENANT_ID);
+                null, null, null, 1, 10);
 
         assertEquals(31, response.getBody().getTotalElements());
         assertSame(vo, response.getBody().getContent().getFirst());
@@ -78,7 +94,7 @@ class RootPaginationControllerTest {
                 mapper, mock(PolicyStatisticsWebMapper.class));
 
         controller.pagePolicies("POL", null, null, null, null, effectiveStart, effectiveEnd, expiryStart, expiryEnd,
-                0, 10, TENANT_ID);
+                0, 10);
 
         verify(queryService).findPageByConditions("POL", null, null, null, null, effectiveStart, effectiveEnd,
                 expiryStart, expiryEnd, TENANT_ID, 0, 10);
@@ -96,8 +112,7 @@ class RootPaginationControllerTest {
         InsuranceController controller = new InsuranceController(mock(InsuranceApplicationService.class),
                 queryService, mapper);
 
-        ResponseEntity<Page<InsuranceVO>> response = controller.pageInsurances(null, null, null, null, 2, 20,
-                TENANT_ID);
+        ResponseEntity<Page<InsuranceVO>> response = controller.pageInsurances(null, null, null, null, 2, 20);
 
         assertEquals(69, response.getBody().getTotalElements());
         assertSame(vo, response.getBody().getContent().getFirst());
@@ -115,8 +130,7 @@ class RootPaginationControllerTest {
         ProposalController controller = new ProposalController(mock(ProposalApplicationService.class), queryService,
                 mapper);
 
-        ResponseEntity<Page<ProposalVO>> response = controller.pageProposals(null, null, null, null, 3, 20,
-                TENANT_ID);
+        ResponseEntity<Page<ProposalVO>> response = controller.pageProposals(null, null, null, null, 3, 20);
 
         assertEquals(92, response.getBody().getTotalElements());
         assertSame(vo, response.getBody().getContent().getFirst());

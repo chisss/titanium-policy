@@ -28,42 +28,42 @@ class ProductServiceAdapterTest {
     @Test
     void shouldPreferProductIssuanceMode() {
         ProductResponse product = product(IssuanceMode.ONE_STEP);
-        when(productApi.getProductById("product-1", "tenant-1")).thenReturn(ApiResponse.success(product));
+        when(productApi.getProductById("product-1")).thenReturn(ApiResponse.success(product));
         ProductServiceAdapter adapter = new ProductServiceAdapter(productApi, productTemplateApi);
 
-        assertEquals(IssuanceMode.ONE_STEP, adapter.getIssuanceMode("product-1", "tenant-1"));
-        verify(productTemplateApi, never()).getByProductId("product-1", "tenant-1");
+        assertEquals(IssuanceMode.ONE_STEP, adapter.getIssuanceMode("product-1"));
+        verify(productTemplateApi, never()).getByProductId("product-1");
     }
 
     @Test
     void shouldFallbackToBoundTemplateIssuanceMode() {
-        when(productApi.getProductById("product-1", "tenant-1"))
+        when(productApi.getProductById("product-1"))
                 .thenReturn(ApiResponse.success(product(null)));
         ProductTemplateResponse template = new ProductTemplateResponse();
         template.setIssuanceMode(IssuanceMode.THREE_STEP);
-        when(productTemplateApi.getByProductId("product-1", "tenant-1"))
+        when(productTemplateApi.getByProductId("product-1"))
                 .thenReturn(ApiResponse.success(template));
         ProductServiceAdapter adapter = new ProductServiceAdapter(productApi, productTemplateApi);
 
-        assertEquals(IssuanceMode.THREE_STEP, adapter.getIssuanceMode("product-1", "tenant-1"));
+        assertEquals(IssuanceMode.THREE_STEP, adapter.getIssuanceMode("product-1"));
     }
 
     @Test
     void shouldExposeVehicleSubjectSchemaAsIssuanceRule() {
         ProductResponse product = product(IssuanceMode.ONE_STEP);
         product.setInsuranceType(InsuranceProductType.AUTO);
-        when(productApi.getProductById("product-1", "tenant-1")).thenReturn(ApiResponse.success(product));
+        when(productApi.getProductById("product-1")).thenReturn(ApiResponse.success(product));
         ProductTemplateResponse template = new ProductTemplateResponse();
         template.setPolicyStructure(ProductTemplateResponse.PolicyStructureConfigDTO.builder()
                 .subjectType(SubjectType.VEHICLE)
                 .subjectFieldsSchema("{\"required\":[\"licensePlate\",\"vin\"]}")
                 .build());
-        when(productTemplateApi.getByProductId("product-1", "tenant-1"))
+        when(productTemplateApi.getByProductId("product-1"))
                 .thenReturn(ApiResponse.success(template));
 
         ProductServiceAdapter adapter = new ProductServiceAdapter(productApi, productTemplateApi);
 
-        var rules = adapter.getIssueRules("product-1", "tenant-1");
+        var rules = adapter.getIssueRules("product-1");
         assertEquals(SubjectType.VEHICLE, rules.subjectType());
         assertEquals(List.of("licensePlate", "vin"), rules.requiredSubjectAttributes());
     }

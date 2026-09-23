@@ -5,7 +5,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 
 import com.titanium.metadata.response.ApiResponse;
 import com.titanium.policy.api.request.issuance.SubmitIssuanceRequest;
@@ -44,12 +43,10 @@ public interface PolicyIssuanceApi {
      * </p>
      *
      * @param request  出单请求（含结构化险种段方案 planLines）
-     * @param tenantId 租户ID
      * @return 出单结果（含当前阶段、各单据ID、保费、支付凭据或拒绝原因）
      */
     @PostMapping
-    ApiResponse<IssuanceResponse> submitIssuance(@RequestBody SubmitIssuanceRequest request,
-                                                 @RequestHeader("X-Tenant-Id") String tenantId);
+    ApiResponse<IssuanceResponse> submitIssuance(@RequestBody SubmitIssuanceRequest request);
 
     /**
      * 查询出单进度（按业务流水号）
@@ -58,10 +55,8 @@ public interface PolicyIssuanceApi {
      * </p>
      *
      * @param bizNo    业务流水号
-     * @param tenantId 租户ID
      * @return 出单进度；流水号不存在时 data 为空
      */
     @GetMapping("/{bizNo}")
-    ApiResponse<IssuanceResponse> getIssuanceProgress(@PathVariable("bizNo") String bizNo,
-                                                      @RequestHeader("X-Tenant-Id") String tenantId);
+    ApiResponse<IssuanceResponse> getIssuanceProgress(@PathVariable String bizNo);
 }

@@ -3,6 +3,7 @@ package com.titanium.policy.web.provider;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.titanium.common.context.RequestContextHolder;
 import com.titanium.metadata.errorcode.PolicyErrorCode;
 import com.titanium.metadata.response.ApiResponse;
 import com.titanium.policy.api.ProposalApi;
@@ -36,25 +37,25 @@ public class ProposalApiProvider implements ProposalApi {
     private final ProposalWebMapper          proposalWebMapper;
 
     @Override
-    public ApiResponse<String> createProposal(CreateProposalRequest dto, String tenantId) {
+    public ApiResponse<String> createProposal(CreateProposalRequest dto) {
         // 协议转换：远程 DTO → 领域命令，收敛到同一应用层门面
-        CreateProposalCommand command = proposalWebMapper.toCommand(dto, tenantId);
+        CreateProposalCommand command = proposalWebMapper.toCommand(dto, RequestContextHolder.requireTenantId());
         String proposalId = proposalApplicationService.createProposal(command);
         return ApiResponse.success(proposalId);
     }
 
     @Override
-    public ApiResponse<ProposalResponse> getProposal(String proposalId, String tenantId) {
+    public ApiResponse<ProposalResponse> getProposal(String proposalId) {
         // 走读模型（QueryGateway → ProposalView），命中组装为对外 DTO，未命中返回 404 码
-        return proposalAppQueryService.findById(proposalId, tenantId)
+        return proposalAppQueryService.findById(proposalId, RequestContextHolder.requireTenantId())
                 .map(proposalWebMapper::toResponse)
                 .map(ApiResponse::success)
                 .orElseGet(() -> ApiResponse.error(PolicyErrorCode.PROPOSAL_NOT_EXIST, "投保意向单不存在: " + proposalId));
     }
 
     @Override
-    public ApiResponse<Void> submitProposal(String proposalId, String tenantId) {
-        proposalApplicationService.submitProposal(proposalId, "提交投保意向单", tenantId);
+    public ApiResponse<Void> submitProposal(String proposalId) {
+        proposalApplicationService.submitProposal(proposalId, "提交投保意向单", RequestContextHolder.requireTenantId());
         return ApiResponse.success();
     }
 }

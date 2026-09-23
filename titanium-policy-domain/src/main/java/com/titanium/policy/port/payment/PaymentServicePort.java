@@ -38,17 +38,15 @@ public interface PaymentServicePort {
      * 查询支付单状态（收费回调缺失时的兜底轮询）。
      *
      * @param paymentOrderId 支付单ID
-     * @param tenantId       租户ID
      * @return 支付单结果；查询失败返回失败结果
      */
-    PaymentOrderResult queryPaymentStatus(String paymentOrderId, String tenantId);
+    PaymentOrderResult queryPaymentStatus(String paymentOrderId);
 
     /**
      * 取消支付单（出单流程终止或超时未支付时释放）。
      *
      * @param paymentOrderId 支付单ID
      * @param reason         取消原因
-     * @param tenantId       租户ID
      */
-    void cancelPaymentOrder(String paymentOrderId, String reason, String tenantId);
+    void cancelPaymentOrder(String paymentOrderId, String reason);
 }

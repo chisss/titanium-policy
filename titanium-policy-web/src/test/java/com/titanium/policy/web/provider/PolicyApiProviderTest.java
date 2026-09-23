@@ -12,9 +12,12 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.List;
 
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
+import com.titanium.common.context.RequestContextHolder;
 import com.titanium.metadata.response.ApiResponse;
 import com.titanium.policy.api.request.maintenance.ApplyPolicyMaintenanceRequest;
 import com.titanium.policy.api.request.maintenance.PolicyMaintenanceFieldChangeRequest;
@@ -33,6 +36,18 @@ import com.titanium.policy.web.mapper.PolicyWebMapper;
 
 class PolicyApiProviderTest {
 
+    @BeforeEach
+    void setUp() {
+        // 契约实现已改为从请求上下文取身份（不再由入参显式传递），故测试须先建立租户上下文；
+        // 操作人各用例期望值不同，由用例自行设置。
+        RequestContextHolder.setTenantId("tenant-1");
+    }
+
+    @AfterEach
+    void tearDown() {
+        RequestContextHolder.clear();
+    }
+
     @Test
     void shouldMapPremiumCollectionToTenantScopedCommand() {
         PolicyApplicationService applicationService = mock(PolicyApplicationService.class);
@@ -43,8 +58,10 @@ class PolicyApiProviderTest {
         RecordPremiumCollectionRequest request = new RecordPremiumCollectionRequest(
                 "payment-1", "trade-1", new BigDecimal("121.20"), "CNY", "ANNUAL", collectedTime);
 
+        // 支付回调以服务身份调用，操作人来自请求上下文而非契约入参
+        RequestContextHolder.setOperatorId("payment-callback");
         ApiResponse<Void> response = provider.recordPremiumCollection(
-                "policy-1", request, "payment-callback", "tenant-1");
+                "policy-1", request);
 
         ArgumentCaptor<RecordPremiumCollectionCommand> commandCaptor =
                 ArgumentCaptor.forClass(RecordPremiumCollectionCommand.class);
@@ -81,7 +98,7 @@ class PolicyApiProviderTest {
         endorsement.setTenantId("tenant-1");
         when(queryService.findEndorsements("policy-1", "tenant-1")).thenReturn(List.of(endorsement));
 
-        var response = provider.getEndorsements("policy-1", "tenant-1");
+        var response = provider.getEndorsements("policy-1");
 
         verify(queryService).findEndorsements("policy-1", "tenant-1");
         assertTrue(response.isSuccess());
@@ -115,8 +132,9 @@ class PolicyApiProviderTest {
                 appliedAt);
         when(applicationService.applyMaintenance(any())).thenReturn(receipt);
 
+        RequestContextHolder.setOperatorId("operator-1");
         ApiResponse<PolicyMaintenanceApplicationResponse> response =
-                provider.applyMaintenance("policy-1", request, "operator-1", "tenant-1");
+                provider.applyMaintenance("policy-1", request);
 
         ArgumentCaptor<ApplyPolicyMaintenanceCommand> commandCaptor =
                 ArgumentCaptor.forClass(ApplyPolicyMaintenanceCommand.class);

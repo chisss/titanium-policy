@@ -6,7 +6,6 @@ import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import com.titanium.metadata.response.ApiResponse;
@@ -32,11 +31,9 @@ public interface PolicyCashValueApi {
      *
      * @param policyId 保单ID
      * @param valuationDate 估值日（为空取当日）
-     * @param tenantId 租户ID
      * @return 现金价值；保单不存在、要素缺失或产品域无适用策略时业务码非成功、{@code data} 为空
      */
     @GetMapping("/{policyId}/cash-value")
-    ApiResponse<PolicyCashValueResponse> getCashValue(@PathVariable("policyId") String policyId,
-            @RequestParam(value = "valuationDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate valuationDate,
-            @RequestHeader("X-Tenant-ID") String tenantId);
+    ApiResponse<PolicyCashValueResponse> getCashValue(@PathVariable String policyId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate valuationDate);
 }

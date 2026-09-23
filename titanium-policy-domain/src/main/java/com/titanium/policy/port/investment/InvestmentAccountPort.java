@@ -21,17 +21,15 @@ public interface InvestmentAccountPort {
      * @param policyId 保单ID
      * @param form 保单形态（决定账户类型：投连/万能）
      * @param initialPremium 首期保费（作为账户初始价值参考）
-     * @param tenantId 租户ID
      * @return 投资账户ID；开户失败返回 null（由调用方兜底，不阻断出单）
      */
-    String openAccount(String policyId, PolicyForm form, Money initialPremium, String tenantId);
+    String openAccount(String policyId, PolicyForm form, Money initialPremium);
 
     /**
      * 查询投资账户价值
      *
      * @param accountId 投资账户ID
-     * @param tenantId 租户ID
      * @return 账户价值；查询失败返回 null
      */
-    Money accountValue(String accountId, String tenantId);
+    Money accountValue(String accountId);
 }
