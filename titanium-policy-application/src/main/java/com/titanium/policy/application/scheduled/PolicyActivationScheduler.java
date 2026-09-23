@@ -16,6 +16,7 @@ import com.titanium.policy.query.view.PolicyView;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 
 /**
  * 待生效保单定时激活补偿（application/scheduled）
@@ -55,6 +56,7 @@ public class PolicyActivationScheduler {
     /**
      * 定时扫描并激活起期已到的待生效保单（默认每日 02:00，可经配置覆盖）。
      */
+        @SchedulerLock(name = "policy-activateDuePolicies")
     @Scheduled(cron = "${titanium.policy.activation.cron:0 0 2 * * ?}")
     public void activateDuePolicies() {
         LocalDateTime dueDate = LocalDateTime.now();

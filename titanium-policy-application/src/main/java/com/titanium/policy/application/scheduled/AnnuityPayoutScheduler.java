@@ -18,6 +18,7 @@ import com.titanium.policy.query.view.AnnuityPayoutPlanView;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 
 /**
  * 年金逐期给付定时驱动（application/scheduled）
@@ -46,6 +47,7 @@ public class AnnuityPayoutScheduler {
     /**
      * 定时扫描并给付到期年金（默认每日 01:00，可经配置覆盖）。
      */
+        @SchedulerLock(name = "policy-payDueAnnuities")
     @Scheduled(cron = "${titanium.policy.annuity-payout.cron:0 0 1 * * ?}")
     public void payDueAnnuities() {
         LocalDateTime dueDate = LocalDateTime.now();

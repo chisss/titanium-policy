@@ -19,6 +19,7 @@ import com.titanium.policy.query.view.PolicyView;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 
 /**
  * 保单满期给付定时驱动（application/scheduled）
@@ -47,6 +48,7 @@ public class PolicyMaturityScheduler {
     /**
      * 定时扫描并满期给付到期保单（默认每日 01:30，可经配置覆盖）。
      */
+        @SchedulerLock(name = "policy-matureDuePolicies")
     @Scheduled(cron = "${titanium.policy.maturity.cron:0 30 1 * * ?}")
     public void matureDuePolicies() {
         LocalDateTime dueDate = LocalDateTime.now();
