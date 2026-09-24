@@ -36,7 +36,10 @@ class MySqlPolicyNoSequenceStore implements PolicyNoSequenceStore {
 
     private static final String LAST_INSERT_ID_SQL = "SELECT LAST_INSERT_ID()";
 
-    private final JdbcTemplate jdbcTemplate;
+        // ✅ m22-06（审查报告 PER-03）定性：本类用 JdbcTemplate 而**非绕过 JPA 的疏漏**——
+    // 号段存储依赖 **MySQL 会话级自增**（LAST_INSERT_ID(expr) 的原子分配语义），JPA 无对应能力；
+    // 号段的 tenant_id 在 INSERT 语句的列清单中（SELECT LAST_INSERT_ID() 是会话函数，与租户无关）。
+private final JdbcTemplate jdbcTemplate;
 
     @Override
     @Transactional
