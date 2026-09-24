@@ -41,6 +41,7 @@ import com.titanium.policy.query.view.PolicyBeneficiaryView;
 import com.titanium.policy.query.view.PolicyInsuredView;
 import com.titanium.policy.query.view.PolicyProductView;
 import com.titanium.policy.query.view.PolicyView;
+import com.titanium.policy.query.view.PolicyView_;
 import com.titanium.policy.service.maintenance.PolicyMaintenanceHashing;
 import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceSnapshotFieldValue;
 
@@ -377,7 +378,7 @@ public class PolicyQueryServiceImpl implements PolicyQueryService {
         boolean byExpiry = "expiryDate".equalsIgnoreCase(dateType);
         Specification<PolicyView> spec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
-            predicates.add(cb.equal(root.get("tenantId"), tenantId));
+            predicates.add(cb.equal(root.get(PolicyView_.tenantId), tenantId));
             String field = byExpiry ? "endDate" : "startDate";
             if (startDate != null) {
                 predicates.add(cb.greaterThanOrEqualTo(root.get(field), startDate));
@@ -406,23 +407,23 @@ public class PolicyQueryServiceImpl implements PolicyQueryService {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
             // 多租户隔离：强制条件
-            predicates.add(cb.equal(root.get("tenantId"), tenantId));
+            predicates.add(cb.equal(root.get(PolicyView_.tenantId), tenantId));
             if (isNotBlank(policyNo)) {
-                predicates.add(cb.like(root.get("policyNo"), "%" + policyNo + "%"));
+                predicates.add(cb.like(root.get(PolicyView_.policyNo), "%" + policyNo + "%"));
             }
             if (isNotBlank(policyHolderName)) {
-                predicates.add(cb.like(root.get("policyHolderName"), "%" + policyHolderName + "%"));
+                predicates.add(cb.like(root.get(PolicyView_.policyHolderName), "%" + policyHolderName + "%"));
             }
             if (isNotBlank(insuredName)) {
-                predicates.add(cb.like(root.get("insuredName"), "%" + insuredName + "%"));
+                predicates.add(cb.like(root.get(PolicyView_.insuredName), "%" + insuredName + "%"));
             }
             if (isNotBlank(productCode)) {
-                predicates.add(cb.equal(root.get("productCode"), productCode));
+                predicates.add(cb.equal(root.get(PolicyView_.productCode), productCode));
             }
             if (isNotBlank(status)) {
                 PolicyEnum.PolicyStatus statusEnum = PolicyEnum.PolicyStatus.fromCode(status);
                 if (statusEnum != null) {
-                    predicates.add(cb.equal(root.get("policyStatus"), statusEnum));
+                    predicates.add(cb.equal(root.get(PolicyView_.policyStatus), statusEnum));
                 } else {
                     // 🔴 未知码 ⇒ 空集（D-501-66）：静默丢弃条件会返回全表，
                     // 界面表现为「按某状态筛选却列出全部」，比报错更隐蔽
@@ -431,16 +432,16 @@ public class PolicyQueryServiceImpl implements PolicyQueryService {
                 }
             }
             if (effectiveDateStart != null) {
-                predicates.add(cb.greaterThanOrEqualTo(root.get("startDate"), effectiveDateStart));
+                predicates.add(cb.greaterThanOrEqualTo(root.get(PolicyView_.startDate), effectiveDateStart));
             }
             if (effectiveDateEnd != null) {
-                predicates.add(cb.lessThanOrEqualTo(root.get("startDate"), effectiveDateEnd));
+                predicates.add(cb.lessThanOrEqualTo(root.get(PolicyView_.startDate), effectiveDateEnd));
             }
             if (expiryDateStart != null) {
-                predicates.add(cb.greaterThanOrEqualTo(root.get("endDate"), expiryDateStart));
+                predicates.add(cb.greaterThanOrEqualTo(root.get(PolicyView_.endDate), expiryDateStart));
             }
             if (expiryDateEnd != null) {
-                predicates.add(cb.lessThanOrEqualTo(root.get("endDate"), expiryDateEnd));
+                predicates.add(cb.lessThanOrEqualTo(root.get(PolicyView_.endDate), expiryDateEnd));
             }
             return cb.and(predicates.toArray(new Predicate[0]));
         };
