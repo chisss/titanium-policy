@@ -10,6 +10,9 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+
 import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.insurance.SubjectType;
 import com.titanium.metadata.enums.product.ProductEnum.IssuanceMode;
@@ -22,6 +25,10 @@ import com.titanium.product.api.response.product.ProductTemplateResponse;
 
 class ProductServiceAdapterTest {
 
+    /** 被测适配器要求注入 JSON 解析器（m22-03：原为字段内裸 new）；测试用带 JavaTimeModule 的实例 */
+    private static final ObjectMapper OBJECT_MAPPER =
+            new ObjectMapper().registerModule(new JavaTimeModule());
+
     private final ProductApi productApi = mock(ProductApi.class);
     private final ProductTemplateApi productTemplateApi = mock(ProductTemplateApi.class);
 
@@ -29,7 +36,7 @@ class ProductServiceAdapterTest {
     void shouldPreferProductIssuanceMode() {
         ProductResponse product = product(IssuanceMode.ONE_STEP);
         when(productApi.getProductById("product-1")).thenReturn(ApiResponse.success(product));
-        ProductServiceAdapter adapter = new ProductServiceAdapter(productApi, productTemplateApi);
+        ProductServiceAdapter adapter = new ProductServiceAdapter(OBJECT_MAPPER, productApi, productTemplateApi);
 
         assertEquals(IssuanceMode.ONE_STEP, adapter.getIssuanceMode("product-1"));
         verify(productTemplateApi, never()).getByProductId("product-1");
@@ -43,7 +50,7 @@ class ProductServiceAdapterTest {
         template.setIssuanceMode(IssuanceMode.THREE_STEP);
         when(productTemplateApi.getByProductId("product-1"))
                 .thenReturn(ApiResponse.success(template));
-        ProductServiceAdapter adapter = new ProductServiceAdapter(productApi, productTemplateApi);
+        ProductServiceAdapter adapter = new ProductServiceAdapter(OBJECT_MAPPER, productApi, productTemplateApi);
 
         assertEquals(IssuanceMode.THREE_STEP, adapter.getIssuanceMode("product-1"));
     }
@@ -61,7 +68,7 @@ class ProductServiceAdapterTest {
         when(productTemplateApi.getByProductId("product-1"))
                 .thenReturn(ApiResponse.success(template));
 
-        ProductServiceAdapter adapter = new ProductServiceAdapter(productApi, productTemplateApi);
+        ProductServiceAdapter adapter = new ProductServiceAdapter(OBJECT_MAPPER, productApi, productTemplateApi);
 
         var rules = adapter.getIssueRules("product-1");
         assertEquals(SubjectType.VEHICLE, rules.subjectType());

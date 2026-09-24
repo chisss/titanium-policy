@@ -8,6 +8,8 @@ import static org.mockito.Mockito.when;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import com.titanium.clause.api.ClauseApi;
 import com.titanium.metadata.errorcode.SystemErrorCode;
 import com.titanium.metadata.response.ApiResponse;
@@ -43,6 +45,9 @@ class RemoteFailureNoFoldingTest {
      * 也不能 {@code mock(Request.class)}——Request 是 final 类，mock 会抛错并使
      * 整个测试类的静态初始化失败（症状是 NoClassDefFound: Could not initialize class）。</p>
      */
+    /** 被测适配器要求注入 JSON 解析器（m22-03 起由构造器注入） */
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
     private static final Request DUMMY_REQUEST = Request.create(Request.HttpMethod.GET, "/probe",
             java.util.Map.of(), new byte[0], java.nio.charset.StandardCharsets.UTF_8);
 
@@ -54,7 +59,7 @@ class RemoteFailureNoFoldingTest {
         ProductApi productApi = mock(ProductApi.class);
         when(productApi.getProductById(anyString()))
                 .thenReturn(ApiResponse.error(SystemErrorCode.RESOURCE_NOT_FOUND, "产品不存在"));
-        ProductServiceAdapter adapter = new ProductServiceAdapter(productApi, mock(ProductTemplateApi.class));
+        ProductServiceAdapter adapter = new ProductServiceAdapter(OBJECT_MAPPER, productApi, mock(ProductTemplateApi.class));
 
         assertThrows(RemoteDependencyUnavailableException.class,
                 () -> adapter.getProductBasicInfo("P-1"));
@@ -67,7 +72,7 @@ class RemoteFailureNoFoldingTest {
         ProductTemplateApi templateApi = mock(ProductTemplateApi.class);
         when(productApi.getProductById(anyString()))
                 .thenReturn(ApiResponse.error(SystemErrorCode.SYSTEM_ERROR, "内部错误"));
-        ProductServiceAdapter adapter = new ProductServiceAdapter(productApi, templateApi);
+        ProductServiceAdapter adapter = new ProductServiceAdapter(OBJECT_MAPPER, productApi, templateApi);
 
         assertThrows(RemoteDependencyUnavailableException.class,
                 () -> adapter.getIssueRules("P-1"));

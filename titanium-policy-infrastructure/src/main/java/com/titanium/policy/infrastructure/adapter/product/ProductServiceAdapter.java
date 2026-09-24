@@ -52,7 +52,13 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class ProductServiceAdapter implements ProductServicePort {
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    /**
+     * JSON 解析器：**由 Spring 注入托管实例**（m22-03 / 审查报告 SPR-04）。
+     * <p>原为字段初始化 {@code = new ObjectMapper()}——裸构造的实例不带 Spring 全局配置
+     * （自定义 Module、命名策略、JavaTimeModule 等），与 REST 层/其它组件的序列化行为**不一致**：
+     * 同一个时间字段在接口响应里是 ISO 字符串、在此处解析却可能失败或语义不同。</p>
+     */
+    private final ObjectMapper objectMapper;
 
     private final ProductApi productApi;
     private final ProductTemplateApi productTemplateApi;

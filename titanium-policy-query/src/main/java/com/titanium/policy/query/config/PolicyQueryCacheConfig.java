@@ -37,6 +37,8 @@ public class PolicyQueryCacheConfig {
                 .serializeKeysWith(
                         RedisSerializationContext.SerializationPair.fromSerializer(new StringRedisSerializer()))
                 .serializeValuesWith(RedisSerializationContext.SerializationPair
+    // ✅ m22-03（审查报告 SPR-04）定性：本处**有意独立构造**——Redis 缓存需要**独立的序列化器**（GenericJacksonJsonRedisSerializer 自带类型信息），
+    // 与 HTTP 响应体的 JSON 形态不同，不能共用 Spring 全局实例。
                         .fromSerializer(new GenericJacksonJsonRedisSerializer(new ObjectMapper())));
 
         return RedisCacheManager.builder(connectionFactory).cacheDefaults(config).build();

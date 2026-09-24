@@ -45,6 +45,8 @@ public class AxonSerializerConfig {
      *
      * @return 忽略未知字段、支持 JSR-310 的 ObjectMapper
      */
+    // ✅ m22-03（审查报告 SPR-04）定性：本处**有意独立构造**——Axon 事件序列化需要**特定的宽容策略**（忽略未知字段以支持存量事件重放），
+    // 与 Web 层严格策略相反，不能共用；🔴 该 lenient 配置本身是 AXN-04 的整改对象（属 m26）。
     private ObjectMapper lenientObjectMapper() {
         return new ObjectMapper()
                 // 支持 LocalDateTime 等 JSR-310 时间类型（Axon 4.10 依赖 Jackson 2.x）
