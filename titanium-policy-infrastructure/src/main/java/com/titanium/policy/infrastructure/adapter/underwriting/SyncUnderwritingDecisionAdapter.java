@@ -2,10 +2,12 @@ package com.titanium.policy.infrastructure.adapter.underwriting;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 
+import com.titanium.common.context.RequestContextHolder;
 import com.titanium.common.exception.BusinessException;
 import com.titanium.metadata.enums.underwriting.UnderwritingEnum;
 import com.titanium.metadata.enums.underwriting.UnderwritingEnum.ConclusionType;
@@ -46,6 +48,14 @@ public class SyncUnderwritingDecisionAdapter implements UnderwritingDecisionGate
     /** 自动核保方式（出单主链路默认走自动核保决策） */
     private static final String AUDIT_TYPE_AUTOMATIC = "AUTOMATIC";
 
+    /**
+     * 系统主体标识：核保决策由本域自动发起，操作人是**系统**而非投保人。
+     * <p>m21-03（审查报告 RPC-02）：改造前三处审计字段一律填 {@code holderId}，
+     * 使核保记录显示「投保人本人提交了核保，并且本人做出了核保决策」——审计留痕失真
+     * （NIST SP 800-53 AU-3/AU-10：审计记录须写明真实主体）。</p>
+     */
+    private static final String SYSTEM_OPERATOR = "SYSTEM_AUTO_UNDERWRITING";
+
     private final UnderwritingApi underwritingApi;
 
     @Override
@@ -53,11 +63,23 @@ public class SyncUnderwritingDecisionAdapter implements UnderwritingDecisionGate
         log.info("[核保网关] 同步请求富核保, insuranceId={}, holderId={}, tenantId={}", request.insuranceId(),
                 request.holderId(), request.tenantId());
 
-        // 1. 创建核保单（透传险种编码供核保域按产品配置决策——UW-4）
-        ResponseEntity<UnderwritingResponse> createdResponse = underwritingApi.createUnderwriting(
-                buildCreateRequest(request));
-        UnderwritingResponse created = requireSuccessfulBody(createdResponse, "创建核保", request);
-        String underwritingId = requireUnderwritingId(created, "创建核保", request);
+        // 1. 幂等前置：先按投保单号查已有核保单，有则复用。
+        //    🔴 m21-03（审查报告 RPC-02）：原实现每次调用都新建，Saga 重试或编排器重入一次即多一张
+        //    孤儿核保单（三次远程写全无幂等键）。此处用「投保单号」这一稳定业务键做查重——
+        //    underwriting 域已有 getUnderwritingByPolicyId 只读查询，无需改契约即可获得幂等。
+        //    仍存的语义污染：本域把 insuranceId 写进对方 policyId 字段（跨域语义错配），
+        //    根治需 underwriting 域提供粗粒度 :auto-decide 接口（见批次规划 §二 m21-03 备注）。
+        String underwritingId = findExistingUnderwritingId(request);
+        if (underwritingId == null) {
+            // 创建核保单（透传险种编码供核保域按产品配置决策——UW-4）
+            ResponseEntity<UnderwritingResponse> createdResponse = underwritingApi.createUnderwriting(
+                    buildCreateRequest(request));
+            UnderwritingResponse created = requireSuccessfulBody(createdResponse, "创建核保", request);
+            underwritingId = requireUnderwritingId(created, "创建核保", request);
+        } else {
+            log.info("[核保网关] 命中已有核保单，跳过创建（幂等）: insuranceId={}, underwritingId={}",
+                    request.insuranceId(), underwritingId);
+        }
 
         // 2. 提交结构化核保输入（被保人风险要素 → 富核保评分依据），替代旧金额兜底
         ResponseEntity<UnderwritingResponse> submittedResponse = underwritingApi.submitInput(underwritingId,
@@ -91,7 +113,7 @@ public class SyncUnderwritingDecisionAdapter implements UnderwritingDecisionGate
         createRequest.setCurrency(request.currency());
         createRequest.setUnderwritingType(UnderwritingEnum.UnderwritingType.NEW_BUSINESS);
         createRequest.setRequestDate(LocalDateTime.now());
-        createRequest.setRequestBy(request.holderId());
+        createRequest.setRequestBy(resolveOperatorId());
         // 险种编码取投保险种列表首个（承保主险载体）
         createRequest.setProductCode(resolveProductCode(request));
         return createRequest;
@@ -106,7 +128,7 @@ public class SyncUnderwritingDecisionAdapter implements UnderwritingDecisionGate
      */
     private SubmitUnderwritingInputApiRequest buildInputRequest(UnderwritingDecisionRequest request) {
         SubmitUnderwritingInputApiRequest inputRequest = new SubmitUnderwritingInputApiRequest();
-        inputRequest.setSubmittedBy(request.holderId());
+        inputRequest.setSubmittedBy(resolveOperatorId());
 
         // 职业信息：有职业类别时填充（意外险/定期寿险风险要素）
         if (request.primaryInsuredOccupationCategory() != null) {
@@ -176,10 +198,35 @@ public class SyncUnderwritingDecisionAdapter implements UnderwritingDecisionGate
     private DecideUnderwritingApiRequest buildDecideRequest(UnderwritingDecisionRequest request) {
         DecideUnderwritingApiRequest decideRequest = new DecideUnderwritingApiRequest();
         decideRequest.setAuditType(AUDIT_TYPE_AUTOMATIC);
-        decideRequest.setDecidedBy(request.holderId());
+        // 核保决策由系统自动作出，主体是系统而非投保人
+        decideRequest.setDecidedBy(SYSTEM_OPERATOR);
         // UW-4：透传险种编码，供核保域 application 层查询产品核保配置（加费许可等）
         decideRequest.setProductCode(resolveProductCode(request));
         return decideRequest;
+    }
+
+    /**
+     * 查询该投保单是否已有核保单，返回其 ID；无则返回 null。
+     * <p>幂等键取「投保单号」——同一投保单在重试/重入下必然映射到同一张核保单。</p>
+     */
+    private String findExistingUnderwritingId(UnderwritingDecisionRequest request) {
+        ResponseEntity<List<UnderwritingResponse>> response =
+                underwritingApi.getUnderwritingByPolicyId(request.insuranceId());
+        if (response == null || response.getBody() == null || response.getBody().isEmpty()) {
+            return null;
+        }
+        return response.getBody().get(0).getUnderwritingId();
+    }
+
+    /**
+     * 取真实操作人；上下文无操作人时回落系统主体。
+     * <p>🔴 绝不回落 {@code holderId}：把投保人记为操作人正是本次修复要消除的审计失真。
+     * 用「回落系统主体」而非 {@code requireOperatorId()} 硬失败，是为兼容事件驱动的自动出单
+     * （该场景确无人工操作人，业务上应由系统主体承担）。</p>
+     */
+    private String resolveOperatorId() {
+        String operatorId = RequestContextHolder.getOperatorId();
+        return operatorId != null && !operatorId.isBlank() ? operatorId : SYSTEM_OPERATOR;
     }
 
     /**
