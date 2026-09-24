@@ -7,6 +7,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 import org.axonframework.commandhandling.gateway.CommandGateway;
 import org.axonframework.modelling.saga.EndSaga;
@@ -71,6 +72,16 @@ import lombok.extern.slf4j.Slf4j;
 @JsonAutoDetect(fieldVisibility = Visibility.ANY, getterVisibility = Visibility.NONE,
         isGetterVisibility = Visibility.NONE)
 public class ProposalIssuanceSaga {
+
+
+    /**
+     * Saga 内同步命令的超时（秒）。
+     * <p>m21-05（审查报告 ORC-02）：{@code sendAndWait(command)} 的无超时重载在下游不响应时
+     * <b>永久阻塞 Saga 事件处理线程</b>——该线程被 Axon 用于顺序处理同一处理器组的事件，
+     * 一条卡住的命令会让整组停止推进，且 Saga 自身的超时机制（DeadlineManager）无从介入。
+     * 故 Saga 内的同步命令一律带超时：超时后抛异常，由错误处理器使该次出单挂起并告警。</p>
+     */
+    private static final long COMMAND_TIMEOUT_SECONDS = 5L;
 
     @Autowired
     private transient CommandGateway commandGateway;
@@ -259,7 +270,7 @@ public class ProposalIssuanceSaga {
                 .proposalId(event.proposalId())
                 .changeReason("意向单提交后自动转投保单")
                 .tenantId(event.tenantId())
-                .build());
+                .build(), COMMAND_TIMEOUT_SECONDS, TimeUnit.SECONDS);
     }
 
     /**
@@ -307,8 +318,8 @@ public class ProposalIssuanceSaga {
                 .premiumPaymentYears(premiumPaymentYears)
                 .build();
 
-        commandGateway.sendAndWait(command);
-        commandGateway.sendAndWait(new SubmitUnderwritingCommand(insuranceId, tenantId));
+        commandGateway.sendAndWait(command, COMMAND_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        commandGateway.sendAndWait(new SubmitUnderwritingCommand(insuranceId, tenantId), COMMAND_TIMEOUT_SECONDS, TimeUnit.SECONDS);
         log.info("[ProposalIssuanceSaga] 投保单已创建，后续由 IssuanceSaga 接力: proposalId={}, insuranceId={}",
                 event.proposalId(), insuranceId);
     }

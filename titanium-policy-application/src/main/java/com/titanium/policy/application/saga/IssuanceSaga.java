@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 import org.axonframework.commandhandling.gateway.CommandGateway;
 import org.axonframework.modelling.saga.EndSaga;
@@ -80,6 +81,16 @@ import lombok.extern.slf4j.Slf4j;
 @JsonAutoDetect(fieldVisibility = Visibility.ANY, getterVisibility = Visibility.NONE,
         isGetterVisibility = Visibility.NONE)
 public class IssuanceSaga {
+
+
+    /**
+     * Saga 内同步命令的超时（秒）。
+     * <p>m21-05（审查报告 ORC-02）：{@code sendAndWait(command)} 的无超时重载在下游不响应时
+     * <b>永久阻塞 Saga 事件处理线程</b>——该线程被 Axon 用于顺序处理同一处理器组的事件，
+     * 一条卡住的命令会让整组停止推进，且 Saga 自身的超时机制（DeadlineManager）无从介入。
+     * 故 Saga 内的同步命令一律带超时：超时后抛异常，由错误处理器使该次出单挂起并告警。</p>
+     */
+    private static final long COMMAND_TIMEOUT_SECONDS = 5L;
 
     @Autowired
     private transient CommandGateway commandGateway;
@@ -235,7 +246,7 @@ public class IssuanceSaga {
                 null, null);
         UnderwritingResult result = underwritingDecisionGateway.requestDecision(request);
 
-        commandGateway.sendAndWait(new ReceiveUnderwritingResultCommand(event.insuranceId(), result, event.tenantId()));
+        commandGateway.sendAndWait(new ReceiveUnderwritingResultCommand(event.insuranceId(), result, event.tenantId()), COMMAND_TIMEOUT_SECONDS, TimeUnit.SECONDS);
         log.info("[IssuanceSaga] 核保结论已回写投保单: insuranceId={}, 结论={}, 加费率={}", event.insuranceId(),
                 result.resultCode(), result.extraPremiumRatio());
     }
@@ -272,7 +283,7 @@ public class IssuanceSaga {
 
         if (policyIssuanceDomainService.canIssueByConclusion(result)) {
             log.info("[IssuanceSaga] 核保通过，触发承保出单: insuranceId={}", event.insuranceId());
-            commandGateway.sendAndWait(new TriggerIssuanceCommand(event.insuranceId(), event.tenantId()));
+            commandGateway.sendAndWait(new TriggerIssuanceCommand(event.insuranceId(), event.tenantId()), COMMAND_TIMEOUT_SECONDS, TimeUnit.SECONDS);
         } else {
             log.warn("[IssuanceSaga] 核保未通过（{}），结束 Saga: insuranceId={}", event.resultCode(), event.insuranceId());
             SagaLifecycle.end();
@@ -320,7 +331,7 @@ public class IssuanceSaga {
                 insuranceType,
                 tenantId);
 
-        commandGateway.sendAndWait(command);
+        commandGateway.sendAndWait(command, COMMAND_TIMEOUT_SECONDS, TimeUnit.SECONDS);
         log.info(
                 "[IssuanceSaga] 承保出单完成，已创建保单: insuranceId={}, policyId={}, policyNo={}, 标准保费={}, 加费率={}, 最终保费={}",
                 event.insuranceId(), policyId, policyNo, standardPremium.value(), extraPremiumRatio,
@@ -359,7 +370,7 @@ public class IssuanceSaga {
                 if (accountId != null) {
                     commandGateway.sendAndWait(
                             new LinkInvestmentAccountCommand(policyId, accountId, PolicyConstants.POLICY_SYSTEM,
-                                    tenantId));
+                                    tenantId), COMMAND_TIMEOUT_SECONDS, TimeUnit.SECONDS);
                     log.info("[IssuanceSaga] 投连/万能保单已挂接投资账户: policyId={}, accountId={}", policyId,
                             accountId);
                 } else {
@@ -388,7 +399,7 @@ public class IssuanceSaga {
      */
     private void activateIfPeriodStarted(String policyId) {
         try {
-            commandGateway.sendAndWait(new ActivatePolicyCommand(policyId, tenantId));
+            commandGateway.sendAndWait(new ActivatePolicyCommand(policyId, tenantId), COMMAND_TIMEOUT_SECONDS, TimeUnit.SECONDS);
             log.info("[IssuanceSaga] 保费条件已满足，保单已生效: policyId={}", policyId);
         } catch (Exception ex) {
             log.info("[IssuanceSaga] 保单暂不可生效（保障起期未到，待定时任务激活）: policyId={}, 原因={}", policyId,
