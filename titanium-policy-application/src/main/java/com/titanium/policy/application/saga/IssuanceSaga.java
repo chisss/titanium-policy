@@ -205,15 +205,16 @@ public class IssuanceSaga {
         if (main.productId() == null) {
             return;
         }
-        try {
-            ProductIssueRules rules = productServicePort.getIssueRules(main.productId());
-            if (rules != null) {
-                this.waitingPeriodDays = rules.waitingPeriodDays() != null ? rules.waitingPeriodDays() : 0;
-                this.hesitationPeriodDays = rules.hesitationPeriodDays() != null ? rules.hesitationPeriodDays() : 0;
-            }
-        } catch (Exception ex) {
-            log.warn("[IssuanceSaga] 取产品等待期/犹豫期配置失败，按无等待期兜底（需人工补正）: productId={}",
-                    main.productId(), ex);
+        // 🔴 m21-02（审查报告 RPC-01）：此处原为 catch-all，把「取产品规则失败」转成
+        // 「按无等待期兜底（需人工补正）」——而那句「人工补正」全仓并不存在对应流程，
+        // 结果是等待期与犹豫期静默归零继续出单：犹豫期是长期人身险客户的法定解约权，
+        // 等待期归零则等待期内出险也会赔付（直接赔付损失）。现改为**不吞异常**，
+        // 由 Saga 的错误处理器（PolicySagaErrorHandlingConfiguration 的传播型处理器）
+        // 使该次出单挂起并告警，等待人工处置。
+        ProductIssueRules rules = productServicePort.getIssueRules(main.productId());
+        if (rules != null) {
+            this.waitingPeriodDays = rules.waitingPeriodDays() != null ? rules.waitingPeriodDays() : 0;
+            this.hesitationPeriodDays = rules.hesitationPeriodDays() != null ? rules.hesitationPeriodDays() : 0;
         }
     }
 

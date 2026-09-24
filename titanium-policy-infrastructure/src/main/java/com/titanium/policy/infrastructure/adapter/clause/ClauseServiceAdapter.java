@@ -10,7 +10,9 @@ import com.titanium.clause.api.response.clause.ClauseResponse;
 import com.titanium.clause.api.response.clause.CoverageResponse;
 import com.titanium.metadata.enums.CurrencyEnum;
 import com.titanium.metadata.enums.clause.DeductibleType;
+import com.titanium.metadata.errorcode.SystemErrorCode;
 import com.titanium.metadata.valueobject.Money;
+import com.titanium.policy.exception.RemoteDependencyUnavailableException;
 import com.titanium.policy.port.clause.ClauseServicePort;
 import com.titanium.policy.valueobject.policy.ClauseSnapshot;
 import com.titanium.policy.valueobject.policy.CoverageSnapshot;
@@ -51,9 +53,12 @@ public class ClauseServiceAdapter implements ClauseServicePort {
             return new ClauseSnapshot(response.getClauseId(), response.getClauseCode(), response.getClauseName(),
                     response.getVersion(), isMainClause);
         } catch (FeignException e) {
-            log.warn("条款服务调用失败（{}），跳过条款装配: clauseId={}, error={}",
-                    e.status(), clauseId, e.getMessage());
-            return null;
+            // 🔴 m21-02（审查报告 RPC-01）：原实现此处返回 null → 保单缺该条款而静默出单成功
+            // （合同无理赔依据）。现改为抛出：连接被拒/超时/5xx 一律视为依赖不可用，
+            // 由编排层挂起该次出单。注意 FeignException 不含「条款确实不存在」——
+            // 后者由下游以成功响应 + 空值表达，走上面的 null 分支。
+            throw new RemoteDependencyUnavailableException(SystemErrorCode.DEPENDENCY_SERVICE_ERROR,
+                    "条款服务调用失败: clauseId=" + clauseId + ", status=" + e.status(), e);
         }
     }
 
@@ -68,9 +73,10 @@ public class ClauseServiceAdapter implements ClauseServicePort {
             log.info("取得条款责任清单: clauseId={}, 责任数={}", clauseId, coverages.size());
             return coverages.stream().map(this::toSnapshot).toList();
         } catch (FeignException e) {
-            log.warn("条款责任服务调用失败（{}），保单将无责任明细: clauseId={}, error={}",
-                    e.status(), clauseId, e.getMessage());
-            return List.of();
+            // 🔴 m21-02：原实现返回空列表 → 保单无任何保险责任而静默出单成功。
+            // 现改为抛出，语义同 fetchClauseSnapshot。
+            throw new RemoteDependencyUnavailableException(SystemErrorCode.DEPENDENCY_SERVICE_ERROR,
+                    "条款责任服务调用失败: clauseId=" + clauseId + ", status=" + e.status(), e);
         }
     }
 

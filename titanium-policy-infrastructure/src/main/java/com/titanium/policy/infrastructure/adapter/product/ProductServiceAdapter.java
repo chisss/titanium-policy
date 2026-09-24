@@ -13,7 +13,9 @@ import com.titanium.metadata.enums.insurance.SubjectType;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.enums.product.ProductEnum.IssuanceMode;
 import com.titanium.metadata.enums.product.ProductEnum.PolicyFormType;
+import com.titanium.metadata.errorcode.SystemErrorCode;
 import com.titanium.metadata.response.ApiResponse;
+import com.titanium.policy.exception.RemoteDependencyUnavailableException;
 import com.titanium.policy.port.product.ProductServicePort;
 import com.titanium.policy.valueobject.product.ProductBasicInfo;
 import com.titanium.policy.valueobject.product.ProductClauseRef;
@@ -179,10 +181,17 @@ public class ProductServiceAdapter implements ProductServicePort {
      */
     private ProductResponse fetchProduct(String productId) {
         ApiResponse<ProductResponse> response = productApi.getProductById(productId);
-        if (response == null || !response.isSuccess()) {
-            log.error("获取产品详情失败: productId={}, error={}", productId,
-                    response != null ? response.getMessage() : "响应为空");
-            return null;
+        if (response == null) {
+            throw new RemoteDependencyUnavailableException(SystemErrorCode.DEPENDENCY_SERVICE_ERROR,
+                    "查询产品详情无响应: productId=" + productId);
+        }
+        if (!response.isSuccess()) {
+            // 🔴 m21-02：下游以失败码作答时不再折叠成 null。可能是「产品不存在」（业务）也可能是下游内部
+            // 错误（技术），但二者对出单都意味着「拿不到权威投保规则」——统一按依赖不可用抛出，
+            // 由编排层决定挂起或拒绝，绝不静默放行（改造前会把等待期/犹豫期置 0 继续出单）。
+            throw new RemoteDependencyUnavailableException(SystemErrorCode.DEPENDENCY_SERVICE_ERROR,
+                    "获取产品详情失败: productId=" + productId + ", downstreamCode=" + response.getCode()
+                            + ", message=" + response.getMessage());
         }
         return response.getData();
     }
@@ -190,10 +199,15 @@ public class ProductServiceAdapter implements ProductServicePort {
     /** 产品实例未覆盖行为时，读取其绑定模板的默认行为。 */
     private ProductTemplateResponse fetchTemplate(String productId) {
         ApiResponse<ProductTemplateResponse> response = productTemplateApi.getByProductId(productId);
-        if (response == null || !response.isSuccess()) {
-            log.error("获取产品模板失败: productId={}, error={}", productId,
-                    response != null ? response.getMessage() : "响应为空");
-            return null;
+        if (response == null) {
+            throw new RemoteDependencyUnavailableException(SystemErrorCode.DEPENDENCY_SERVICE_ERROR,
+                    "查询产品模板无响应: productId=" + productId);
+        }
+        if (!response.isSuccess()) {
+            // 同上：失败不折叠。返回 null 仅用于「查询成功但没有模板」这一业务事实。
+            throw new RemoteDependencyUnavailableException(SystemErrorCode.DEPENDENCY_SERVICE_ERROR,
+                    "获取产品模板失败: productId=" + productId + ", downstreamCode=" + response.getCode()
+                            + ", message=" + response.getMessage());
         }
         return response.getData();
     }
