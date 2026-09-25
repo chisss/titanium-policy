@@ -49,6 +49,7 @@ import com.titanium.policy.web.mapper.PolicyStatisticsWebMapper;
 import com.titanium.policy.web.mapper.PolicyWebMapper;
 import com.titanium.policy.web.response.policy.PolicyDetailVO;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 /**
@@ -83,7 +84,7 @@ public class PolicyController {
      * @return 保单ID
      */
     @PostMapping
-    public ResponseEntity<String> createPolicy(@RequestBody CreatePolicyDTO request) {
+    public ResponseEntity<String> createPolicy(@Valid @RequestBody CreatePolicyDTO request) {
         String tenantId = RequestContextHolder.requireTenantId();
         // 协议转换：HTTP Request → 领域命令，收敛到同一应用层门面
         CreatePolicyCommand command = policyWebMapper.toCommand(request, tenantId);
@@ -98,7 +99,7 @@ public class PolicyController {
      * @return 保单ID
      */
     @PostMapping("/direct")
-    public ResponseEntity<String> createPolicyDirectly(@RequestBody CreatePolicyDTO request) {
+    public ResponseEntity<String> createPolicyDirectly(@Valid @RequestBody CreatePolicyDTO request) {
         String tenantId = RequestContextHolder.requireTenantId();
         CreatePolicyDirectlyCommand command = policyWebMapper.toDirectCommand(request, tenantId);
         String policyId = policyApplicationService.createPolicyDirectly(command);
@@ -301,7 +302,7 @@ public class PolicyController {
      */
     @PutMapping("/{policyId}/suspend")
     public ResponseEntity<Void> suspendPolicy(@PathVariable String policyId,
-                                              @RequestBody PolicyReasonDTO request) {
+                                              @Valid @RequestBody PolicyReasonDTO request) {
         String operatorId = RequestContextHolder.requireOperatorId();
         String tenantId = RequestContextHolder.requireTenantId();
         policyApplicationService.suspendPolicy(policyId, request.getReason(), operatorId, tenantId);
@@ -317,7 +318,7 @@ public class PolicyController {
      */
     @PutMapping("/{policyId}/resume")
     public ResponseEntity<Void> resumePolicy(@PathVariable String policyId,
-                                             @RequestBody PolicyReasonDTO request) {
+                                             @Valid @RequestBody PolicyReasonDTO request) {
         String operatorId = RequestContextHolder.requireOperatorId();
         String tenantId = RequestContextHolder.requireTenantId();
         policyApplicationService.resumePolicy(policyId, request.getReason(), operatorId, tenantId);
@@ -333,7 +334,7 @@ public class PolicyController {
      */
     @PutMapping("/{policyId}/terminate")
     public ResponseEntity<Void> terminatePolicy(@PathVariable String policyId,
-                                                @RequestBody TerminatePolicyDTO request) {
+                                                @Valid @RequestBody TerminatePolicyDTO request) {
         String operatorId = RequestContextHolder.requireOperatorId();
         String tenantId = RequestContextHolder.requireTenantId();
         policyApplicationService.terminatePolicy(policyId, request.getReason(), operatorId,
@@ -350,7 +351,7 @@ public class PolicyController {
      */
     @PutMapping("/{policyId}/cancel")
     public ResponseEntity<Void> cancelPolicy(@PathVariable String policyId,
-                                             @RequestBody PolicyReasonDTO request) {
+                                             @Valid @RequestBody PolicyReasonDTO request) {
         String operatorId = RequestContextHolder.requireOperatorId();
         String tenantId = RequestContextHolder.requireTenantId();
         policyApplicationService.cancelPolicy(policyId, request.getReason(), operatorId, tenantId);
@@ -366,7 +367,7 @@ public class PolicyController {
      */
     @PutMapping("/{policyId}/waive-premium")
     public ResponseEntity<Void> waivePremium(@PathVariable String policyId,
-                                             @RequestBody WaivePremiumDTO request) {
+                                             @Valid @RequestBody WaivePremiumDTO request) {
         String operatorId = RequestContextHolder.requireOperatorId();
         String tenantId = RequestContextHolder.requireTenantId();
         WaivePremiumCommand command = policyWebMapper.toWaivePremiumCommand(request, policyId, operatorId, tenantId);
@@ -383,7 +384,7 @@ public class PolicyController {
      */
     @PostMapping("/{policyId}/dividend")
     public ResponseEntity<Void> distributeDividend(@PathVariable String policyId,
-                                                   @RequestBody DistributeDividendDTO request) {
+                                                   @Valid @RequestBody DistributeDividendDTO request) {
         String operatorId = RequestContextHolder.requireOperatorId();
         String tenantId = RequestContextHolder.requireTenantId();
         DistributeDividendCommand command = policyWebMapper.toDistributeDividendCommand(request, policyId, operatorId,
@@ -401,7 +402,7 @@ public class PolicyController {
      */
     @PostMapping("/{policyId}/annuity-payout/start")
     public ResponseEntity<Void> startAnnuityPayout(@PathVariable String policyId,
-                                                   @RequestBody StartAnnuityPayoutDTO request) {
+                                                   @Valid @RequestBody StartAnnuityPayoutDTO request) {
         String operatorId = RequestContextHolder.requireOperatorId();
         String tenantId = RequestContextHolder.requireTenantId();
         StartAnnuityPayoutCommand command = policyWebMapper.toStartAnnuityPayoutCommand(request, policyId, operatorId,
@@ -433,7 +434,7 @@ public class PolicyController {
      */
     @PutMapping("/{policyId}/mature")
     public ResponseEntity<Void> maturePolicy(@PathVariable String policyId,
-                                             @RequestBody MaturePolicyDTO request) {
+                                             @Valid @RequestBody MaturePolicyDTO request) {
         String operatorId = RequestContextHolder.requireOperatorId();
         String tenantId = RequestContextHolder.requireTenantId();
         MaturePolicyCommand command = policyWebMapper.toMaturePolicyCommand(request, policyId, operatorId, tenantId);
@@ -450,7 +451,7 @@ public class PolicyController {
      */
     @PostMapping("/{policyId}/endorsement")
     public ResponseEntity<String> applyEndorsement(@PathVariable String policyId,
-                                                   @RequestBody ApplyEndorsementDTO request) {
+                                                   @Valid @RequestBody ApplyEndorsementDTO request) {
         String operatorId = RequestContextHolder.requireOperatorId();
         String tenantId = RequestContextHolder.requireTenantId();
         ApplyPolicyEndorsementCommand command = policyWebMapper.toApplyEndorsementCommand(request, policyId, operatorId,

@@ -26,6 +26,7 @@ import com.titanium.policy.web.handler.PolicyExceptionHandler;
 import com.titanium.policy.web.mapper.ProposalWebMapper;
 import com.titanium.policy.web.response.proposal.ProposalVO;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 /**
@@ -57,7 +58,7 @@ public class ProposalController {
      * @return 意向单ID
      */
     @PostMapping
-    public ResponseEntity<String> createProposal(@RequestBody CreateProposalDTO request) {
+    public ResponseEntity<String> createProposal(@Valid @RequestBody CreateProposalDTO request) {
         String tenantId = RequestContextHolder.requireTenantId();
         // 协议转换：HTTP Request → 领域命令，收敛到同一应用层门面
         CreateProposalCommand command = proposalWebMapper.toCommand(request, tenantId);

@@ -8,6 +8,8 @@ import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.policy.PolicyForm;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 /**
@@ -21,18 +23,22 @@ import lombok.Data;
 public class ConvertToInsuranceDTO {
 
     @Schema(description = "投保单ID", example = "INS20260701001")
+    @Size(max = 64)
     private String        insuranceId;
 
     @Schema(description = "投保单编号", example = "INS20260701001")
+    @Size(max = 64)
     private String        insuranceNo;
 
     @Schema(description = "关联意向单ID", example = "PROP20260701001")
+    @Size(max = 64)
     private String        proposalId;
 
     @Schema(description = "保单形态", example = "INDIVIDUAL")
     private PolicyForm    policyForm;
 
     @Schema(description = "投保人ID", example = "CUST001")
+    @Size(max = 64)
     private String        applicantId;
 
     @Schema(description = "被保险人数", example = "1")
@@ -42,6 +48,7 @@ public class ConvertToInsuranceDTO {
     private BigDecimal    exactPremium;
 
     @Schema(description = "币种", example = "CNY")
+    @Size(max = 8)
     private String        currency;
 
     @Schema(description = "保险起期", example = "2026-07-01T00:00:00")
@@ -51,12 +58,15 @@ public class ConvertToInsuranceDTO {
     private LocalDateTime insurancePeriodEnd;
 
     @Schema(description = "险种编码列表")
+    @Size(max = 200)
     private List<String>  productCodes;
 
     @Schema(description = "核保优先级", example = "0")
     private int           underwritingPriority;
 
     @Schema(description = "转换原因", example = "客户确认投保")
+    @NotBlank
+    @Size(max = 255)
     private String        changeReason;
 
     @Schema(description = "险种三级分类", example = "TERM_LIFE")

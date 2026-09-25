@@ -6,6 +6,9 @@ import java.util.List;
 import java.util.Map;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 /**
@@ -24,61 +27,81 @@ public class SubmitIssuanceRequest {
 
     @Schema(description = "调用方业务流水号（同租户内唯一，重复提交返回首次结果）", example = "BIZ20260807001",
             requiredMode = Schema.RequiredMode.REQUIRED)
+    @Size(max = 64)
     private String              bizNo;
 
     @Schema(description = "营销包ID（弱引用，可空）", example = "PKG-FAMILY-2026")
+    @Size(max = 64)
     private String              marketPackageId;
 
     @Schema(description = "出单策略：MERGE_ONE_POLICY 合并为一张多险种保单（缺省）/ SPLIT_MULTI_POLICY 拆分为多张保单",
             example = "MERGE_ONE_POLICY")
+    @Size(max = 64)
     private String              issuanceStrategy;
 
     @Schema(description = "发起投保的注册用户ID（后台代录场景可空）", example = "USER-001")
+    @Size(max = 64)
     private String              userId;
 
     @Schema(description = "渠道ID（指向 channel 域）", example = "CH-ONLINE-001")
+    @Size(max = 64)
     private String              channelId;
 
     @Schema(description = "销售渠道大类码（AGENT/BANCASSURANCE/ONLINE/BROKER/TELEMARKETING/GROUP_SALES）",
             example = "ONLINE")
+    @Size(max = 64)
     private String              salesChannel;
 
     @Schema(description = "代理人/业务员ID", example = "AGENT-001")
+    @Size(max = 64)
     private String              agentId;
 
     @Schema(description = "投保人（单据级）", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Valid
     private PartyInput          holder;
 
     @Schema(description = "被保险人列表（单据级，至少一人）", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Size(max = 100)
+    @Valid
     private List<PartyInput>    insuredList;
 
     @Schema(description = "受益人列表（单据级；空则视为法定继承，非空则同顺位份额和须为 100）")
+    @Size(max = 100)
+    @Valid
     private List<PartyInput>    beneficiaryList;
 
     @Schema(description = "保单主保障起期", example = "2026-09-01T00:00:00")
+    @NotNull
     private LocalDateTime       periodStart;
 
     @Schema(description = "保单主保障止期", example = "2027-08-31T23:59:59")
+    @NotNull
     private LocalDateTime       periodEnd;
 
     @Schema(description = "收费方式码（OFFLINE 线下 / ONLINE 线上 / FREE 免支付 / PAY_AFTER_USE 先享后付 / WITHHOLD 代扣）",
             example = "ONLINE", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Size(max = 64)
     private String              collectionMode;
 
     @Schema(description = "保单形态码（缺省由主险产品配置推导）", example = "INDIVIDUAL")
+    @Size(max = 64)
     private String              policyForm;
 
     @Schema(description = "上游报价（仅用于与系统试算比对，不作为保费真相）")
     private BigDecimal          quotedPremium;
 
     @Schema(description = "币种（缺省 CNY）", example = "CNY")
+    @Size(max = 8)
     private String              currency;
 
     @Schema(description = "出单方案行列表（险种段级要素，至少一个 productCategory=MAIN）",
             requiredMode = Schema.RequiredMode.REQUIRED)
+    @Size(max = 200)
+    @Valid
     private List<PlanLine>      planLines;
 
     @Schema(description = "单据级扩展要素（本期透传存档）")
+    @Size(max = 100)
     private Map<String, Object> extendData;
 
     /**

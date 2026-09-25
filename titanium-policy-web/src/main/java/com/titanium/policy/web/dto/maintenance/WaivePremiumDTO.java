@@ -3,6 +3,7 @@ package com.titanium.policy.web.dto.maintenance;
 import com.titanium.policy.common.enums.PremiumWaiverReason;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 /**
@@ -16,5 +17,6 @@ import lombok.Data;
 public class WaivePremiumDTO {
 
     @Schema(description = "豁免原因（投保人身故/全残/重疾）", example = "TOTAL_DISABILITY")
+    @NotNull
     private PremiumWaiverReason reason;
 }

@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import com.titanium.policy.common.enums.PolicyDataUpdateType;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 /**
@@ -19,6 +20,7 @@ import lombok.Data;
 public class ApplyEndorsementDTO {
 
     @Schema(description = "批单号", example = "END20260801001")
+    @Size(max = 64)
     private String               endorsementNo;
 
     @Schema(description = "批改类型", example = "POLICY_HOLDER_INFO")
@@ -28,11 +30,14 @@ public class ApplyEndorsementDTO {
     private LocalDateTime        endorsementEffectiveDate;
 
     @Schema(description = "变更摘要", example = "变更投保人联系方式")
+    @Size(max = 1024)
     private String               changeSummary;
 
     @Schema(description = "变更前快照（JSON）")
+    @Size(max = 1024)
     private String               originalSnapshot;
 
     @Schema(description = "来源保全ID", example = "MNT20260801001")
+    @Size(max = 64)
     private String               sourceMaintenanceId;
 }

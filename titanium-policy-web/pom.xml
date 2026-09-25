@@ -39,6 +39,14 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
+
+        <!-- 边界参数校验：@Valid/@NotBlank/@Size 等注解来自 jakarta.validation，
+             该 API 不随 spring-boot-starter-web 传递（Spring Boot 2.3 起已剥离）。
+             此前靠其它模块传递依赖偶然可用，显式声明以免上游依赖变动即编译失败。 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
         
         <!-- Spring Boot Security -->
         <dependency>

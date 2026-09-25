@@ -8,6 +8,8 @@ import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.enums.product.ProductEnum.SalesChannel;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 /**
@@ -22,9 +24,11 @@ import lombok.Data;
 public class CreateProposalDTO {
 
     @Schema(description = "意向单ID", example = "PROP20260701001")
+    @Size(max = 64)
     private String        proposalId;
 
     @Schema(description = "意向单编号", example = "PRP20260701001")
+    @Size(max = 64)
     private String        proposalNo;
 
     @Schema(description = "保单形态", example = "INDIVIDUAL")
@@ -34,6 +38,7 @@ public class CreateProposalDTO {
     private SalesChannel  channel;
 
     @Schema(description = "客户ID", example = "CUST001")
+    @Size(max = 64)
     private String        customerId;
 
     @Schema(description = "意向保额", example = "100000.00")
@@ -43,6 +48,7 @@ public class CreateProposalDTO {
     private BigDecimal    intendedPremium;
 
     @Schema(description = "币种", example = "CNY")
+    @Size(max = 8)
     private String        currency;
 
     @Schema(description = "保险起期", example = "2026-07-01T00:00:00")
@@ -52,6 +58,8 @@ public class CreateProposalDTO {
     private LocalDateTime insurancePeriodEnd;
 
     @Schema(description = "期望险种编码", example = "PROD_A")
+    @NotBlank
+    @Size(max = 64)
     private String        expectedProductCode;
 
     @Schema(description = "险种三级分类(可空)", example = "TERM_LIFE")

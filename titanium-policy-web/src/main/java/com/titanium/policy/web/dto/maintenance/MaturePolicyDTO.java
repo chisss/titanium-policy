@@ -3,6 +3,7 @@ package com.titanium.policy.web.dto.maintenance;
 import java.math.BigDecimal;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 /**
@@ -16,5 +17,6 @@ import lombok.Data;
 public class MaturePolicyDTO {
 
     @Schema(description = "满期给付金额（满期生存保险金）", example = "100000.00")
+    @NotNull
     private BigDecimal maturityBenefit;
 }

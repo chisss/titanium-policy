@@ -5,6 +5,7 @@ import java.math.BigDecimal;
 import com.titanium.policy.common.enums.DividendOption;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 /**
@@ -19,6 +20,7 @@ import lombok.Data;
 public class DistributeDividendDTO {
 
     @Schema(description = "本次派发红利金额", example = "1500.00")
+    @NotNull
     private BigDecimal     dividendAmount;
 
     @Schema(description = "红利领取方式", example = "ACCUMULATE")

@@ -8,6 +8,8 @@ import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.enums.product.ProductEnum.SalesChannel;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 /**
@@ -23,27 +25,34 @@ import lombok.Data;
 public class CreatePolicyDTO {
 
     @Schema(description = "保单ID", example = "1234567890")
+    @Size(max = 64)
     private String        policyId;
 
     @Schema(description = "保单号", example = "P20230801001")
+    @Size(max = 64)
     private String        policyNo;
 
     @Schema(description = "关联投保单ID", example = "INS20230801001")
+    @Size(max = 64)
     private String        insuranceId;
 
     @Schema(description = "保单形态", example = "INDIVIDUAL")
     private PolicyForm    policyForm;
 
     @Schema(description = "产品ID", example = "PROD_A")
+    @Size(max = 64)
     private String        productId;
 
     @Schema(description = "签发机构", example = "ORG001")
+    @Size(max = 255)
     private String        issueOrg;
 
     @Schema(description = "投保人ID", example = "CUST001")
+    @Size(max = 64)
     private String        policyHolderId;
 
     @Schema(description = "被保险人ID", example = "CUST002")
+    @Size(max = 64)
     private String        insuredId;
 
     @Schema(description = "保额", example = "100000.00")
@@ -53,12 +62,15 @@ public class CreatePolicyDTO {
     private BigDecimal    premium;
 
     @Schema(description = "币种", example = "CNY")
+    @Size(max = 8)
     private String        currency;
 
     @Schema(description = "生效日期", example = "2023-08-01T00:00:00")
+    @NotNull
     private LocalDateTime startDate;
 
     @Schema(description = "终止日期", example = "2023-12-31T23:59:59")
+    @NotNull
     private LocalDateTime endDate;
 
     @Schema(description = "销售渠道", example = "DIRECT")
@@ -68,5 +80,6 @@ public class CreatePolicyDTO {
     private InsuranceProductType insuranceType;
 
     @Schema(description = "租户ID", example = "tenant-001")
+    @Size(max = 64)
     private String        tenantId;
 }

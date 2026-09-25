@@ -1,6 +1,8 @@
 package com.titanium.policy.web.dto.policy;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 /**
@@ -15,5 +17,7 @@ import lombok.Data;
 public class PolicyReasonDTO {
 
     @Schema(description = "变更原因", example = "客户申请")
+    @NotBlank
+    @Size(max = 1024)
     private String reason;
 }

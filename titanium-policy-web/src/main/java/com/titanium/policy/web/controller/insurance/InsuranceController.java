@@ -26,6 +26,7 @@ import com.titanium.policy.web.handler.PolicyExceptionHandler;
 import com.titanium.policy.web.mapper.InsuranceWebMapper;
 import com.titanium.policy.web.response.insurance.InsuranceVO;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 /**
@@ -58,7 +59,7 @@ public class InsuranceController {
      * @return 响应结果
      */
     @PostMapping("/from-proposal")
-    public ResponseEntity<String> convertFromProposal(@RequestBody ConvertToInsuranceDTO request) {
+    public ResponseEntity<String> convertFromProposal(@Valid @RequestBody ConvertToInsuranceDTO request) {
         String tenantId = RequestContextHolder.requireTenantId();
         // 协议转换：HTTP Request → 领域命令，收敛到同一应用层门面
         ConvertProposalToInsuranceCommand command = insuranceWebMapper.toCommand(request, tenantId);

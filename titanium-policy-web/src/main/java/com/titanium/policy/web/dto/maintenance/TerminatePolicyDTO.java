@@ -3,6 +3,9 @@ package com.titanium.policy.web.dto.maintenance;
 import com.titanium.metadata.enums.policy.PolicyEnum;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 /**
@@ -17,8 +20,11 @@ import lombok.Data;
 public class TerminatePolicyDTO {
 
     @Schema(description = "终止原因说明", example = "客户申请退保")
+    @NotBlank
+    @Size(max = 1024)
     private String                       reason;
 
     @Schema(description = "终止原因分类", example = "WITHDRAWAL")
+    @NotNull
     private PolicyEnum.TerminationReason terminationReason;
 }
