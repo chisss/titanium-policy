@@ -124,16 +124,13 @@ public class PolicyExceptionHandler {
     }
 
     /**
-     * 处理非法参数异常（存量裸抛的兜底，统一 400 + PARAM_INVALID）
-     */
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<ApiResponse<Void>> handleIllegalArgumentException(IllegalArgumentException exception) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.error(SystemErrorCode.PARAM_INVALID, exception.getMessage()));
-    }
-
-    /**
      * 兜底处理未预期异常（500 + SYSTEM_ERROR；不泄漏堆栈与原始消息）
+     * <p>
+     * 🔴 本处理器有意接管 {@code IllegalArgumentException}/{@code IllegalStateException}（审查报告 EXC-05）：
+     * 二者语义是<b>编程错误</b>而非「调用方参数错误」，故原 IAE→400 兜底已删除——它会把「服务端自己写错了」
+     * 误报成「客户端传错了」。入参类错误已在边界由 Bean Validation 拦为 400（API-03），领域内的业务条件
+     * 一律抛携带错误码的领域异常，故该路径上不再应有正常业务流量；真命中即说明存在未收敛的裸抛点。
+     * </p>
      */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleException(Exception exception) {

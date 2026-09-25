@@ -13,8 +13,10 @@ import com.titanium.metadata.enums.insurance.SubjectType;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.enums.product.ProductEnum.IssuanceMode;
 import com.titanium.metadata.enums.product.ProductEnum.PolicyFormType;
+import com.titanium.metadata.errorcode.PolicyErrorCode;
 import com.titanium.metadata.errorcode.SystemErrorCode;
 import com.titanium.metadata.response.ApiResponse;
+import com.titanium.policy.exception.PolicyBusinessRuleException;
 import com.titanium.policy.exception.RemoteDependencyUnavailableException;
 import com.titanium.policy.port.product.ProductServicePort;
 import com.titanium.policy.valueobject.product.ProductBasicInfo;
@@ -84,7 +86,13 @@ public class ProductServiceAdapter implements ProductServicePort {
         }
         ProductTemplateResponse template = fetchTemplate(productId);
         if (template == null || template.getIssuanceMode() == null) {
-            throw new IllegalStateException(String.format("产品[%s]及其模板均未配置出单流程，无法决定出单模式", productId));
+            // 🔴 业务条件，非编程错误（审查报告 EXC-05）：productId 来自投保请求，调用方改选一个已配
+            // 出单流程的产品即可继续，属可预期的业务拒绝。此前抛裸 IllegalStateException，而本方法的
+            // 两个调用点（PolicyIssuanceApplicationService#issue、IssuanceOrchestrator#orchestrate）
+            // 均无 try 包裹 ⇒ 异常逃逸至 web 兜底成为 500 + SYSTEM_ERROR，把「产品没配出单流程」
+            // 这个可解释的业务事实，报成了「服务端出错了」。
+            throw new PolicyBusinessRuleException(PolicyErrorCode.ISSUANCE_MODE_NOT_CONFIGURED,
+                    String.format("产品[%s]及其模板均未配置出单流程，无法决定出单模式", productId));
         }
         log.info("产品出单模式: productId={}, mode={}, source=TEMPLATE", productId, template.getIssuanceMode());
         return template.getIssuanceMode();

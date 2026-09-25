@@ -48,9 +48,17 @@ public interface ProductServicePort {
      * <p>
      * 取代调用方硬编码出单步数：由产品域配置决定该产品走一步/两步/三步出单。
      * </p>
+     * <p>
+     * 🔴 与 {@link #getIssueRules(String)} 的「未配置返回 null」不同，本方法**不返回 null**：
+     * 出单模式是流程路由的必要输入，取不到就无法决定后续步骤，故产品及其模板均未配置时抛
+     * {@code PolicyBusinessRuleException}（{@code PolicyErrorCode.ISSUANCE_MODE_NOT_CONFIGURED}，
+     * 20007027）。调用方**不应**用 try/catch 兜底成「走默认模式」——那会让未配出单流程的产品
+     * 静默按默认流程出单。
+     * </p>
      *
      * @param productId 产品ID
-     * @return 出单模式
+     * @return 出单模式（非 null）
+     * @throws com.titanium.policy.exception.PolicyBusinessRuleException 产品及其模板均未配置出单流程
      */
     IssuanceMode getIssuanceMode(String productId);
 

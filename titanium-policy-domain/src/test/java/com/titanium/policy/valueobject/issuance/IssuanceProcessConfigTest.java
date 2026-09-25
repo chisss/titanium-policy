@@ -9,6 +9,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import com.titanium.metadata.enums.product.ProductEnum;
+import com.titanium.metadata.errorcode.PolicyErrorCode;
+import com.titanium.policy.exception.PolicyBusinessRuleException;
 
 /**
  * 出单流程配置 forMode 工厂测试
@@ -50,14 +52,18 @@ class IssuanceProcessConfigTest {
     }
 
     @Test
-    @DisplayName("CUSTOM：暂不支持，抛出异常")
+    @DisplayName("CUSTOM：暂不支持，抛携带 20007011 的领域异常（业务条件，非编程错误）")
     void shouldRejectCustomMode() {
-        assertThrows(IllegalArgumentException.class,
+        PolicyBusinessRuleException exception = assertThrows(PolicyBusinessRuleException.class,
                 () -> IssuanceProcessConfig.forMode(ProductEnum.IssuanceMode.CUSTOM, PRODUCT_CODE));
+        // 🔴 断言错误码而非仅断言异常类型：CUSTOM 是「产品域把模式配成了 CUSTOM」这一业务条件，
+        //    必须携带 ISSUANCE_MODE_UNSUPPORTED 才能让调用方按码处理；只断言异常类型会在
+        //    错误码被换成别的码时静默放行。
+        assertEquals(PolicyErrorCode.ISSUANCE_MODE_UNSUPPORTED.getCode(), exception.getErrorCodeValue());
     }
 
     @Test
-    @DisplayName("出单模式为空：抛出异常")
+    @DisplayName("出单模式为空：抛 IAE（调用方漏校验，属编程错误）")
     void shouldRejectNullMode() {
         assertThrows(IllegalArgumentException.class, () -> IssuanceProcessConfig.forMode(null, PRODUCT_CODE));
     }

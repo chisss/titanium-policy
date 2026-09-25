@@ -48,6 +48,39 @@ class PolicyExceptionHandlerTest {
         assertEquals("投保意向单不存在", response.getBody().getMessage());
     }
 
+    /**
+     * 🔴 出单流程未配置 → 400，不是 500（审查报告 EXC-05 复核新增）。
+     * <p>
+     * 该码由 {@code ProductServiceAdapter#getIssuanceMode} 在「产品及其模板均未配出单流程」时携带。
+     * 断言 HTTP 400 而非仅断言「抛了业务异常」，是因为该结论<b>跨了两段容易各自失守的逻辑</b>：
+     * </p>
+     * <ol>
+     *   <li>适配器弃用裸 {@code IllegalStateException}，改抛携带错误码的业务异常；</li>
+     *   <li>边界 {@code resolve} 按码串回查枚举——{@code BusinessRuleViolationException} 的
+     *       {@link com.titanium.metadata.errorcode.BaseErrorCode} 构造器目前<b>仍把枚举降级为裸串</b>
+     *       （走 {@code @Deprecated} 的 {@code DomainException(String, String)}，包装成
+     *       {@code RawErrorCode}，其 {@code category()} 恒为 {@code INTERNAL_FAILURE}），
+     *       全靠此处的反查把枚举还原回来，类别才能回到 {@code PARAMETER_INVALID}。</li>
+     * </ol>
+     * <p>
+     * 故本用例锁的是<b>两段合起来的结果</b>：任一段失守（改回裸抛，或边界改用无反查的
+     * {@code ExceptionResponseFactory.of(exception)}），「产品没配出单流程」都会静默退回 500，
+     * 而两段的单侧改动都不会让任何既有用例变红。
+     * </p>
+     */
+    @Test
+    void shouldRejectUnconfiguredIssuanceModeAsBadRequest() {
+        DomainException exception = new PolicyBusinessRuleException(
+                PolicyErrorCode.ISSUANCE_MODE_NOT_CONFIGURED,
+                "产品[P-1]及其模板均未配置出单流程，无法决定出单模式");
+
+        ResponseEntity<ApiResponse<Void>> response = handler.handleDomainException(exception);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals(PolicyErrorCode.ISSUANCE_MODE_NOT_CONFIGURED.getCode(), response.getBody().getCode());
+    }
+
     @Test
     void shouldTranslateLegacyBusinessRuleViolationAsUnprocessableEntity() {
         // 复刻 D-501-14 实测形态：存量裸串构造器抛出的规则拒绝（Proposal.validateApplicants:343）
