@@ -9,6 +9,7 @@ import com.titanium.metadata.response.ApiResponse;
 import com.titanium.policy.common.enums.RuleEngineDecision;
 import com.titanium.policy.port.ruleengine.RuleEngineServicePort;
 import com.titanium.ruleengine.api.RuleEngineApi;
+import com.titanium.ruleengine.api.request.execution.RuleFacts;
 import com.titanium.ruleengine.api.response.execution.RuleExecutionResultResponse;
 import com.titanium.ruleengine.api.response.execution.ValidationResultResponse;
 
@@ -39,8 +40,8 @@ public class RuleEngineServiceAdapter implements RuleEngineServicePort {
     public RuleEngineDecision executeRule(String ruleSetCode, Map<String, Object> variables, String tenantId,
                                           String businessId) {
         log.info("执行规则, ruleSetCode={}, tenantId={}, businessId={}", ruleSetCode, tenantId, businessId);
-        ApiResponse<RuleExecutionResultResponse> response = ruleEngineApi.execute(ruleSetCode, variables,
-                businessId, BUSINESS_TYPE);
+        ApiResponse<RuleExecutionResultResponse> response = ruleEngineApi.execute(ruleSetCode,
+                RuleFacts.of(variables), businessId, BUSINESS_TYPE);
         if (response == null || !response.isSuccess() || response.getData() == null) {
             String message = response != null ? response.getMessage() : "无响应";
             log.error("执行规则失败, ruleSetCode={}, error={}", ruleSetCode, message);
@@ -62,8 +63,8 @@ public class RuleEngineServiceAdapter implements RuleEngineServicePort {
     public boolean validateRule(String ruleSetCode, Map<String, Object> variables, String tenantId,
                                 String businessId) {
         log.info("验证规则, ruleSetCode={}, tenantId={}, businessId={}", ruleSetCode, tenantId, businessId);
-        ApiResponse<ValidationResultResponse> response = ruleEngineApi.validate(ruleSetCode, variables,
-                businessId, BUSINESS_TYPE);
+        ApiResponse<ValidationResultResponse> response = ruleEngineApi.validate(ruleSetCode,
+                RuleFacts.of(variables), businessId, BUSINESS_TYPE);
         if (response == null || !response.isSuccess() || response.getData() == null) {
             String message = response != null ? response.getMessage() : "无响应";
             log.error("验证规则失败, ruleSetCode={}, error={}", ruleSetCode, message);

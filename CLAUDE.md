@@ -265,7 +265,7 @@ mvn -pl titanium-policy-domain test
     - 🔴 **判定方法（可脚本化，适用全仓）**：比对「文件所在目录（相对 `src/main/java` 或 `src/test/java`）」与文件 `package` 声明是否一致，不一致即命中；本次该法一次性定位全部 28 处，整改后复扫归零。
 
 18. ✅ **规则引擎执行审计的业务上下文透传（m8-1104，2026-09-14）**：`RuleEngineServicePort.executeRule`/`validateRule` 末参追加 `businessId`，`RiskAssessmentExecutor` 透传 `request.bizNo()`（出单业务流水号），`RuleEngineServiceAdapter` 以常量 `BUSINESS_TYPE = BusinessDomainType.POLICY.getCode()` 上报业务域类型。规则引擎侧 `t_rule_execution_log` 由「business_id/business_type 恒空」变为可按**出单流水号**反查风控步骤的执行轨迹。
-    - 🔴 **契约走可选请求头** `X-Business-Id`/`X-Business-Type`（与既有 `X-Tenant-Id` 同构），**不进请求体**——规则执行入口的 body 是裸 `Map<String,Object>` 规则变量，塞业务字段会污染规则变量命名空间。
+    - 🔴 **契约走可选请求头** `X-Business-Id`/`X-Business-Type`（与既有 `X-Tenant-Id` 同构），**不进请求体**——规则执行入口的 body 是**规则变量**（键即规则里引用的变量名），塞业务字段会污染规则变量命名空间。🔴 **原记「body 是裸 `Map<String,Object>`」已于 m24-04a（2026-09-26）失效**：规则引擎侧四个执行端点的 body 现为契约类型 `com.titanium.ruleengine.api.request.execution.RuleFacts`（不可变 Map + 键白名单），**报文形态不变**（仍为扁平键值对象，本域 Adapter 调 `RuleFacts.of(variables)` 即可，无报文改动）。详见 [titanium-rule-engine/CLAUDE.md](../titanium-rule-engine/CLAUDE.md) §九。
     - 🔴 `businessType` 是**端口归属**（adapter 常量），不是调用方逐次传入的入参；`businessId` 一律**追加为最后一个参数**，最小化既有参数语义扰动。新增规则集调用点时**勿再走无 businessId 的签名**。
 
 19. ✅ **核保死 Port 与死 Adapter 已删除（m10-1303，2026-09-14）**：`port/underwriting/UnderwritingServicePort`（4 方法全弱类型 `Object`/`List<?>`；javadoc 自称「由应用层实现」——**本身即违反根规约 §3.4.5**，Adapter 必须落 infrastructure）与其实现 `infrastructure/adapter/underwriting/UnderwritingServiceAdapter`（`@Component`，自身在 `src/main` 亦零注入）**双双零引用**，属「能力已被活链路取代的冗余死壳」。
