@@ -32,7 +32,7 @@ public class IssuanceOrchestrationException extends RuntimeException {
      * @deprecated 裸字符串消息无法国际化，新代码请改用
      *         {@link #IssuanceOrchestrationException(BaseErrorCode, IssuanceResult, Throwable)}
      */
-    @Deprecated
+    @Deprecated(since = "2026-08", forRemoval = true)
     public IssuanceOrchestrationException(String message, IssuanceResult partialResult, Throwable cause) {
         super(message, cause);
         this.partialResult = partialResult;

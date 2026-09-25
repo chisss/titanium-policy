@@ -95,8 +95,22 @@ class PolicyExceptionHandlerTest {
         assertTrue(response.getBody().getMessage().contains("POLICY_RULE_VIOLATION"), response.getBody().getMessage());
     }
 
+    /**
+     * 状态流转非法 → 409 + {@code POLICY_STATUS_TRANSITION_ILLEGAL}。
+     * <p>
+     * 🔴 <b>本用例名原为 {@code shouldTranslateLegacyIllegalStateTransitionAsConflict}，已去掉「Legacy」（m30-10）</b>：
+     * 迁移前它锁的是 <b>LEGACY 回查路径</b>——{@code PolicyStatusTransitionException} 转发父类的裸串构造器，
+     * 错误码退化为符号串 {@code ILLEGAL_STATE_TRANSITION}，须由 {@code PolicyExceptionHandler} 的
+     * {@code LEGACY_ERROR_CODES} 回查才还原成本码。迁移后该异常<b>直接携带枚举</b>，走 {@code resolve}
+     * 的 {@code instanceof PolicyErrorCode} 分支直通，回查条目已随同删除。
+     * </p>
+     * <p>
+     * 故本用例的断言<b>值未变、对象已换</b>：它现在守的是「枚举直通同样得到 409 + 正确码」，
+     * 而非「历史裸串回查生效」。留着原名会让人误以为 LEGACY 回查仍有覆盖，实际该路径已无产生源。
+     * </p>
+     */
     @Test
-    void shouldTranslateLegacyIllegalStateTransitionAsConflict() {
+    void shouldTranslateIllegalStateTransitionAsConflict() {
         DomainException exception = new PolicyStatusTransitionException("投保单", "P-1", "DRAFT", "SUBMITTED");
 
         ResponseEntity<ApiResponse<Void>> response = handler.handleDomainException(exception);

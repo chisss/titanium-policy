@@ -61,16 +61,23 @@ public class PolicyExceptionHandler {
      * 历史「裸串错误码」→ 本域业务码。
      * <p>
      * {@code DomainException} 的裸串构造器已 {@code @Deprecated}（根规约 §3.4.12 红线 19），
-     * 但存量抛出点仍在用：{@code PolicyBusinessRuleException} 全部落 {@code BUSINESS_RULE_VIOLATION}、
-     * {@code PolicyStatusTransitionException} 全部落 {@code ILLEGAL_STATE_TRANSITION}
+     * 但存量抛出点仍在用：{@code PolicyBusinessRuleException} 的废弃构造器把规则码交给父类
+     * {@code BusinessRuleViolationException} 覆写为 {@code BUSINESS_RULE_VIOLATION}
      * （具体规则码在 message 内，如 {@code 违反业务规则[POLICY_RULE_VIOLATION]: …}）。
      * 不映射则这些异常只能兜底成 500，D-501-14 的实测现象即如此。
      * </p>
+     * <p>
+     * 🔴 <b>原另两条已随 EXC-06 中间父类迁移删除（m30-10）</b>，删除前提是「本域已无产生源」：
+     * {@code ILLEGAL_STATE_TRANSITION}——域内唯一继承 {@code IllegalStateTransitionException} 的
+     * {@code PolicyStatusTransitionException} 已改直接携带
+     * {@link PolicyErrorCode#POLICY_STATUS_TRANSITION_ILLEGAL}，且全仓无直接构造父类；
+     * {@code POLICY_FIELD_CATALOG_INVALID}——其唯一产生者 {@code PolicyFieldCatalogValidationException}
+     * 已改直接携带 {@link SystemErrorCode#PARAM_INVALID}。两处迁移选用的枚举与原映射目标<b>逐一相同</b>，
+     * 故行为中性；留着则成为永远走不到的兜底，反而让读者误判「该码仍会到达本处理器」。
+     * </p>
      */
     private static final Map<String, BaseErrorCode> LEGACY_ERROR_CODES = Map.of(
-            "BUSINESS_RULE_VIOLATION", PolicyErrorCode.POLICY_RULE_VIOLATION,
-            "ILLEGAL_STATE_TRANSITION", PolicyErrorCode.POLICY_STATUS_TRANSITION_ILLEGAL,
-            "POLICY_FIELD_CATALOG_INVALID", SystemErrorCode.PARAM_INVALID);
+            "BUSINESS_RULE_VIOLATION", PolicyErrorCode.POLICY_RULE_VIOLATION);
 
     /**
      * 「按 id 取详情」未命中时的统一拒绝（R8-05）。

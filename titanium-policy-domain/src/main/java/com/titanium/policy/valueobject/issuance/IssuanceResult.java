@@ -60,7 +60,7 @@ public record IssuanceResult(boolean success, String bizNo, IssuanceMode issuanc
      * @deprecated 裸字符串错误码无法国际化（规约红线 16），新代码请改用
      *         {@link #rejected(String, RuleDecision)} 或 {@link #rejected(String, BaseErrorCode, String)}
      */
-    @Deprecated
+    @Deprecated(since = "2026-08", forRemoval = true)
     public static IssuanceResult rejected(String bizNo, String code, String reason) {
         return new IssuanceResult(false, bizNo, null, null, IssuanceStage.REJECTED, null, null, null, null, List.of(),
                 null, null, null, null, null, null, null, code, reason);

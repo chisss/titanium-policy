@@ -33,7 +33,7 @@ public class PolicyBusinessRuleException extends BusinessRuleViolationException 
     /**
      * @deprecated 裸字符串规则码无法国际化，请改用 {@link #PolicyBusinessRuleException(BaseErrorCode, String)}
      */
-    @Deprecated
+    @Deprecated(since = "2026-08", forRemoval = true)
     public PolicyBusinessRuleException(String ruleCode, String ruleDescription) {
         super(ruleCode, ruleDescription);
     }

@@ -45,7 +45,7 @@ public class CustomerResolutionException extends RuntimeException {
      * @deprecated 裸字符串错误码无法国际化，新代码请改用
      *         {@link #CustomerResolutionException(BaseErrorCode, String, Throwable, boolean)}
      */
-    @Deprecated
+    @Deprecated(since = "2026-08", forRemoval = true)
     public CustomerResolutionException(String errorCode, String message) {
         this(errorCode, message, null, false);
     }
@@ -57,7 +57,7 @@ public class CustomerResolutionException extends RuntimeException {
      * @deprecated 裸字符串错误码无法国际化，新代码请改用
      *         {@link #CustomerResolutionException(BaseErrorCode, String, Throwable, boolean)}
      */
-    @Deprecated
+    @Deprecated(since = "2026-08", forRemoval = true)
     public CustomerResolutionException(String errorCode, String message, Throwable cause) {
         this(errorCode, message, cause, false);
     }
@@ -70,7 +70,7 @@ public class CustomerResolutionException extends RuntimeException {
      * @deprecated 裸字符串错误码无法国际化，新代码请改用
      *         {@link #CustomerResolutionException(BaseErrorCode, String, Throwable, boolean)}
      */
-    @Deprecated
+    @Deprecated(since = "2026-08", forRemoval = true)
     public CustomerResolutionException(String errorCode, String message, Throwable cause, boolean retryable) {
         super(message, cause);
         this.errorCode = errorCode;
