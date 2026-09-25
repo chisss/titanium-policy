@@ -73,7 +73,7 @@ class InsuranceLinePremiumConfirmationServiceTest {
                 List.of(line(null).withPremium(Money.of(new BigDecimal("999.00"), "CNY"))), null,
                 "INSURANCE-1", "BIZ-1", BUSINESS_TIME, "TENANT-1", false));
 
-        assertEquals(PolicyErrorCode.ISSUANCE_PREMIUM_CONFIRMATION_FAILED.getCode(), exception.getErrorCode());
+        assertEquals(PolicyErrorCode.ISSUANCE_PREMIUM_CONFIRMATION_FAILED.getCode(), exception.getErrorCodeValue());
     }
 
     @Test

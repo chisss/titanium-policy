@@ -126,7 +126,7 @@ public class PolicyApiProvider implements PolicyApi {
                     .orElseGet(() -> ApiResponse.error(
                             PolicyErrorCode.POLICY_NOT_EXIST, "保单不存在: " + policyId));
         } catch (BusinessException exception) {
-            return new ApiResponse<>(exception.getErrorCode(), exception.getMessage(), null);
+            return new ApiResponse<>(exception.getErrorCodeValue(), exception.getMessage(), null);
         }
     }
 

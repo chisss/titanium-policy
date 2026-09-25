@@ -293,7 +293,7 @@ class IssuanceOrchestratorTest {
         BusinessException exception = assertThrows(BusinessException.class,
                 () -> orchestrator.orchestrate(IssuanceProcessConfig.oneStep(PRODUCT_ID), request()));
 
-        assertEquals(PolicyErrorCode.ISSUANCE_PREMIUM_CONFIRMATION_FAILED.getCode(), exception.getErrorCode());
+        assertEquals(PolicyErrorCode.ISSUANCE_PREMIUM_CONFIRMATION_FAILED.getCode(), exception.getErrorCodeValue());
         verifyNoInteractions(commandGateway, premiumCollectionOrchestrator);
     }
 

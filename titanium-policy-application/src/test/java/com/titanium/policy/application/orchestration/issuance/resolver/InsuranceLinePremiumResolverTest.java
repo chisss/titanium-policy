@@ -88,7 +88,7 @@ class InsuranceLinePremiumResolverTest {
                 () -> resolver.resolve(lines, TENANT_ID, Money.of(new BigDecimal("1000.00"), "CNY")));
 
         assertEquals("险种段保费计算失败: lineNo=2, productId=PRODUCT_RIDER", exception.getMessage());
-        assertEquals("ISSUANCE_LINE_PREMIUM_CALCULATION_FAILED", exception.getErrorCode());
+        assertEquals("ISSUANCE_LINE_PREMIUM_CALCULATION_FAILED", exception.getErrorCodeValue());
     }
 
     private InsuranceLine line(String lineId, int lineNo, ProductCategory category, String parentLineId,
