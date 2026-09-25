@@ -8,10 +8,10 @@ import java.util.Optional;
 import org.axonframework.modelling.command.AggregateStreamCreationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import com.titanium.common.boundary.ErrorCategoryHttpStatus;
 import com.titanium.metadata.errorcode.BaseErrorCode;
 import com.titanium.metadata.errorcode.PolicyErrorCode;
 import com.titanium.metadata.errorcode.RawErrorCode;
@@ -31,6 +31,15 @@ import lombok.extern.slf4j.Slf4j;
  * <p>
  * HTTP 状态码在传输层表达（400/404/409/422/500），不进 {@code ApiResponse.code}
  * （业务错误码 ≠ HTTP 状态码，见根规约 §8.2）；失败工厂只接受 {@code BaseErrorCode} 强类型。
+ * </p>
+ * <p>
+ * 🔴 <b>本类只处理业务/领域异常；框架异常（报文不可解析、方法不支持、路径未命中、
+ * 缺请求头等）统一由 {@code titanium-common} 的 {@code BoundaryExceptionHandler} 接管</b>——
+ * 后者以 {@code HIGHEST_PRECEDENCE + 20} 注册，在派发上<b>先于</b>本类命中框架异常。
+ * 本类曾自带的 {@code handleMissingRequestHeader}（R8-05：缺 {@code X-Tenant-Id} → 400 +
+ * {@code TENANT_HEADER_MISSING}）已随之<b>不可达</b>，故删除；该语义迁至
+ * {@code FrameworkErrorCodes}（全域唯一实现），行为不变，且同时覆盖了 {@code /web/v1/**}
+ * 这条 {@code TenantApiInterceptor} 不覆盖的入口。
  * </p>
  */
 @Slf4j
@@ -63,9 +72,6 @@ public class PolicyExceptionHandler {
             "ILLEGAL_STATE_TRANSITION", PolicyErrorCode.POLICY_STATUS_TRANSITION_ILLEGAL,
             "POLICY_FIELD_CATALOG_INVALID", SystemErrorCode.PARAM_INVALID);
 
-    /** 规范化租户头名（与 {@code TenantApiInterceptor}、{@code TenantFeignRequestInterceptor} 一致） */
-    private static final String TENANT_HEADER = "X-Tenant-Id";
-
     /**
      * 「按 id 取详情」未命中时的统一拒绝（R8-05）。
      * <p>
@@ -88,39 +94,19 @@ public class PolicyExceptionHandler {
     }
 
     /**
-     * 处理请求头缺失异常（R8-05）。
-     * <p>
-     * 🔴 <b>此前缺 {@code X-Tenant-Id} 会得到 500</b>：{@code @RequestHeader} 缺失时 Spring 抛
-     * {@link MissingRequestHeaderException}，本类无对应处理器，被下面的
-     * {@code @ExceptionHandler(Exception.class)} 兜成 500 + SYSTEM_ERROR
-     * （实测响应体 {@code {"code":"10000000","message":"Required request header 'X-Tenant-Id' ..."}}）。
-     * 调用方看到 500 会去查服务端故障，而真相是**自己的请求少了个头**。</p>
-     * <p>
-     * 🔴 <b>为何 {@code statusFor} 里早有 TENANT_HEADER_MISSING → 400 却仍发生</b>：那行映射此前的
-     * 唯一经由是 {@code TenantApiInterceptor}（抛 {@code DomainException(TENANT_HEADER_MISSING)}），
-     * 而该拦截器只挂在 {@code /api/v1/**}（Feign 契约入口）与 {@code /admin/**}，
-     * <b>不覆盖 {@code /web/v1/**}</b>——前端入口因此从来走不到那条映射。本处理器把这条缺口补上，
-     * 使两个入口对同一个缺失头给出同样的 400 + TENANT_HEADER_MISSING。</p>
-     * <p>
-     * 缺其它头（{@code X-Operator-Id} 等）归为参数错误 400 + PARAM_INVALID。
-     * </p>
-     */
-    @ExceptionHandler(MissingRequestHeaderException.class)
-    public ResponseEntity<ApiResponse<Void>> handleMissingRequestHeader(MissingRequestHeaderException exception) {
-        BaseErrorCode errorCode = TENANT_HEADER.equalsIgnoreCase(exception.getHeaderName())
-                ? SystemErrorCode.TENANT_HEADER_MISSING
-                : SystemErrorCode.PARAM_INVALID;
-        return ResponseEntity.status(statusFor(errorCode))
-                .body(ApiResponse.error(errorCode, exception.getMessage()));
-    }
-
-    /**
      * 处理领域异常（业务规则违反、状态流转非法、字段目录校验等，均继承 {@link DomainException}）
+     * <p>
+     * 🔴 状态码出自 {@link ErrorCategoryHttpStatus} 这张<b>全仓唯一</b>的「类别 → 状态」表，
+     * 由错误码在其枚举里的 {@code category()} 决定，<b>不再有本类私有的命名推断</b>。
+     * 迁移前本类另有一份 {@code statusFor}，按 {@code endsWith("_NOT_EXIST")} 之类的<b>名字</b>
+     * 猜状态（{@code *_NOT_EXIST}→404、{@code *_FAILED}→500、余者 400），
+     * 与 payment 域的那份各写一遍、互不一致；本次收敛为一处。
+     * </p>
      */
     @ExceptionHandler(DomainException.class)
     public ResponseEntity<ApiResponse<Void>> handleDomainException(DomainException exception) {
         BaseErrorCode errorCode = resolve(exception.getErrorCode());
-        return ResponseEntity.status(statusFor(errorCode))
+        return ResponseEntity.status(ErrorCategoryHttpStatus.of(errorCode))
                 .body(ApiResponse.error(errorCode, exception.getMessage()));
     }
 
@@ -175,37 +161,6 @@ public class PolicyExceptionHandler {
                 .findFirst()
                 .or(() -> Optional.ofNullable(LEGACY_ERROR_CODES.get(errorCode.getCode())))
                 .orElse(SystemErrorCode.SYSTEM_ERROR);
-    }
-
-    /**
-     * 业务码 → HTTP 状态。
-     * <p>
-     * 命名约定：{@code *_NOT_EXIST} 资源不存在 → 404；规则违反 / 参数非法 → 422 / 400；
-     * 状态流转冲突、聚合重复 → 409；{@code *_FAILED} 处理失败与其余无对应语义者 → 500。
-     * </p>
-     */
-    private HttpStatus statusFor(BaseErrorCode errorCode) {
-        if (errorCode instanceof SystemErrorCode systemErrorCode) {
-            return switch (systemErrorCode) {
-                case PARAM_INVALID, TENANT_HEADER_MISSING, TENANT_CONTEXT_ERROR -> HttpStatus.BAD_REQUEST;
-                case RESOURCE_NOT_FOUND -> HttpStatus.NOT_FOUND;
-                default -> HttpStatus.INTERNAL_SERVER_ERROR;
-            };
-        }
-        if (errorCode instanceof PolicyErrorCode policyErrorCode) {
-            if (policyErrorCode.name().endsWith("_NOT_EXIST")) {
-                return HttpStatus.NOT_FOUND;
-            }
-            return switch (policyErrorCode) {
-                case POLICY_RULE_VIOLATION -> HttpStatus.UNPROCESSABLE_CONTENT;
-                case POLICY_STATUS_TRANSITION_ILLEGAL, POLICY_AGGREGATE_ALREADY_EXISTS, POLICY_ALREADY_EXIST ->
-                    HttpStatus.CONFLICT;
-                default -> policyErrorCode.name().endsWith("_FAILED")
-                        ? HttpStatus.INTERNAL_SERVER_ERROR
-                        : HttpStatus.BAD_REQUEST;
-            };
-        }
-        return HttpStatus.INTERNAL_SERVER_ERROR;
     }
 
     private static List<BaseErrorCode> domainErrorCodes() {
