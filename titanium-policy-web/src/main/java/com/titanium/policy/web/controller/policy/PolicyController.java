@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.titanium.common.context.RequestContextHolder;
 import com.titanium.metadata.errorcode.PolicyErrorCode;
 import com.titanium.metadata.exception.DomainException;
+import com.titanium.metadata.response.ApiResponse;
 import com.titanium.policy.api.response.policy.PolicyStatisticsResponse;
 import com.titanium.policy.application.command.policy.PolicyApplicationService;
 import com.titanium.policy.application.query.PolicyAppQueryService;
@@ -84,12 +85,13 @@ public class PolicyController {
      * @return 保单ID
      */
     @PostMapping
-    public ResponseEntity<String> createPolicy(@Valid @RequestBody CreatePolicyDTO request) {
+    public ResponseEntity<ApiResponse<String>> createPolicy(@Valid @RequestBody CreatePolicyDTO request) {
         String tenantId = RequestContextHolder.requireTenantId();
         // 协议转换：HTTP Request → 领域命令，收敛到同一应用层门面
         CreatePolicyCommand command = policyWebMapper.toCommand(request, tenantId);
         String policyId = policyApplicationService.createPolicy(command);
-        return new ResponseEntity<>(policyId, HttpStatus.CREATED);
+        // 保留 201：创建语义属 HTTP 传输层，不并入 ApiResponse.code
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(policyId));
     }
 
     /**
@@ -99,11 +101,12 @@ public class PolicyController {
      * @return 保单ID
      */
     @PostMapping("/direct")
-    public ResponseEntity<String> createPolicyDirectly(@Valid @RequestBody CreatePolicyDTO request) {
+    public ResponseEntity<ApiResponse<String>> createPolicyDirectly(@Valid @RequestBody CreatePolicyDTO request) {
         String tenantId = RequestContextHolder.requireTenantId();
         CreatePolicyDirectlyCommand command = policyWebMapper.toDirectCommand(request, tenantId);
         String policyId = policyApplicationService.createPolicyDirectly(command);
-        return new ResponseEntity<>(policyId, HttpStatus.CREATED);
+        // 保留 201：创建语义属 HTTP 传输层，不并入 ApiResponse.code
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(policyId));
     }
 
     /**
@@ -119,11 +122,11 @@ public class PolicyController {
      * @return 保单详情
      */
     @GetMapping("/{policyId}")
-    public ResponseEntity<PolicyDetailVO> getPolicy(@PathVariable String policyId) {
+    public ApiResponse<PolicyDetailVO> getPolicy(@PathVariable String policyId) {
         String tenantId = RequestContextHolder.requireTenantId();
         return policyAppQueryService.findById(new FindPolicyByIdQuery(policyId, tenantId)).map(policyWebMapper::toVO)
-                .map(ResponseEntity::ok)
-                .orElseThrow(() -> PolicyExceptionHandler.notFoundInTenant(PolicyErrorCode.POLICY_NOT_EXIST, policyId));
+             .map(ApiResponse::success)
+             .orElseThrow(() -> PolicyExceptionHandler.notFoundInTenant(PolicyErrorCode.POLICY_NOT_EXIST, policyId));
     }
 
     /**
@@ -133,11 +136,11 @@ public class PolicyController {
      * @return 空响应
      */
     @PutMapping("/{policyId}/issue")
-    public ResponseEntity<Void> issuePolicy(@PathVariable String policyId) {
+    public ApiResponse<Void> issuePolicy(@PathVariable String policyId) {
         String operatorId = RequestContextHolder.requireOperatorId();
         String tenantId = RequestContextHolder.requireTenantId();
         policyApplicationService.issuePolicy(policyId, operatorId, tenantId);
-        return ResponseEntity.noContent().build();
+        return ApiResponse.success();
     }
 
     /**
@@ -147,10 +150,10 @@ public class PolicyController {
      * @return 空响应
      */
     @PutMapping("/{policyId}/activate")
-    public ResponseEntity<Void> activatePolicy(@PathVariable String policyId) {
+    public ApiResponse<Void> activatePolicy(@PathVariable String policyId) {
         String tenantId = RequestContextHolder.requireTenantId();
         policyApplicationService.activatePolicy(policyId, tenantId);
-        return ResponseEntity.noContent().build();
+        return ApiResponse.success();
     }
 
     /**
@@ -166,28 +169,28 @@ public class PolicyController {
      * @return 保单详情列表
      */
     @GetMapping
-    public ResponseEntity<List<PolicyDetailVO>> listPolicies(
-            @RequestParam(required = false) String policyNo,
-            @RequestParam(required = false) String policyHolderName,
-            @RequestParam(required = false) String insuredName,
-            @RequestParam(required = false) String productCode,
-            @RequestParam(required = false) String status,
-            @RequestParam(required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime effectiveDateStart,
-            @RequestParam(required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime effectiveDateEnd,
-            @RequestParam(required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime expiryDateStart,
-            @RequestParam(required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime expiryDateEnd,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+    public ApiResponse<List<PolicyDetailVO>> listPolicies(
+         @RequestParam(required = false) String policyNo,
+         @RequestParam(required = false) String policyHolderName,
+         @RequestParam(required = false) String insuredName,
+         @RequestParam(required = false) String productCode,
+         @RequestParam(required = false) String status,
+         @RequestParam(required = false)
+         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime effectiveDateStart,
+         @RequestParam(required = false)
+         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime effectiveDateEnd,
+         @RequestParam(required = false)
+         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime expiryDateStart,
+         @RequestParam(required = false)
+         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime expiryDateEnd,
+         @RequestParam(defaultValue = "0") int page,
+         @RequestParam(defaultValue = "10") int size) {
         String tenantId = RequestContextHolder.requireTenantId();
         List<PolicyDetailVO> policies = policyAppQueryService
                 .findByConditions(policyNo, policyHolderName, insuredName, productCode, status,
                         effectiveDateStart, effectiveDateEnd, expiryDateStart, expiryDateEnd, tenantId, page, size)
                 .stream().map(policyWebMapper::toVO).toList();
-        return ResponseEntity.ok(policies);
+        return ApiResponse.success(policies);
     }
 
     /**
@@ -201,28 +204,28 @@ public class PolicyController {
      * </p>
      */
     @GetMapping("/page")
-    public ResponseEntity<Page<PolicyDetailVO>> pagePolicies(
-            @RequestParam(required = false) String policyNo,
-            @RequestParam(required = false) String policyHolderName,
-            @RequestParam(required = false) String insuredName,
-            @RequestParam(required = false) String productCode,
-            @RequestParam(required = false) String status,
-            @RequestParam(required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime effectiveDateStart,
-            @RequestParam(required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime effectiveDateEnd,
-            @RequestParam(required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime expiryDateStart,
-            @RequestParam(required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime expiryDateEnd,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+    public ApiResponse<Page<PolicyDetailVO>> pagePolicies(
+         @RequestParam(required = false) String policyNo,
+         @RequestParam(required = false) String policyHolderName,
+         @RequestParam(required = false) String insuredName,
+         @RequestParam(required = false) String productCode,
+         @RequestParam(required = false) String status,
+         @RequestParam(required = false)
+         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime effectiveDateStart,
+         @RequestParam(required = false)
+         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime effectiveDateEnd,
+         @RequestParam(required = false)
+         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime expiryDateStart,
+         @RequestParam(required = false)
+         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime expiryDateEnd,
+         @RequestParam(defaultValue = "0") int page,
+         @RequestParam(defaultValue = "10") int size) {
         String tenantId = RequestContextHolder.requireTenantId();
         Page<PolicyDetailVO> policies = policyAppQueryService
                 .findPageByConditions(policyNo, policyHolderName, insuredName, productCode, status,
                         effectiveDateStart, effectiveDateEnd, expiryDateStart, expiryDateEnd, tenantId, page, size)
                 .map(policyWebMapper::toVO);
-        return ResponseEntity.ok(policies);
+        return ApiResponse.success(policies);
     }
 
     /**
@@ -234,10 +237,10 @@ public class PolicyController {
      * @return 保单统计结果
      */
     @GetMapping("/statistics")
-    public ResponseEntity<PolicyStatisticsResponse> getStatistics(
-            ) {
+    public ApiResponse<PolicyStatisticsResponse> getStatistics(
+         ) {
         String tenantId = RequestContextHolder.requireTenantId();
-        return ResponseEntity.ok(
+        return ApiResponse.success(
                 policyStatisticsWebMapper.toResponse(policyAppQueryService.getStatistics(tenantId)));
     }
 
@@ -248,10 +251,10 @@ public class PolicyController {
      * @return 受益人列表
      */
     @GetMapping("/{policyId}/beneficiaries")
-    public ResponseEntity<List<PolicyBeneficiaryQueryResult>> listBeneficiaries(
-            @PathVariable String policyId) {
+    public ApiResponse<List<PolicyBeneficiaryQueryResult>> listBeneficiaries(
+         @PathVariable String policyId) {
         String tenantId = RequestContextHolder.requireTenantId();
-        return ResponseEntity.ok(policyAppQueryService.findBeneficiaries(policyId, tenantId));
+        return ApiResponse.success(policyAppQueryService.findBeneficiaries(policyId, tenantId));
     }
 
     /**
@@ -261,10 +264,10 @@ public class PolicyController {
      * @return 被保险人列表
      */
     @GetMapping("/{policyId}/insured-parties")
-    public ResponseEntity<List<PolicyInsuredQueryResult>> listInsuredParties(
-            @PathVariable String policyId) {
+    public ApiResponse<List<PolicyInsuredQueryResult>> listInsuredParties(
+         @PathVariable String policyId) {
         String tenantId = RequestContextHolder.requireTenantId();
-        return ResponseEntity.ok(policyAppQueryService.findInsuredParties(policyId, tenantId));
+        return ApiResponse.success(policyAppQueryService.findInsuredParties(policyId, tenantId));
     }
 
     /**
@@ -274,10 +277,10 @@ public class PolicyController {
      * @return 批改历史列表
      */
     @GetMapping("/{policyId}/endorsements")
-    public ResponseEntity<List<PolicyEndorsementQueryResult>> listEndorsements(
-            @PathVariable String policyId) {
+    public ApiResponse<List<PolicyEndorsementQueryResult>> listEndorsements(
+         @PathVariable String policyId) {
         String tenantId = RequestContextHolder.requireTenantId();
-        return ResponseEntity.ok(policyAppQueryService.findEndorsements(policyId, tenantId));
+        return ApiResponse.success(policyAppQueryService.findEndorsements(policyId, tenantId));
     }
 
     /**
@@ -287,10 +290,10 @@ public class PolicyController {
      * </p>
      */
     @GetMapping("/{policyId}/maintenance-cases")
-    public ResponseEntity<List<PolicyMaintenanceCaseReferenceQueryResult>> listMaintenanceCaseReferences(
-            @PathVariable String policyId) {
+    public ApiResponse<List<PolicyMaintenanceCaseReferenceQueryResult>> listMaintenanceCaseReferences(
+         @PathVariable String policyId) {
         String tenantId = RequestContextHolder.requireTenantId();
-        return ResponseEntity.ok(policyAppQueryService.findMaintenanceCaseReferences(policyId, tenantId));
+        return ApiResponse.success(policyAppQueryService.findMaintenanceCaseReferences(policyId, tenantId));
     }
 
     /**
@@ -301,12 +304,12 @@ public class PolicyController {
      * @return 空响应
      */
     @PutMapping("/{policyId}/suspend")
-    public ResponseEntity<Void> suspendPolicy(@PathVariable String policyId,
-                                              @Valid @RequestBody PolicyReasonDTO request) {
+    public ApiResponse<Void> suspendPolicy(@PathVariable String policyId,
+                                           @Valid @RequestBody PolicyReasonDTO request) {
         String operatorId = RequestContextHolder.requireOperatorId();
         String tenantId = RequestContextHolder.requireTenantId();
         policyApplicationService.suspendPolicy(policyId, request.getReason(), operatorId, tenantId);
-        return ResponseEntity.noContent().build();
+        return ApiResponse.success();
     }
 
     /**
@@ -317,12 +320,12 @@ public class PolicyController {
      * @return 空响应
      */
     @PutMapping("/{policyId}/resume")
-    public ResponseEntity<Void> resumePolicy(@PathVariable String policyId,
-                                             @Valid @RequestBody PolicyReasonDTO request) {
+    public ApiResponse<Void> resumePolicy(@PathVariable String policyId,
+                                          @Valid @RequestBody PolicyReasonDTO request) {
         String operatorId = RequestContextHolder.requireOperatorId();
         String tenantId = RequestContextHolder.requireTenantId();
         policyApplicationService.resumePolicy(policyId, request.getReason(), operatorId, tenantId);
-        return ResponseEntity.noContent().build();
+        return ApiResponse.success();
     }
 
     /**
@@ -333,13 +336,13 @@ public class PolicyController {
      * @return 空响应
      */
     @PutMapping("/{policyId}/terminate")
-    public ResponseEntity<Void> terminatePolicy(@PathVariable String policyId,
-                                                @Valid @RequestBody TerminatePolicyDTO request) {
+    public ApiResponse<Void> terminatePolicy(@PathVariable String policyId,
+                                             @Valid @RequestBody TerminatePolicyDTO request) {
         String operatorId = RequestContextHolder.requireOperatorId();
         String tenantId = RequestContextHolder.requireTenantId();
         policyApplicationService.terminatePolicy(policyId, request.getReason(), operatorId,
                 request.getTerminationReason(), tenantId);
-        return ResponseEntity.noContent().build();
+        return ApiResponse.success();
     }
 
     /**
@@ -350,12 +353,12 @@ public class PolicyController {
      * @return 空响应
      */
     @PutMapping("/{policyId}/cancel")
-    public ResponseEntity<Void> cancelPolicy(@PathVariable String policyId,
-                                             @Valid @RequestBody PolicyReasonDTO request) {
+    public ApiResponse<Void> cancelPolicy(@PathVariable String policyId,
+                                          @Valid @RequestBody PolicyReasonDTO request) {
         String operatorId = RequestContextHolder.requireOperatorId();
         String tenantId = RequestContextHolder.requireTenantId();
         policyApplicationService.cancelPolicy(policyId, request.getReason(), operatorId, tenantId);
-        return ResponseEntity.noContent().build();
+        return ApiResponse.success();
     }
 
     /**
@@ -366,13 +369,13 @@ public class PolicyController {
      * @return 空响应
      */
     @PutMapping("/{policyId}/waive-premium")
-    public ResponseEntity<Void> waivePremium(@PathVariable String policyId,
-                                             @Valid @RequestBody WaivePremiumDTO request) {
+    public ApiResponse<Void> waivePremium(@PathVariable String policyId,
+                                          @Valid @RequestBody WaivePremiumDTO request) {
         String operatorId = RequestContextHolder.requireOperatorId();
         String tenantId = RequestContextHolder.requireTenantId();
         WaivePremiumCommand command = policyWebMapper.toWaivePremiumCommand(request, policyId, operatorId, tenantId);
         policyApplicationService.waivePremium(command);
-        return ResponseEntity.noContent().build();
+        return ApiResponse.success();
     }
 
     /**
@@ -383,14 +386,14 @@ public class PolicyController {
      * @return 空响应
      */
     @PostMapping("/{policyId}/dividend")
-    public ResponseEntity<Void> distributeDividend(@PathVariable String policyId,
-                                                   @Valid @RequestBody DistributeDividendDTO request) {
+    public ApiResponse<Void> distributeDividend(@PathVariable String policyId,
+                                                @Valid @RequestBody DistributeDividendDTO request) {
         String operatorId = RequestContextHolder.requireOperatorId();
         String tenantId = RequestContextHolder.requireTenantId();
         DistributeDividendCommand command = policyWebMapper.toDistributeDividendCommand(request, policyId, operatorId,
                 tenantId);
         policyApplicationService.distributeDividend(command);
-        return ResponseEntity.noContent().build();
+        return ApiResponse.success();
     }
 
     /**
@@ -401,14 +404,14 @@ public class PolicyController {
      * @return 空响应
      */
     @PostMapping("/{policyId}/annuity-payout/start")
-    public ResponseEntity<Void> startAnnuityPayout(@PathVariable String policyId,
-                                                   @Valid @RequestBody StartAnnuityPayoutDTO request) {
+    public ApiResponse<Void> startAnnuityPayout(@PathVariable String policyId,
+                                                @Valid @RequestBody StartAnnuityPayoutDTO request) {
         String operatorId = RequestContextHolder.requireOperatorId();
         String tenantId = RequestContextHolder.requireTenantId();
         StartAnnuityPayoutCommand command = policyWebMapper.toStartAnnuityPayoutCommand(request, policyId, operatorId,
                 tenantId);
         policyApplicationService.startAnnuityPayout(command);
-        return ResponseEntity.noContent().build();
+        return ApiResponse.success();
     }
 
     /**
@@ -418,11 +421,11 @@ public class PolicyController {
      * @return 空响应
      */
     @PostMapping("/{policyId}/annuity-payout/pay")
-    public ResponseEntity<Void> payAnnuityBenefit(@PathVariable String policyId) {
+    public ApiResponse<Void> payAnnuityBenefit(@PathVariable String policyId) {
         String operatorId = RequestContextHolder.requireOperatorId();
         String tenantId = RequestContextHolder.requireTenantId();
         policyApplicationService.payAnnuityBenefit(new PayAnnuityBenefitCommand(policyId, operatorId, tenantId));
-        return ResponseEntity.noContent().build();
+        return ApiResponse.success();
     }
 
     /**
@@ -433,13 +436,13 @@ public class PolicyController {
      * @return 空响应
      */
     @PutMapping("/{policyId}/mature")
-    public ResponseEntity<Void> maturePolicy(@PathVariable String policyId,
-                                             @Valid @RequestBody MaturePolicyDTO request) {
+    public ApiResponse<Void> maturePolicy(@PathVariable String policyId,
+                                          @Valid @RequestBody MaturePolicyDTO request) {
         String operatorId = RequestContextHolder.requireOperatorId();
         String tenantId = RequestContextHolder.requireTenantId();
         MaturePolicyCommand command = policyWebMapper.toMaturePolicyCommand(request, policyId, operatorId, tenantId);
         policyApplicationService.maturePolicy(command);
-        return ResponseEntity.noContent().build();
+        return ApiResponse.success();
     }
 
     /**
@@ -450,13 +453,13 @@ public class PolicyController {
      * @return 保单ID
      */
     @PostMapping("/{policyId}/endorsement")
-    public ResponseEntity<String> applyEndorsement(@PathVariable String policyId,
-                                                   @Valid @RequestBody ApplyEndorsementDTO request) {
+    public ApiResponse<String> applyEndorsement(@PathVariable String policyId,
+                                                @Valid @RequestBody ApplyEndorsementDTO request) {
         String operatorId = RequestContextHolder.requireOperatorId();
         String tenantId = RequestContextHolder.requireTenantId();
         ApplyPolicyEndorsementCommand command = policyWebMapper.toApplyEndorsementCommand(request, policyId, operatorId,
                 tenantId);
         String result = policyApplicationService.applyEndorsement(command);
-        return ResponseEntity.ok(result);
+        return ApiResponse.success(result);
     }
 }

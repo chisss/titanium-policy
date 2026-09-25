@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.titanium.common.context.RequestContextHolder;
 import com.titanium.metadata.errorcode.PolicyErrorCode;
 import com.titanium.metadata.exception.DomainException;
+import com.titanium.metadata.response.ApiResponse;
 import com.titanium.policy.application.command.insurance.InsuranceApplicationService;
 import com.titanium.policy.application.query.InsuranceAppQueryService;
 import com.titanium.policy.command.ConvertProposalToInsuranceCommand;
@@ -59,12 +60,14 @@ public class InsuranceController {
      * @return 响应结果
      */
     @PostMapping("/from-proposal")
-    public ResponseEntity<String> convertFromProposal(@Valid @RequestBody ConvertToInsuranceDTO request) {
+    public ResponseEntity<ApiResponse<String>> convertFromProposal(
+            @Valid @RequestBody ConvertToInsuranceDTO request) {
         String tenantId = RequestContextHolder.requireTenantId();
         // 协议转换：HTTP Request → 领域命令，收敛到同一应用层门面
         ConvertProposalToInsuranceCommand command = insuranceWebMapper.toCommand(request, tenantId);
         String insuranceId = insuranceApplicationService.convertFromProposal(command);
-        return new ResponseEntity<>(insuranceId, HttpStatus.CREATED);
+        // 保留 201：创建语义属 HTTP 传输层，不并入 ApiResponse.code
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(insuranceId));
     }
 
     /**
@@ -79,12 +82,12 @@ public class InsuranceController {
      * @return 投保单详情
      */
     @GetMapping("/{insuranceId}")
-    public ResponseEntity<InsuranceVO> getInsurance(@PathVariable String insuranceId) {
+    public ApiResponse<InsuranceVO> getInsurance(@PathVariable String insuranceId) {
         String tenantId = RequestContextHolder.requireTenantId();
         Optional<InsuranceVO> vo = insuranceAppQueryService.findById(insuranceId, tenantId)
-                .map(insuranceWebMapper::toVO);
-        return vo.map(ResponseEntity::ok).orElseThrow(
-                () -> PolicyExceptionHandler.notFoundInTenant(PolicyErrorCode.INSURANCE_NOT_EXIST, insuranceId));
+             .map(insuranceWebMapper::toVO);
+        return vo.map(ApiResponse::success).orElseThrow(
+             () -> PolicyExceptionHandler.notFoundInTenant(PolicyErrorCode.INSURANCE_NOT_EXIST, insuranceId));
     }
 
     /**
@@ -102,38 +105,38 @@ public class InsuranceController {
      * @return 投保单列表
      */
     @GetMapping
-    public ResponseEntity<List<InsuranceVO>> listInsurances(
-            @RequestParam(required = false) String insuranceNo,
-            @RequestParam(required = false) String holderId,
-            @RequestParam(required = false) String productId,
-            @RequestParam(required = false) String status,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+    public ApiResponse<List<InsuranceVO>> listInsurances(
+         @RequestParam(required = false) String insuranceNo,
+         @RequestParam(required = false) String holderId,
+         @RequestParam(required = false) String productId,
+         @RequestParam(required = false) String status,
+         @RequestParam(defaultValue = "0") int page,
+         @RequestParam(defaultValue = "20") int size) {
         String tenantId = RequestContextHolder.requireTenantId();
         List<InsuranceVO> insurances = insuranceAppQueryService
                 .findByConditions(insuranceNo, holderId, productId, status, tenantId, page, size)
                 .stream()
                 .map(insuranceWebMapper::toVO)
                 .toList();
-        return ResponseEntity.ok(insurances);
+        return ApiResponse.success(insurances);
     }
 
     /**
      * 多条件分页查询投保单，返回完整分页元数据。
      */
     @GetMapping("/page")
-    public ResponseEntity<Page<InsuranceVO>> pageInsurances(
-            @RequestParam(required = false) String insuranceNo,
-            @RequestParam(required = false) String holderId,
-            @RequestParam(required = false) String productId,
-            @RequestParam(required = false) String status,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+    public ApiResponse<Page<InsuranceVO>> pageInsurances(
+         @RequestParam(required = false) String insuranceNo,
+         @RequestParam(required = false) String holderId,
+         @RequestParam(required = false) String productId,
+         @RequestParam(required = false) String status,
+         @RequestParam(defaultValue = "0") int page,
+         @RequestParam(defaultValue = "20") int size) {
         String tenantId = RequestContextHolder.requireTenantId();
         Page<InsuranceVO> insurances = insuranceAppQueryService
                 .findPageByConditions(insuranceNo, holderId, productId, status, tenantId, page, size)
                 .map(insuranceWebMapper::toVO);
-        return ResponseEntity.ok(insurances);
+        return ApiResponse.success(insurances);
     }
 
     /**
@@ -143,10 +146,10 @@ public class InsuranceController {
      * @return 响应结果
      */
     @PutMapping("/{insuranceId}/underwriting")
-    public ResponseEntity<Void> submitUnderwriting(@PathVariable String insuranceId) {
+    public ApiResponse<Void> submitUnderwriting(@PathVariable String insuranceId) {
         String tenantId = RequestContextHolder.requireTenantId();
         insuranceApplicationService.submitUnderwriting(insuranceId, tenantId);
-        return ResponseEntity.noContent().build();
+        return ApiResponse.success();
     }
 
     /**
@@ -156,9 +159,9 @@ public class InsuranceController {
      * @return 响应结果
      */
     @PutMapping("/{insuranceId}/underwrite")
-    public ResponseEntity<Void> triggerUnderwriting(@PathVariable String insuranceId) {
+    public ApiResponse<Void> triggerUnderwriting(@PathVariable String insuranceId) {
         String tenantId = RequestContextHolder.requireTenantId();
         insuranceApplicationService.submitUnderwriting(insuranceId, tenantId);
-        return ResponseEntity.noContent().build();
+        return ApiResponse.success();
     }
 }

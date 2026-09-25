@@ -2,7 +2,6 @@ package com.titanium.policy.web.controller.policy;
 
 import java.util.List;
 
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -12,6 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.titanium.common.context.RequestContextHolder;
 import com.titanium.metadata.enums.customer.CustomerEnum.InsuranceRole;
 import com.titanium.metadata.errorcode.PolicyErrorCode;
+import com.titanium.metadata.response.ApiResponse;
 import com.titanium.policy.application.query.PolicyLineAppQueryService;
 import com.titanium.policy.query.result.PolicyCoverageQueryResult;
 import com.titanium.policy.query.result.PolicyFullDetailQueryResult;
@@ -54,11 +54,11 @@ public class PolicyDetailController {
      */
     @Operation(summary = "保单全景查询", description = "一次返回保单全部维度，后台详情页专用")
     @GetMapping("/{policyId}/full-detail")
-    public ResponseEntity<PolicyFullDetailQueryResult> getFullDetail(@PathVariable String policyId) {
+    public ApiResponse<PolicyFullDetailQueryResult> getFullDetail(@PathVariable String policyId) {
         String tenantId = RequestContextHolder.requireTenantId();
         return policyLineAppQueryService.findFullDetail(policyId, tenantId)
-                .map(ResponseEntity::ok)
-                .orElseThrow(() -> PolicyExceptionHandler.notFoundInTenant(PolicyErrorCode.POLICY_NOT_EXIST, policyId));
+             .map(ApiResponse::success)
+             .orElseThrow(() -> PolicyExceptionHandler.notFoundInTenant(PolicyErrorCode.POLICY_NOT_EXIST, policyId));
     }
 
     /**
@@ -74,11 +74,11 @@ public class PolicyDetailController {
      */
     @Operation(summary = "查询保单险种段", description = "一单多险的段清单，可选是否装配段内明细")
     @GetMapping("/{policyId}/lines")
-    public ResponseEntity<List<PolicyProductQueryResult>> getLines(
-            @PathVariable String policyId,
-            @RequestParam(defaultValue = "false") boolean withDetails) {
+    public ApiResponse<List<PolicyProductQueryResult>> getLines(
+         @PathVariable String policyId,
+         @RequestParam(defaultValue = "false") boolean withDetails) {
         String tenantId = RequestContextHolder.requireTenantId();
-        return ResponseEntity.ok(policyLineAppQueryService.findLines(policyId, withDetails, tenantId));
+        return ApiResponse.success(policyLineAppQueryService.findLines(policyId, withDetails, tenantId));
     }
 
     /**
@@ -92,9 +92,9 @@ public class PolicyDetailController {
      */
     @Operation(summary = "查询保单保险责任", description = "理赔定责依据，含免赔与赔付比例")
     @GetMapping("/{policyId}/coverages")
-    public ResponseEntity<List<PolicyCoverageQueryResult>> getCoverages(@PathVariable String policyId) {
+    public ApiResponse<List<PolicyCoverageQueryResult>> getCoverages(@PathVariable String policyId) {
         String tenantId = RequestContextHolder.requireTenantId();
-        return ResponseEntity.ok(policyLineAppQueryService.findCoverages(policyId, tenantId));
+        return ApiResponse.success(policyLineAppQueryService.findCoverages(policyId, tenantId));
     }
 
     /**
@@ -109,9 +109,9 @@ public class PolicyDetailController {
      */
     @Operation(summary = "查询保单标的", description = "含各险种特有的类型化属性包")
     @GetMapping("/{policyId}/subjects")
-    public ResponseEntity<List<PolicySubjectQueryResult>> getSubjects(@PathVariable String policyId) {
+    public ApiResponse<List<PolicySubjectQueryResult>> getSubjects(@PathVariable String policyId) {
         String tenantId = RequestContextHolder.requireTenantId();
-        return ResponseEntity.ok(policyLineAppQueryService.findSubjects(policyId, tenantId));
+        return ApiResponse.success(policyLineAppQueryService.findSubjects(policyId, tenantId));
     }
 
     /**
@@ -129,14 +129,13 @@ public class PolicyDetailController {
      */
     @Operation(summary = "按客户角色查保单", description = "支持投保人/被保险人/受益人三种角色维度")
     @GetMapping("/by-customer/{customerId}")
-    public ResponseEntity<List<PolicyQueryResult>> getByCustomerRole(
-            @PathVariable String customerId,
-            @RequestParam(required = false) String role,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+    public ApiResponse<List<PolicyQueryResult>> getByCustomerRole(
+         @PathVariable String customerId,
+         @RequestParam(required = false) String role,
+         @RequestParam(defaultValue = "0") int page,
+         @RequestParam(defaultValue = "20") int size) {
         String tenantId = RequestContextHolder.requireTenantId();
         InsuranceRole insuranceRole = role != null ? InsuranceRole.fromCode(role) : null;
-        return ResponseEntity
-                .ok(policyLineAppQueryService.findByCustomerRole(customerId, insuranceRole, tenantId, page, size));
+        return ApiResponse.success(policyLineAppQueryService.findByCustomerRole(customerId, insuranceRole, tenantId, page, size));
     }
 }

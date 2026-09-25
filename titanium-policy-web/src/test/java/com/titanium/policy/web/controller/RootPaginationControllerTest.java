@@ -15,10 +15,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.http.ResponseEntity;
 
 import com.titanium.common.context.RequestContext;
 import com.titanium.common.context.RequestContextHolder;
+import com.titanium.metadata.response.ApiResponse;
 import com.titanium.policy.application.command.insurance.InsuranceApplicationService;
 import com.titanium.policy.application.command.policy.PolicyApplicationService;
 import com.titanium.policy.application.command.proposal.ProposalApplicationService;
@@ -67,11 +67,11 @@ class RootPaginationControllerTest {
         PolicyController controller = new PolicyController(mock(PolicyApplicationService.class), queryService,
                 mapper, mock(PolicyStatisticsWebMapper.class));
 
-        ResponseEntity<Page<PolicyDetailVO>> response = controller.pagePolicies(null, null, null, null, null, null,
+        ApiResponse<Page<PolicyDetailVO>> response = controller.pagePolicies(null, null, null, null, null, null,
                 null, null, null, 1, 10);
 
-        assertEquals(31, response.getBody().getTotalElements());
-        assertSame(vo, response.getBody().getContent().getFirst());
+        assertEquals(31, response.getData().getTotalElements());
+        assertSame(vo, response.getData().getContent().getFirst());
     }
 
     /**
@@ -112,10 +112,10 @@ class RootPaginationControllerTest {
         InsuranceController controller = new InsuranceController(mock(InsuranceApplicationService.class),
                 queryService, mapper);
 
-        ResponseEntity<Page<InsuranceVO>> response = controller.pageInsurances(null, null, null, null, 2, 20);
+        ApiResponse<Page<InsuranceVO>> response = controller.pageInsurances(null, null, null, null, 2, 20);
 
-        assertEquals(69, response.getBody().getTotalElements());
-        assertSame(vo, response.getBody().getContent().getFirst());
+        assertEquals(69, response.getData().getTotalElements());
+        assertSame(vo, response.getData().getContent().getFirst());
     }
 
     @Test
@@ -130,9 +130,9 @@ class RootPaginationControllerTest {
         ProposalController controller = new ProposalController(mock(ProposalApplicationService.class), queryService,
                 mapper);
 
-        ResponseEntity<Page<ProposalVO>> response = controller.pageProposals(null, null, null, null, 3, 20);
+        ApiResponse<Page<ProposalVO>> response = controller.pageProposals(null, null, null, null, 3, 20);
 
-        assertEquals(92, response.getBody().getTotalElements());
-        assertSame(vo, response.getBody().getContent().getFirst());
+        assertEquals(92, response.getData().getTotalElements());
+        assertSame(vo, response.getData().getContent().getFirst());
     }
 }

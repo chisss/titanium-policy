@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.titanium.common.context.RequestContextHolder;
 import com.titanium.metadata.errorcode.PolicyErrorCode;
 import com.titanium.metadata.exception.DomainException;
+import com.titanium.metadata.response.ApiResponse;
 import com.titanium.policy.application.command.proposal.ProposalApplicationService;
 import com.titanium.policy.application.query.ProposalAppQueryService;
 import com.titanium.policy.command.CreateProposalCommand;
@@ -58,12 +59,13 @@ public class ProposalController {
      * @return 意向单ID
      */
     @PostMapping
-    public ResponseEntity<String> createProposal(@Valid @RequestBody CreateProposalDTO request) {
+    public ResponseEntity<ApiResponse<String>> createProposal(@Valid @RequestBody CreateProposalDTO request) {
         String tenantId = RequestContextHolder.requireTenantId();
         // 协议转换：HTTP Request → 领域命令，收敛到同一应用层门面
         CreateProposalCommand command = proposalWebMapper.toCommand(request, tenantId);
         String proposalId = proposalApplicationService.createProposal(command);
-        return new ResponseEntity<>(proposalId, HttpStatus.CREATED);
+        // 保留 201：创建语义属 HTTP 传输层，不并入 ApiResponse.code
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(proposalId));
     }
 
     /**
@@ -78,12 +80,12 @@ public class ProposalController {
      * @return 投保意向单详情
      */
     @GetMapping("/{proposalId}")
-    public ResponseEntity<ProposalVO> getProposal(@PathVariable String proposalId) {
+    public ApiResponse<ProposalVO> getProposal(@PathVariable String proposalId) {
         String tenantId = RequestContextHolder.requireTenantId();
         Optional<ProposalVO> vo = proposalAppQueryService.findById(proposalId, tenantId)
-                .map(proposalWebMapper::toVO);
-        return vo.map(ResponseEntity::ok).orElseThrow(
-                () -> PolicyExceptionHandler.notFoundInTenant(PolicyErrorCode.PROPOSAL_NOT_EXIST, proposalId));
+             .map(proposalWebMapper::toVO);
+        return vo.map(ApiResponse::success).orElseThrow(
+             () -> PolicyExceptionHandler.notFoundInTenant(PolicyErrorCode.PROPOSAL_NOT_EXIST, proposalId));
     }
 
     /**
@@ -101,38 +103,38 @@ public class ProposalController {
      * @return 意向单列表
      */
     @GetMapping
-    public ResponseEntity<List<ProposalVO>> listProposals(
-            @RequestParam(required = false) String proposalNo,
-            @RequestParam(required = false) String customerId,
-            @RequestParam(required = false) String productCode,
-            @RequestParam(required = false) String status,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+    public ApiResponse<List<ProposalVO>> listProposals(
+         @RequestParam(required = false) String proposalNo,
+         @RequestParam(required = false) String customerId,
+         @RequestParam(required = false) String productCode,
+         @RequestParam(required = false) String status,
+         @RequestParam(defaultValue = "0") int page,
+         @RequestParam(defaultValue = "20") int size) {
         String tenantId = RequestContextHolder.requireTenantId();
         List<ProposalVO> proposals = proposalAppQueryService
                 .findByConditions(proposalNo, customerId, productCode, status, tenantId, page, size)
                 .stream()
                 .map(proposalWebMapper::toVO)
                 .toList();
-        return ResponseEntity.ok(proposals);
+        return ApiResponse.success(proposals);
     }
 
     /**
      * 多条件分页查询投保意向单，返回完整分页元数据。
      */
     @GetMapping("/page")
-    public ResponseEntity<Page<ProposalVO>> pageProposals(
-            @RequestParam(required = false) String proposalNo,
-            @RequestParam(required = false) String customerId,
-            @RequestParam(required = false) String productCode,
-            @RequestParam(required = false) String status,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+    public ApiResponse<Page<ProposalVO>> pageProposals(
+         @RequestParam(required = false) String proposalNo,
+         @RequestParam(required = false) String customerId,
+         @RequestParam(required = false) String productCode,
+         @RequestParam(required = false) String status,
+         @RequestParam(defaultValue = "0") int page,
+         @RequestParam(defaultValue = "20") int size) {
         String tenantId = RequestContextHolder.requireTenantId();
         Page<ProposalVO> proposals = proposalAppQueryService
                 .findPageByConditions(proposalNo, customerId, productCode, status, tenantId, page, size)
                 .map(proposalWebMapper::toVO);
-        return ResponseEntity.ok(proposals);
+        return ApiResponse.success(proposals);
     }
 
     /**
@@ -142,9 +144,9 @@ public class ProposalController {
      * @return 响应结果
      */
     @PutMapping("/{proposalId}/submit")
-    public ResponseEntity<Void> submitProposal(@PathVariable String proposalId) {
+    public ApiResponse<Void> submitProposal(@PathVariable String proposalId) {
         String tenantId = RequestContextHolder.requireTenantId();
         proposalApplicationService.submitProposal(proposalId, "提交投保意向单", tenantId);
-        return ResponseEntity.noContent().build();
+        return ApiResponse.success();
     }
 }
