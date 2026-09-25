@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import com.titanium.metadata.errorcode.BaseErrorCode;
 import com.titanium.metadata.errorcode.PolicyErrorCode;
+import com.titanium.metadata.errorcode.RawErrorCode;
 import com.titanium.metadata.errorcode.SystemErrorCode;
 import com.titanium.metadata.exception.DomainException;
 import com.titanium.metadata.response.ApiResponse;
@@ -39,8 +40,10 @@ public class PolicyExceptionHandler {
     /**
      * 本域全部可用错误码：本域 {@link PolicyErrorCode} + 跨域通用 {@link SystemErrorCode}。
      * <p>
-     * {@link DomainException} 只携带 8 位数字码串（{@code getErrorCode()}），故需反查枚举实例
-     * 才能交给 {@code ApiResponse.error(BaseErrorCode, message)}。
+     * 🔴 自 2026-09-25 起，{@link DomainException} 的错误码字段已是 {@link BaseErrorCode} 强类型，
+     * <b>不再需要</b>按码串反查枚举——枚举身份随异常一路传递。本清单<b>仅</b>服务于存量裸串路径
+     * （{@link RawErrorCode} 包装的调用点，构造器已 {@code @Deprecated}）：它只带码串、无枚举身份，
+     * 仍需回查才能恢复 404/409 等状态语义。EXC-06 废弃棘轮清零后本清单即可删除。
      * </p>
      */
     private static final List<BaseErrorCode> DOMAIN_ERROR_CODES = domainErrorCodes();
@@ -116,8 +119,7 @@ public class PolicyExceptionHandler {
      */
     @ExceptionHandler(DomainException.class)
     public ResponseEntity<ApiResponse<Void>> handleDomainException(DomainException exception) {
-        BaseErrorCode errorCode = resolve(exception.getErrorCode())
-                .orElse(SystemErrorCode.SYSTEM_ERROR);
+        BaseErrorCode errorCode = resolve(exception.getErrorCode());
         return ResponseEntity.status(statusFor(errorCode))
                 .body(ApiResponse.error(errorCode, exception.getMessage()));
     }
@@ -157,13 +159,22 @@ public class PolicyExceptionHandler {
     }
 
     /**
-     * 按 8 位数字码反查枚举，未命中再按历史裸串码映射
+     * 领域错误码归一：强类型枚举直接透传；存量裸串码回查枚举，未命中再按历史符号码映射。
+     * <p>
+     * 返回非空——最终兜底 {@link SystemErrorCode#SYSTEM_ERROR}，调用方无需再判空。
+     * </p>
      */
-    private Optional<BaseErrorCode> resolve(String code) {
+    private BaseErrorCode resolve(BaseErrorCode errorCode) {
+        if (errorCode instanceof PolicyErrorCode || errorCode instanceof SystemErrorCode) {
+            return errorCode;
+        }
+        // 存量裸串路径（@Deprecated 构造器）的语义保持：先按码串回查枚举（与改造前一致），
+        // 再按历史符号码映射；两者皆未命中才降级为系统错误。
         return DOMAIN_ERROR_CODES.stream()
-                .filter(errorCode -> errorCode.getCode().equals(code))
+                .filter(candidate -> candidate.getCode().equals(errorCode.getCode()))
                 .findFirst()
-                .or(() -> Optional.ofNullable(LEGACY_ERROR_CODES.get(code)));
+                .or(() -> Optional.ofNullable(LEGACY_ERROR_CODES.get(errorCode.getCode())))
+                .orElse(SystemErrorCode.SYSTEM_ERROR);
     }
 
     /**

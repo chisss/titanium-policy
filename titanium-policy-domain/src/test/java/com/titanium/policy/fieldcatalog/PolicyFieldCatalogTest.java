@@ -85,6 +85,6 @@ class PolicyFieldCatalogTest {
                         PolicyFieldMaskingPolicy.NONE,
                         null));
 
-        assertNotEquals("", exception.getErrorCode());
+        assertNotEquals("", exception.getErrorCodeValue());
     }
 }
