@@ -70,7 +70,7 @@ public class PolicyMaturityScheduler {
                 } catch (Exception e) {
                     failed++;
                     log.warn("[满期给付定时] 单条满期给付失败, policyId={}, tenantId={}, 原因={}", policy.getPolicyId(),
-                            policy.getTenantId(), e.getMessage());
+                            policy.getTenantId(), e.getMessage(), e);
                 }
             }
             if (due.size() < PAGE_SIZE) {

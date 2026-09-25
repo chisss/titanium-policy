@@ -95,7 +95,7 @@ public class PolicyRelationCascadeOrchestrator {
         try {
             command.run();
         } catch (Exception e) {
-            LOG.warn("[父子级联] 子保单{}失败, child={}, 原因={}", action, childPolicyId, e.getMessage());
+            LOG.warn("[父子级联] 子保单{}失败, child={}, 原因={}", action, childPolicyId, e.getMessage(), e);
         }
     }
 }

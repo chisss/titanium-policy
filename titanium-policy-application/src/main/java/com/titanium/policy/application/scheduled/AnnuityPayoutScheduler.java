@@ -71,7 +71,7 @@ public class AnnuityPayoutScheduler {
                 } catch (Exception e) {
                     failed++;
                     log.warn("[年金给付定时] 单条给付失败, policyId={}, tenantId={}, 原因={}", plan.getPolicyId(),
-                            plan.getTenantId(), e.getMessage());
+                            plan.getTenantId(), e.getMessage(), e);
                 }
             }
             if (due.size() < PAGE_SIZE) {

@@ -99,7 +99,7 @@ public class MaintenanceExecutedEventListener {
         } catch (Exception e) {
             // 幂等保护：保单状态已达目标态（重复投递）等场景会抛业务异常，记录但不阻塞消费
             log.error("保全回写失败, type={}, policyId={}, 原因={}", message.maintenanceType(), message.policyId(),
-                    e.getMessage());
+                    e.getMessage(), e);
         }
     }
 }

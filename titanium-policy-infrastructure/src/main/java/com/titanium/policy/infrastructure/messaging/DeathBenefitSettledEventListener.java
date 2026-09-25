@@ -75,7 +75,7 @@ public class DeathBenefitSettledEventListener {
                             TERMINATION_DESCRIPTION));
         } catch (Exception e) {
             // 幂等保护：保单已达终态（重复投递）会抛业务异常，记录但不阻塞消费
-            log.error("[身故给付-入站] 保单终止失败, policyId={}, 原因={}", policyId, e.getMessage());
+            log.error("[身故给付-入站] 保单终止失败, policyId={}, 原因={}", policyId, e.getMessage(), e);
         }
     }
 }

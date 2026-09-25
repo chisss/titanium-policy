@@ -78,7 +78,7 @@ public class PolicyActivationScheduler {
                     failed++;
                     log.warn("[待生效激活定时] 单条激活失败（保费未收讫属预期，需人工跟进）, policyId={}, policyNo={}, "
                             + "tenantId={}, 原因={}", policy.getPolicyId(), policy.getPolicyNo(), policy.getTenantId(),
-                            e.getMessage());
+                            e.getMessage(), e);
                 }
             }
             if (due.size() < PAGE_SIZE) {
