@@ -11,6 +11,7 @@ import com.titanium.common.context.RequestContextHolder;
 import com.titanium.common.exception.BusinessException;
 import com.titanium.metadata.enums.underwriting.UnderwritingEnum;
 import com.titanium.metadata.enums.underwriting.UnderwritingEnum.ConclusionType;
+import com.titanium.metadata.response.ApiResponse;
 import com.titanium.policy.port.underwriting.UnderwritingDecisionGateway;
 import com.titanium.policy.valueobject.insurance.UnderwritingDecisionRequest;
 import com.titanium.policy.valueobject.insurance.UnderwritingResult;
@@ -72,7 +73,8 @@ public class SyncUnderwritingDecisionAdapter implements UnderwritingDecisionGate
         String underwritingId = findExistingUnderwritingId(request);
         if (underwritingId == null) {
             // 创建核保单（透传险种编码供核保域按产品配置决策——UW-4）
-            ResponseEntity<UnderwritingResponse> createdResponse = underwritingApi.createUnderwriting(
+            // 契约仅本方法保留 ResponseEntity 外层（201 Created 状态语义），载荷仍是统一信封
+            ResponseEntity<ApiResponse<UnderwritingResponse>> createdResponse = underwritingApi.createUnderwriting(
                     buildCreateRequest(request));
             UnderwritingResponse created = requireSuccessfulBody(createdResponse, "创建核保", request);
             underwritingId = requireUnderwritingId(created, "创建核保", request);
@@ -82,12 +84,12 @@ public class SyncUnderwritingDecisionAdapter implements UnderwritingDecisionGate
         }
 
         // 2. 提交结构化核保输入（被保人风险要素 → 富核保评分依据），替代旧金额兜底
-        ResponseEntity<UnderwritingResponse> submittedResponse = underwritingApi.submitInput(underwritingId,
+        ApiResponse<UnderwritingResponse> submittedResponse = underwritingApi.submitInput(underwritingId,
                 buildInputRequest(request));
         requireSuccessfulBody(submittedResponse, "提交核保输入", request);
 
         // 3. 触发核保决策（核保域基于已提交输入产出富结论/风险等级/加费）
-        ResponseEntity<UnderwritingResponse> decidedResponse = underwritingApi.decide(underwritingId,
+        ApiResponse<UnderwritingResponse> decidedResponse = underwritingApi.decide(underwritingId,
                 buildDecideRequest(request));
         UnderwritingResponse decided = requireSuccessfulBody(decidedResponse, "触发核保决策", request);
         String decidedUnderwritingId = requireUnderwritingId(decided, "核保决策", request);
@@ -151,9 +153,10 @@ public class SyncUnderwritingDecisionAdapter implements UnderwritingDecisionGate
 
     /**
      * 校验核保域同步调用响应，避免空响应在 Saga 内退化为无上下文空指针异常。
+     * <p>仅 {@code createUnderwriting} 使用（契约保留 {@code ResponseEntity} 外层表达 201 Created）。</p>
      */
-    private UnderwritingResponse requireSuccessfulBody(ResponseEntity<UnderwritingResponse> response, String stage,
-                                                        UnderwritingDecisionRequest request) {
+    private UnderwritingResponse requireSuccessfulBody(ResponseEntity<ApiResponse<UnderwritingResponse>> response,
+                                                        String stage, UnderwritingDecisionRequest request) {
         if (response == null) {
             throw new BusinessException(stage + "失败: insuranceId=" + request.insuranceId() + ", 无响应");
         }
@@ -162,9 +165,31 @@ public class SyncUnderwritingDecisionAdapter implements UnderwritingDecisionGate
                     + response.getStatusCode().value());
         }
         if (response.getBody() == null) {
+            // 2xx 但无载荷：与「无响应」区分（前者是契约应答了却没带信封），语义更精确便于排障
             throw new BusinessException(stage + "响应体为空: insuranceId=" + request.insuranceId());
         }
-        return response.getBody();
+        return requireSuccessfulBody(response.getBody(), stage, request);
+    }
+
+    /**
+     * 解包统一信封（m24-01a 起核保契约统一返回 {@code ApiResponse}）。
+     * <p>
+     * 🔴 错误信封（2xx + 错误码）必须显式失败，不得并入「结论缺失」——否则契约失败会被读成业务事实。
+     * </p>
+     */
+    private UnderwritingResponse requireSuccessfulBody(ApiResponse<UnderwritingResponse> response, String stage,
+                                                        UnderwritingDecisionRequest request) {
+        if (response == null) {
+            throw new BusinessException(stage + "失败: insuranceId=" + request.insuranceId() + ", 无响应");
+        }
+        if (!response.isSuccess()) {
+            throw new BusinessException(stage + "失败: insuranceId=" + request.insuranceId() + ", 错误码="
+                    + response.getCode() + ", " + response.getMessage());
+        }
+        if (response.getData() == null) {
+            throw new BusinessException(stage + "响应体为空: insuranceId=" + request.insuranceId());
+        }
+        return response.getData();
     }
 
     /**
@@ -210,12 +235,18 @@ public class SyncUnderwritingDecisionAdapter implements UnderwritingDecisionGate
      * <p>幂等键取「投保单号」——同一投保单在重试/重入下必然映射到同一张核保单。</p>
      */
     private String findExistingUnderwritingId(UnderwritingDecisionRequest request) {
-        ResponseEntity<List<UnderwritingResponse>> response =
+        ApiResponse<List<UnderwritingResponse>> response =
                 underwritingApi.getUnderwritingByPolicyId(request.insuranceId());
-        if (response == null || response.getBody() == null || response.getBody().isEmpty()) {
+        if (response == null || !response.isSuccess()) {
+            // 🔴 幂等前置查询失败不得并入「无既有核保单」——否则重试会再建一张孤儿核保单
+            throw new BusinessException("核保幂等前置查询失败: insuranceId=" + request.insuranceId()
+                    + (response == null ? ", 无响应" : ", 错误码=" + response.getCode()));
+        }
+        List<UnderwritingResponse> existing = response.getData();
+        if (existing == null || existing.isEmpty()) {
             return null;
         }
-        return response.getBody().get(0).getUnderwritingId();
+        return existing.get(0).getUnderwritingId();
     }
 
     /**

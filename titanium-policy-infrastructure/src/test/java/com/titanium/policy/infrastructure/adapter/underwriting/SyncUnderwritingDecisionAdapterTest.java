@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -22,6 +23,8 @@ import org.springframework.http.ResponseEntity;
 import com.titanium.common.exception.BusinessException;
 import com.titanium.metadata.enums.underwriting.UnderwritingEnum.ConclusionType;
 import com.titanium.metadata.enums.underwriting.UnderwritingEnum.UnderwritingStatus;
+import com.titanium.metadata.errorcode.SystemErrorCode;
+import com.titanium.metadata.response.ApiResponse;
 import com.titanium.policy.valueobject.insurance.UnderwritingDecisionRequest;
 import com.titanium.policy.valueobject.insurance.UnderwritingResult;
 import com.titanium.underwriting.api.UnderwritingApi;
@@ -46,6 +49,8 @@ class SyncUnderwritingDecisionAdapterTest {
     void setUp() {
         underwritingApi = mock(UnderwritingApi.class);
         adapter = new SyncUnderwritingDecisionAdapter(underwritingApi);
+        // 幂等前置查询默认「无既有核保单」；未桩会返回 null ⇒ 按失败关闭拒绝，故各用例须显式表态
+        when(underwritingApi.getUnderwritingByPolicyId(any())).thenReturn(ApiResponse.success(List.of()));
     }
 
     @Test
@@ -101,16 +106,34 @@ class SyncUnderwritingDecisionAdapterTest {
     }
 
     @Test
+    void reusesExistingUnderwritingInsteadOfCreatingOrphanOnRetry() {
+        UnderwritingResponse existing = new UnderwritingResponse();
+        existing.setUnderwritingId(UNDERWRITING_ID);
+        when(underwritingApi.getUnderwritingByPolicyId(INSURANCE_ID))
+                .thenReturn(ApiResponse.success(List.of(existing)));
+        when(underwritingApi.submitInput(eq(UNDERWRITING_ID), any(SubmitUnderwritingInputApiRequest.class)))
+                .thenReturn(ApiResponse.success(new UnderwritingResponse()));
+        when(underwritingApi.decide(eq(UNDERWRITING_ID), any(DecideUnderwritingApiRequest.class)))
+                .thenReturn(ApiResponse.success(decision(ConclusionType.ACCEPT, UnderwritingStatus.APPROVED)));
+
+        adapter.requestDecision(request(new BigDecimal("1200.00")));
+
+        // 幂等命中即复用：绝不新建第二张核保单
+        verify(underwritingApi, never()).createUnderwriting(any());
+    }
+
+    @Test
     void rejectsNonSuccessfulCreateResponse() {
         when(underwritingApi.createUnderwriting(any()))
-                .thenReturn(ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(new UnderwritingResponse()));
+                .thenReturn(ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                        .body(ApiResponse.success(new UnderwritingResponse())));
 
         assertFailureContains("创建核保", () -> adapter.requestDecision(request(new BigDecimal("1200.00"))));
     }
 
     @Test
     void rejectsEmptyCreateResponseBody() {
-        ResponseEntity<UnderwritingResponse> emptyResponse = ResponseEntity.ok().build();
+        ResponseEntity<ApiResponse<UnderwritingResponse>> emptyResponse = ResponseEntity.ok().build();
         when(underwritingApi.createUnderwriting(any())).thenReturn(emptyResponse);
 
         assertFailureContains("创建核保响应体为空",
@@ -118,10 +141,20 @@ class SyncUnderwritingDecisionAdapterTest {
     }
 
     @Test
+    void rejectsErrorEnvelopeFromCreateResponse() {
+        when(underwritingApi.createUnderwriting(any()))
+                .thenReturn(ResponseEntity.ok(ApiResponse.error(SystemErrorCode.DEPENDENCY_SERVICE_ERROR)));
+
+        // 2xx + 错误码：契约层失败必须显式抛出，不得并入「响应体为空/结论缺失」被读成业务事实
+        assertFailureContains("创建核保失败", () -> adapter.requestDecision(request(new BigDecimal("1200.00"))));
+    }
+
+    @Test
     void rejectsBlankCreatedUnderwritingId() {
         UnderwritingResponse created = new UnderwritingResponse();
         created.setUnderwritingId(" ");
-        when(underwritingApi.createUnderwriting(any())).thenReturn(ResponseEntity.ok(created));
+        when(underwritingApi.createUnderwriting(any()))
+                .thenReturn(ResponseEntity.ok(ApiResponse.success(created)));
 
         assertFailureContains("核保单ID为空", () -> adapter.requestDecision(request(new BigDecimal("1200.00"))));
     }
@@ -130,7 +163,7 @@ class SyncUnderwritingDecisionAdapterTest {
     void rejectsNonSuccessfulSubmitInputResponse() {
         stubCreatedResponse();
         when(underwritingApi.submitInput(eq(UNDERWRITING_ID), any()))
-                .thenReturn(ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(new UnderwritingResponse()));
+                .thenReturn(ApiResponse.error(SystemErrorCode.DEPENDENCY_SERVICE_ERROR));
 
         assertFailureContains("提交核保输入", () -> adapter.requestDecision(request(new BigDecimal("1200.00"))));
     }
@@ -139,7 +172,7 @@ class SyncUnderwritingDecisionAdapterTest {
     void rejectsNonSuccessfulDecisionResponse() {
         stubCreatedAndSubmittedResponses();
         when(underwritingApi.decide(eq(UNDERWRITING_ID), any()))
-                .thenReturn(ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(new UnderwritingResponse()));
+                .thenReturn(ApiResponse.error(SystemErrorCode.DEPENDENCY_SERVICE_ERROR));
 
         assertFailureContains("触发核保决策", () -> adapter.requestDecision(request(new BigDecimal("1200.00"))));
     }
@@ -147,8 +180,7 @@ class SyncUnderwritingDecisionAdapterTest {
     @Test
     void rejectsEmptyDecisionResponseBody() {
         stubCreatedAndSubmittedResponses();
-        ResponseEntity<UnderwritingResponse> emptyResponse = ResponseEntity.ok().build();
-        when(underwritingApi.decide(eq(UNDERWRITING_ID), any())).thenReturn(emptyResponse);
+        when(underwritingApi.decide(eq(UNDERWRITING_ID), any())).thenReturn(ApiResponse.success());
 
         assertFailureContains("核保决策响应体为空",
                 () -> adapter.requestDecision(request(new BigDecimal("1200.00"))));
@@ -170,22 +202,34 @@ class SyncUnderwritingDecisionAdapterTest {
         assertFailureContains("核保结论为空", () -> adapter.requestDecision(request(new BigDecimal("1200.00"))));
     }
 
+    @Test
+    void rejectsWhenIdempotencyPreCheckCarriesErrorEnvelope() {
+        when(underwritingApi.getUnderwritingByPolicyId(INSURANCE_ID))
+                .thenReturn(ApiResponse.error(SystemErrorCode.DEPENDENCY_SERVICE_ERROR));
+
+        // 🔴 前置查询失败不得并入「无既有核保单」——否则重试会再建一张孤儿核保单
+        assertFailureContains("核保幂等前置查询失败",
+                () -> adapter.requestDecision(request(new BigDecimal("1200.00"))));
+        verify(underwritingApi, never()).createUnderwriting(any());
+    }
+
     private void stubSuccessfulWorkflow(UnderwritingResponse decided) {
         stubCreatedAndSubmittedResponses();
         when(underwritingApi.decide(eq(UNDERWRITING_ID), any(DecideUnderwritingApiRequest.class)))
-                .thenReturn(ResponseEntity.ok(decided));
+                .thenReturn(ApiResponse.success(decided));
     }
 
     private void stubCreatedAndSubmittedResponses() {
         stubCreatedResponse();
-        when(underwritingApi.submitInput(eq(UNDERWRITING_ID), any(SubmitUnderwritingInputApiRequest.class))).thenReturn(ResponseEntity.ok(new UnderwritingResponse()));
+        when(underwritingApi.submitInput(eq(UNDERWRITING_ID), any(SubmitUnderwritingInputApiRequest.class)))
+                .thenReturn(ApiResponse.success(new UnderwritingResponse()));
     }
 
     private void stubCreatedResponse() {
         UnderwritingResponse created = new UnderwritingResponse();
         created.setUnderwritingId(UNDERWRITING_ID);
         when(underwritingApi.createUnderwriting(any(CreateUnderwritingRequest.class)))
-                .thenReturn(ResponseEntity.ok(created));
+                .thenReturn(ResponseEntity.ok(ApiResponse.success(created)));
     }
 
     private UnderwritingResponse decision(ConclusionType conclusionType, UnderwritingStatus status) {

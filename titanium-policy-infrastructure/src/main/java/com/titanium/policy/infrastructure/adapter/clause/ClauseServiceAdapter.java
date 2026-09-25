@@ -11,6 +11,7 @@ import com.titanium.clause.api.response.clause.CoverageResponse;
 import com.titanium.metadata.enums.CurrencyEnum;
 import com.titanium.metadata.enums.clause.DeductibleType;
 import com.titanium.metadata.errorcode.SystemErrorCode;
+import com.titanium.metadata.response.ApiResponse;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.exception.RemoteDependencyUnavailableException;
 import com.titanium.policy.port.clause.ClauseServicePort;
@@ -45,18 +46,26 @@ public class ClauseServiceAdapter implements ClauseServicePort {
     @Override
     public ClauseSnapshot fetchClauseSnapshot(String clauseId, boolean isMainClause, String tenantId) {
         try {
-            ClauseResponse response = clauseApi.getClauseById(clauseId);
-            if (response == null) {
+            ApiResponse<ClauseResponse> response = clauseApi.getClauseById(clauseId);
+            if (!response.isSuccess()) {
+                // 信封化后新增的失败形态：错误信封（非 2xx 时 Feign 已抛，此处防「2xx + 错误码」）
+                log.error("条款详情查询失败, clauseId={}, error={}", clauseId, response.getMessage());
+                throw new RemoteDependencyUnavailableException(SystemErrorCode.DEPENDENCY_SERVICE_ERROR,
+                        "条款服务调用失败: clauseId=" + clauseId + ", errorCode=" + response.getCode(), null);
+            }
+            ClauseResponse clause = response.getData();
+            if (clause == null) {
                 log.warn("条款不存在，无法装配条款快照: clauseId={}, tenantId={}", clauseId, tenantId);
                 return null;
             }
-            return new ClauseSnapshot(response.getClauseId(), response.getClauseCode(), response.getClauseName(),
-                    response.getVersion(), isMainClause);
+            return new ClauseSnapshot(clause.getClauseId(), clause.getClauseCode(), clause.getClauseName(),
+                    clause.getVersion(), isMainClause);
         } catch (FeignException e) {
             // 🔴 m21-02（审查报告 RPC-01）：原实现此处返回 null → 保单缺该条款而静默出单成功
             // （合同无理赔依据）。现改为抛出：连接被拒/超时/5xx 一律视为依赖不可用，
-            // 由编排层挂起该次出单。注意 FeignException 不含「条款确实不存在」——
-            // 后者由下游以成功响应 + 空值表达，走上面的 null 分支。
+            // 由编排层挂起该次出单。
+            // 订正（m24-01a 实读）：条款域对「条款不存在」实为抛 ClauseNotFoundException → 全局处理器
+            // 映射 404，故同样落入本 catch，而非「成功响应 + 空值」；上面的 null 分支仅作防御保留。
             throw new RemoteDependencyUnavailableException(SystemErrorCode.DEPENDENCY_SERVICE_ERROR,
                     "条款服务调用失败: clauseId=" + clauseId + ", status=" + e.status(), e);
         }
@@ -65,7 +74,13 @@ public class ClauseServiceAdapter implements ClauseServicePort {
     @Override
     public List<CoverageSnapshot> fetchCoverageSnapshots(String clauseId, String tenantId) {
         try {
-            List<CoverageResponse> coverages = clauseApi.getCoveragesByClauseId(clauseId);
+            ApiResponse<List<CoverageResponse>> response = clauseApi.getCoveragesByClauseId(clauseId);
+            if (!response.isSuccess()) {
+                log.error("条款责任清单查询失败, clauseId={}, error={}", clauseId, response.getMessage());
+                throw new RemoteDependencyUnavailableException(SystemErrorCode.DEPENDENCY_SERVICE_ERROR,
+                        "条款责任服务调用失败: clauseId=" + clauseId + ", errorCode=" + response.getCode(), null);
+            }
+            List<CoverageResponse> coverages = response.getData();
             if (coverages == null || coverages.isEmpty()) {
                 log.warn("条款下无保险责任，保单将无责任明细: clauseId={}, tenantId={}", clauseId, tenantId);
                 return List.of();

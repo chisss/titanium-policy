@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 import com.titanium.customer.api.CustomerApi;
 import com.titanium.customer.api.request.customer.ResolveCustomerRequest;
 import com.titanium.customer.api.response.CustomerResponse;
+import com.titanium.metadata.response.ApiResponse;
 import com.titanium.policy.port.customer.CustomerServicePort;
 import com.titanium.policy.valueobject.customer.CustomerIdentitySnapshot;
 
@@ -30,7 +31,13 @@ public class CustomerServiceAdapter implements CustomerServicePort {
     @Override
     public boolean isCustomerExists(String customerId, String tenantId) {
         try {
-            return customerApi.isCustomerExists(customerId);
+            ApiResponse<Boolean> response = customerApi.isCustomerExists(customerId);
+            Boolean exists = response != null && response.isSuccess() ? response.getData() : null;
+            if (exists == null) {
+                // 存在性无答复（错误信封 / 成功但无载荷）不得降级为 false——那会把依赖故障伪装成「客户不存在」
+                throw new IllegalStateException("客户服务调用失败: customerId=" + customerId);
+            }
+            return exists;
         } catch (FeignException exception) {
             log.warn("客户存在性查询失败: customerId={}, tenantId={}, status={}", customerId, tenantId,
                     exception.status(), exception);
@@ -41,7 +48,18 @@ public class CustomerServiceAdapter implements CustomerServicePort {
     @Override
     public Optional<CustomerIdentitySnapshot> findCustomerIdentity(String customerId, String tenantId) {
         try {
-            CustomerResponse customer = customerApi.getCustomer(customerId);
+            ApiResponse<CustomerResponse> response = customerApi.getCustomer(customerId);
+            if (response == null) {
+                return Optional.empty();
+            }
+            if (!response.isSuccess()) {
+                // 🔴 错误信封不得并入「客户不存在」——否则契约失败会被表述成输入问题
+                log.warn("客户身份查询失败: customerId={}, tenantId={}, error={}", customerId, tenantId,
+                        response.getMessage());
+                throw new IllegalStateException("客户服务调用失败: customerId=" + customerId
+                        + ", errorCode=" + response.getCode());
+            }
+            CustomerResponse customer = response.getData();
             if (customer == null) {
                 return Optional.empty();
             }
@@ -65,7 +83,13 @@ public class CustomerServiceAdapter implements CustomerServicePort {
                     .phoneNumber(identity.phoneNumber())
                     .operatorId(identity.operatorId())
                     .build();
-            return customerApi.resolveCustomer(request);
+            ApiResponse<String> response = customerApi.resolveCustomer(request);
+            String customerId = response != null && response.isSuccess() ? response.getData() : null;
+            if (customerId == null) {
+                // 建档未返回客户ID即视为失败：上层已无「伪造客户ID」的通道（本类类注释承诺）
+                throw new IllegalStateException("客户服务调用失败: 未返回客户ID");
+            }
+            return customerId;
         } catch (FeignException exception) {
             log.warn("客户服务调用失败: tenantId={}, status={}", tenantId, exception.status(), exception);
             throw new IllegalStateException("客户服务调用失败", exception);
