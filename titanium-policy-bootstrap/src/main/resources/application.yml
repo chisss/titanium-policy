@@ -2,6 +2,12 @@ server:
   port: 8080
 
 spring:
+  # 错误文案国际化（m30-07）：资源包位于 titanium-metadata 的 classpath:i18n/messages_*.properties，
+  # basename 带 i18n/ 前缀而非裸 messages——裸 messages 会被 JDK ResourceBundle 在多个 jar 之间
+  # 只取「第一个」命中者，第三方 jar 若也有根级 messages.properties 会静默顶掉本项目文案。
+  messages:
+    basename: i18n/messages
+    encoding: UTF-8
   application:
     name: titanium-policy
   main:
