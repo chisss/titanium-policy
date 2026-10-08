@@ -209,3 +209,108 @@ titanium:
       # 首次部署时会从事件流头部起算，把本域全部历史事件重发给下游。
       groups:
         - policy-kafka-group
+
+  # ==========================================================================================
+  # 分析型取数声明（G08/g08-06）——由 titanium-analytical-starter 消费，本域零 Java 代码。
+  #
+  # 🔴 YAML 是开发资产，不是运营配置（方案 R-3）：它声明「哪个字段落在哪张表的哪一列」，
+  #    改它走代码评审 + 发版。运营配置的是特征定义（后台），不是取数映射。
+  # 实体码 `policy` 与 t_entity_registry 登记行、字段目录的 field_code 前缀三者一致；
+  # 请求写 `policy.holder.name`（starter 按首个点切分）⇒ 下方 code 一律**不含**实体码前缀。
+  # ==========================================================================================
+  analytical:
+    # 恒为 none：本域目录表 t_policy_field_catalog 已版本化（含 catalog_version 列），
+    # starter 的 init 模式对已版本化目录**主动退让**（代写会造出没有版本头的行）；且本域目录
+    # 由 liquibase 灌种子、变更走发布流程，不由 YAML 生成。
+    seed-mode: none
+
+    entities:
+      policy:
+        # CQRS 读模型表：取数走读侧垂直切片，绕过写侧聚合
+        table: t_policy_view
+        subject-column: policy_id
+        # 🔴 如实声明：读模型有投影可见延迟 ⇒ EVENTUAL。与 t_entity_registry.consistency
+        #    逐字一致，R-14 一致性对账据此比对。
+        consistency: EVENTUAL
+        # 读模型无删除标记列（投影不落逻辑删除）——这是**陈述事实**，不是关闭过滤的开关：
+        # starter 会用 JDBC 元数据核验本表确无该列，核验不过即拒绝服务。
+        deleted-column: none
+        # 🔴 不声明 effective-from/to-column：start_date/end_date 是**保障期间**（业务语义），
+        #    不是数据时效列。声明后每次取数都要按 [start_date, end_date) 过滤 businessTime，
+        #    未生效保单（核保/定价场景的主角）将取不到数——那是静默漏数据；不声明则 asOf
+        #    被忽略、响应如实回报 null（契约明确允许）。
+        # allow-cross-subject 保持默认 false（最小暴露面）：需跨主体聚合时改这一行即可，
+        #    届时是一次显式的评审决策，而不是一个「反正开着」的默认值。
+        fields:
+          # 字段集 = 目录（t_policy_field_catalog 19 行）∩ 本表实有列，共 10 项。
+          # 🔴 四项能力位照搬目录口径（README：与 G07 目录四项同名同义），规则见
+          #    dml/policy_field_catalog_analysis_seed_*.sql：analyzable=全部 / aggregatable=
+          #    非 TEXT / groupable=集合或 ENUM、DATE / filterable=全部。两份声明取值一致，
+          #    避免「目录说可筛选、取数声明说不可筛选」的静默漂移。
+          # ⚠️ 目录另 9 个字段（holder.email/address、insured.documentNumber、
+          #    payment.accountNumber、loan.outstandingAmount、surrender.reason、
+          #    beneficiary.{name,relationship,share}）散在 t_policy_beneficiary / t_policy_loan
+          #    等多行表，本表无对应列，当前不可经通用执行器取数——缺口已登记，处置需属主域
+          #    建专用分析视图（v_analytical_*）或走 Bean 逃生舱，不属本次接入范围。
+          - code: holder.name
+            column: policy_holder_name
+            type: STRING
+            analyzable: true
+            filterable: true
+          - code: holder.gender
+            column: policy_holder_gender
+            type: ENUM
+            analyzable: true
+            aggregatable: true
+            groupable: true
+            filterable: true
+          - code: holder.birthDate
+            column: policy_holder_birth_date
+            type: DATE
+            analyzable: true
+            aggregatable: true
+            groupable: true
+            filterable: true
+          - code: holder.documentType
+            column: policy_holder_id_type
+            type: ENUM
+            analyzable: true
+            aggregatable: true
+            groupable: true
+            filterable: true
+          - code: holder.documentNumber
+            column: policy_holder_id_no
+            type: STRING
+            analyzable: true
+            filterable: true
+          - code: holder.mobile
+            column: policy_holder_phone
+            type: STRING
+            analyzable: true
+            filterable: true
+          - code: insured.name
+            column: insured_name
+            type: STRING
+            analyzable: true
+            filterable: true
+          - code: status
+            column: policy_status
+            type: ENUM
+            analyzable: true
+            aggregatable: true
+            groupable: true
+            filterable: true
+          - code: payment.method
+            column: payment_method
+            type: ENUM
+            analyzable: true
+            aggregatable: true
+            groupable: true
+            filterable: true
+          - code: coverage.sumInsured
+            column: sum_insured
+            type: DECIMAL
+            analyzable: true
+            aggregatable: true
+            groupable: true
+            filterable: true
