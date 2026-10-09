@@ -25,6 +25,8 @@ public record ApplyPolicyMaintenanceRequest(
         LocalDateTime effectiveAt,
         @NotBlank @Size(max = 512) String changeSummary,
         List<@Valid PolicyMaintenanceFieldChangeRequest> changes,
+        @Valid PolicyMaintenanceAmountRequest amountFact,
+        @Valid PolicyServiceRestrictionRequest serviceRestriction,
         PolicyMaintenanceAction stateAction,
         @Size(max = 500) String stateReason,
         TerminationReason terminationReason,
@@ -48,7 +50,7 @@ public record ApplyPolicyMaintenanceRequest(
             List<PolicyMaintenanceFieldChangeRequest> changes) {
         this(requestId, maintenanceCaseId, expectedPolicyVersion, requestPayloadHash,
                 proposedSnapshotHash, effectiveTimeType, effectiveAt, changeSummary, changes,
-                PolicyMaintenanceAction.NONE, null, null, null);
+                null, null, PolicyMaintenanceAction.NONE, null, null, null);
     }
 
     /** 兼容 M5-03 状态类请求。 */
@@ -67,6 +69,6 @@ public record ApplyPolicyMaintenanceRequest(
             TerminationReason terminationReason) {
         this(requestId, maintenanceCaseId, expectedPolicyVersion, requestPayloadHash,
                 proposedSnapshotHash, effectiveTimeType, effectiveAt, changeSummary, changes,
-                stateAction, stateReason, terminationReason, null);
+                null, null, stateAction, stateReason, terminationReason, null);
     }
 }

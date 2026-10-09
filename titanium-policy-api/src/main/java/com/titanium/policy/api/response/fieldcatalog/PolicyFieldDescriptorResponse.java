@@ -6,6 +6,7 @@ import com.titanium.metadata.enums.policy.fieldcatalog.PolicyFieldMaskingPolicy;
 import com.titanium.metadata.enums.policy.fieldcatalog.PolicyFieldObjectType;
 import com.titanium.metadata.enums.policy.fieldcatalog.PolicyFieldSensitivityLevel;
 import com.titanium.metadata.enums.policy.fieldcatalog.PolicyFieldValueType;
+import com.titanium.metadata.fieldcatalog.FieldAnalysisCapability;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -21,5 +22,7 @@ public record PolicyFieldDescriptorResponse(
         @Schema(description = "字段能力") PolicyFieldCapabilityResponse capability,
         @Schema(description = "敏感级别") PolicyFieldSensitivityLevel sensitivity,
         @Schema(description = "掩码策略") PolicyFieldMaskingPolicy maskingPolicy,
-        @Schema(description = "废弃日期") LocalDate deprecatedAt) {
+        @Schema(description = "废弃日期") LocalDate deprecatedAt,
+        @Schema(description = "分析能力位（跨域共享；非 null，反序列化缺字段会暴露为契约漂移）")
+        FieldAnalysisCapability analysis) {
 }
