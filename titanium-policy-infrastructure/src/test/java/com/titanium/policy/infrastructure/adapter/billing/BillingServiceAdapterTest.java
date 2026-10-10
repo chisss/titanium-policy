@@ -52,6 +52,10 @@ class BillingServiceAdapterTest {
         billApi = mock(BillApi.class);
         billingAccountApi = mock(BillingAccountApi.class);
         billingRequestMapper = mock(BillingRequestMapper.class);
+        // 期缴计划映射转调真实 MapStruct 实现：适配器只做编排，映射正确性由映射器自身测试承担
+        when(billingRequestMapper.toGenerateScheduleRequest(any()))
+                .thenAnswer(invocation -> Mappers.getMapper(BillingRequestMapper.class)
+                        .toGenerateScheduleRequest(invocation.getArgument(0)));
         adapter = new BillingServiceAdapter(billApi, billingAccountApi, billingRequestMapper);
     }
 
@@ -112,7 +116,7 @@ class BillingServiceAdapterTest {
         GenerateScheduleRequest actual = requestCaptor.getValue();
         assertEquals("ANNUAL", actual.getPaymentMode());
         assertEquals(10, actual.getTotalPeriods());
-        assertEquals(new BigDecimal("1000.00"), actual.getInstallmentAmount());
+        assertEquals(new BigDecimal("1000.00"), actual.getTotalPremium());
         assertEquals("CNY", actual.getCurrency());
         assertEquals(LocalDate.of(2026, 8, 13), actual.getFirstDueDate());
         assertEquals("SYSTEM_ISSUANCE", actual.getOperatedBy());

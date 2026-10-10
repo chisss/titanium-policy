@@ -1,8 +1,12 @@
 package com.titanium.policy.port.billing;
 
+
+import java.util.List;
+
 import com.titanium.policy.valueobject.billing.BillingResult;
 import com.titanium.policy.valueobject.billing.PremiumBillRequest;
 import com.titanium.policy.valueobject.billing.PremiumScheduleRequest;
+import com.titanium.policy.valueobject.billing.UnpaidBill;
 
 /**
  * 计费服务网关端口（driven port，与聚合平级）
@@ -31,4 +35,16 @@ public interface BillingServicePort {
      * @param request 期缴计划生成请求
      */
     void generatePremiumSchedule(PremiumScheduleRequest request);
+
+    /**
+     * 查保单名下全部未结账单的未缴金额（g04-02 财务快照取数）。
+     * <p>
+     * 账单状态语义由计费域权威，本域只取「未缴金额」这一事实汇总欠费。取数失败（计费域
+     * 不可达或应答异常）时由 Adapter 以领域异常失败关闭，绝不静默返回空列表冒充「无欠费」。
+     * </p>
+     *
+     * @param policyId 保单ID
+     * @return 未结账单摘要列表（无未结账单为空列表）
+     */
+    List<UnpaidBill> getUnpaidBills(String policyId);
 }

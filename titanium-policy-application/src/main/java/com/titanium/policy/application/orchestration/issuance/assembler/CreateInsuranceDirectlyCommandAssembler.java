@@ -10,6 +10,7 @@ import com.titanium.policy.entity.insurance.InsuranceLine;
 import com.titanium.policy.valueobject.issuance.IssuancePlanLine;
 import com.titanium.policy.valueobject.issuance.IssuanceRequest;
 import com.titanium.policy.valueobject.policy.ChannelInfo;
+import com.titanium.policy.valueobject.product.ProductSumInsuredTiers;
 
 /**
  * 投保单命令装配器（两步出单起点）。
@@ -33,11 +34,14 @@ public class CreateInsuranceDirectlyCommandAssembler {
      * @param lines      险种段列表（由 {@code InsuranceLineAssembler} 装配）
      * @param policyForm 保单形态（由编排器经产品配置解析）
      * @param mainPlan   主险方案行（可空，缴费条件取其声明值）
+     * @param sumInsuredTiers 各险种段产品的责任级保额档次配置（G02/AC-09，由编排器经
+     *                        {@code ProductServicePort} 取回；聚合据此校验段级保额）
      * @return 创建投保单命令
      */
     public CreateInsuranceDirectlyCommand assemble(IssuanceRequest request, String insuranceId, String insuranceNo,
                                                    List<InsuranceLine> lines, PolicyForm policyForm,
-                                                   IssuancePlanLine mainPlan) {
+                                                   IssuancePlanLine mainPlan,
+                                                   List<ProductSumInsuredTiers> sumInsuredTiers) {
         return new CreateInsuranceDirectlyCommand(insuranceId, insuranceNo, policyForm, request.holderCustomerId(),
                 request.insuredCount(),
                 request.quotedPremium() != null ? request.quotedPremium().value() : null, request.periodStart(),
@@ -46,7 +50,8 @@ public class CreateInsuranceDirectlyCommandAssembler {
                 request.marketPackageId(), request.tenantId(),
                 request.mainSumInsured() != null ? request.mainSumInsured().value() : null,
                 mainPlan != null && mainPlan.paymentFrequency() != null ? mainPlan.paymentFrequency().getCode() : null,
-                mainPlan != null && mainPlan.premiumPaymentYears() != null ? mainPlan.premiumPaymentYears() : 0);
+                mainPlan != null && mainPlan.premiumPaymentYears() != null ? mainPlan.premiumPaymentYears() : 0,
+                sumInsuredTiers);
     }
 
     /**

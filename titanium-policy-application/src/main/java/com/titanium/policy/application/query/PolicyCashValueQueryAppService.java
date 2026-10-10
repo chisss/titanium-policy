@@ -61,8 +61,12 @@ public class PolicyCashValueQueryAppService {
      * <p>
      * 估值日早于生效日属异常数据（退保价值策略无第 0 年度配置），下界收敛到 1 以免查出空策略。
      * </p>
+     * <p>
+     * static 包可见：财务快照取数（{@code PolicyFinancialSnapshotQueryAppService}）复用同一口径，
+     * 保单年度推导规则本域仅此一处，消费方不得自行推导。
+     * </p>
      */
-    private int policyYearOf(LocalDateTime startDate, LocalDate valuationDate) {
+    static int policyYearOf(LocalDateTime startDate, LocalDate valuationDate) {
         int elapsedYears = Period.between(startDate.toLocalDate(), valuationDate).getYears();
         return Math.max(1, elapsedYears + 1);
     }

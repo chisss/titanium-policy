@@ -21,9 +21,16 @@ import lombok.extern.slf4j.Slf4j;
  * 核保决策事件监听器（policy 域 Kafka 入站适配器 / 防腐层）——核保结论异步回流轨
  * <p>
  * 监听核保域发布的"核保决策完成"事件，解析为 policy 域 {@link UnderwritingResult} 后委托应用层
- * 回写投保单聚合，完成人工核保/批量核保场景的「核保结论 → 承保」异步闭环。投保出单主链路仍走
- * 同步 {@code UnderwritingDecisionGateway} 即时拉取，二者以「是否需人工介入」为天然分界，
- * 接收端统一收敛到 {@code receiveUnderwritingResult}，不形成双写重复。
+ * 回写投保单聚合，与同步轨共同构成核保结论的「双轨回流」。
+ * </p>
+ * <p>
+ * 🔴 <b>两轨并非按场景分界（原注释「以是否需人工介入为天然分界」已订正）</b>：核保域
+ * {@code UnderwritingKafkaEventPublisher} 对每个 {@code UnderwritingDecidedEvent}
+ * <b>无条件</b>发布，而同步轨（{@code UnderwritingDecisionGateway}）在自动决策件上是即时返回的，
+ * 故<b>同一决策两轨都会到达本域</b>。去重不在此处、也不靠场景划分，而由投保单聚合承担——
+ * {@code Insurance.isRedeliveredResult}（同核保单号 + 同结论 ⇒ 静默幂等、不发事件、不改状态），
+ * 两轨最终收敛到同一 {@code ReceiveUnderwritingResultCommand}。守卫测试见
+ * {@code InsuranceUnderwritingResultIdempotencyTest}（含跨轨形态用例）与本类用例。
  * </p>
  * <p>
  * <b>归属 infrastructure（driving adapter）</b>：{@code @KafkaListener} 消费外部消息后调用应用层用例，
@@ -49,10 +56,12 @@ public class UnderwritingDecidedEventListener {
     public void onUnderwritingDecided(String payload) {
         // 一次性反序列化为防腐入站消息（不依赖核保域类型），取代手工逐字段解析与嵌套值对象提取
         UnderwritingDecidedMessage message = JSONObject.parseObject(payload, UnderwritingDecidedMessage.class);
-        String insuranceId = message.policyIdValue();
+        // g02-04：投保单号双读——新字段 insuranceId 优先，存量事件缺失时回退 policyId（详见消息类 javadoc）
+        String insuranceId = message.insuranceIdOrPolicyIdValue();
         String underwritingId = message.underwritingIdValue();
         if (insuranceId == null) {
-            log.warn("[核保回流] 事件缺少 policyId，忽略: underwritingId={}", underwritingId);
+            log.warn("[核保回流] 事件缺少投保单号（insuranceId 与 policyId 均为空），忽略: underwritingId={}",
+                    underwritingId);
             return;
         }
         String tenantId = message.tenantId();

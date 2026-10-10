@@ -20,7 +20,7 @@
 
 | 业务分组 | 服务 |
 |---|---|
-| 平台与运营 | [管理后台服务 `titanium-admin`](https://github.com/chisss/titanium-admin) · [功能中心域 `titanium-feature-center`](https://github.com/chisss/titanium-feature-center) |
+| 平台与运营 | [管理后台服务 `titanium-admin`](https://github.com/chisss/titanium-admin) · [特征中心域 `titanium-feature-center`](https://github.com/chisss/titanium-feature-center) |
 | 交易与履约 | [计费域 `titanium-billing`](https://github.com/chisss/titanium-billing) · [理赔域 `titanium-claim`](https://github.com/chisss/titanium-claim) · [投资域 `titanium-investment`](https://github.com/chisss/titanium-investment) · [保全域 `titanium-maintenance`](https://github.com/chisss/titanium-maintenance) · [支付域 `titanium-payment`](https://github.com/chisss/titanium-payment) |
 | 生态支撑 | [渠道域 `titanium-channel`](https://github.com/chisss/titanium-channel) · [文档域 `titanium-document`](https://github.com/chisss/titanium-document) · [通知域 `titanium-notification`](https://github.com/chisss/titanium-notification) |
 | 产品与承保 | [条款域 `titanium-clause`](https://github.com/chisss/titanium-clause) · **[保单域 `titanium-policy`](https://github.com/chisss/titanium)** · [产品域 `titanium-product`](https://github.com/chisss/titanium-product) · [核保域 `titanium-underwriting`](https://github.com/chisss/titanium-underwriting) |
@@ -135,6 +135,17 @@ flowchart LR
 | 本服务负责 | 本服务不负责 |
 |---|---|
 | 投保资料和合同快照<br/>承保、签发及生效状态机<br/>保单版本和批单引用<br/>合同参与人、保障和期限事实 | 产品定义与定价<br/>客户主数据<br/>核保决策过程<br/>收付款执行 |
+
+### 字段目录与业务时点（G07）
+
+保单字段目录（`t_policy_field_catalog` / `t_policy_field_catalog_version`）是**跨租户共享的平台元数据**：它回答「系统里存在哪些可分析、可保全的字段，口径与能力是什么」，**同一份目录对全部租户生效**。
+
+- **版本与业务时点**：目录按版本发布，每个版本带生效区间（半开区间 `[生效起, 生效止)`）与发布时冻结的内容哈希；读取时按 `businessDate` 解析**当时生效**的版本。业务日期早于最早版本时**返回最早版本并标记 `fallback = true`**（不报错，否则历史保单的读侧会全线失败）；落在已发布版本之间的时间空档则**拒绝**（不静默降级，空档是数据缺陷）。
+- 🔴 **`tenantId` 是查询条件中的死参数**：只做回显与审计，**不参与取数过滤**，仓储接口里也不存在带租户条件的查找方法。租户在**入口**处强制校验（缺租户即拒），但目录内容不因租户而分叉。
+- 🔴 **租户差异落在特征定义层**：某租户、某产品、某险种能用哪些字段，由 feature-center 的 `FeatureDefinition` 勾选决定；`productType` / `policyType` 同为不参与取数的保留参数，不是目录的分叉维度——目录一旦按产品分叉，同一字段的口径就有多份，跨域一致性无从保证。
+- **跨域消费**：保全域经 Feign 契约 `PolicyFieldCatalogApi` 取目录，`fallback` 标记随契约透出，消费侧据此记录降级告警。
+
+上述口径由 `FieldCatalogTenantDeadParamGuardTest` 机械守护：服务层不得读租户、仓储契约不得含租户方法，且本小节与 `PolicyFieldCatalogCriteria` 的 javadoc 必须记录该约定。
 
 ### 核心能力
 

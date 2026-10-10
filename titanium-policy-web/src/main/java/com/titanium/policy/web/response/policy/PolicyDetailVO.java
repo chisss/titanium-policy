@@ -99,12 +99,6 @@ public class PolicyDetailVO {
     @Schema(description = "险种段数量")
     private Integer                 lineCount;
 
-    @Schema(description = "等待期届满日")
-    private LocalDateTime           waitingPeriodEndDate;
-
-    @Schema(description = "犹豫期届满日")
-    private LocalDateTime           hesitationPeriodEndDate;
-
     @Schema(description = "收费方式码")
     private String                  collectionMode;
 

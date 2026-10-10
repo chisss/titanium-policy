@@ -20,6 +20,7 @@ import com.titanium.metadata.errorcode.PolicyErrorCode;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.entity.insurance.InsuredPartyList;
 import com.titanium.policy.service.impl.IssuanceEligibilityDomainServiceImpl;
+import com.titanium.policy.service.impl.VinValidatorImpl;
 import com.titanium.policy.valueobject.RuleDecision;
 import com.titanium.policy.valueobject.issuance.IssuancePlanLine;
 import com.titanium.policy.valueobject.issuance.IssuanceRequest;
@@ -36,7 +37,8 @@ class IssuanceEligibilityDomainServiceTest {
 
     private static final String PRODUCT_ID = "PROD_MED_001";
 
-    private final IssuanceEligibilityDomainService service = new IssuanceEligibilityDomainServiceImpl();
+    private final IssuanceEligibilityDomainService service =
+            new IssuanceEligibilityDomainServiceImpl(new VinValidatorImpl());
 
     /** 医疗险典型规则：0-65 岁、保额 100 万~600 万、禁高危职业、年缴 */
     private static ProductIssueRules medicalRules() {
@@ -61,6 +63,24 @@ class IssuanceEligibilityDomainServiceTest {
                 List.of(PaymentFrequency.ANNUAL, PaymentFrequency.LUMP_SUM), List.of(1), null, List.of(1),
                 null, new BigDecimal("5000000"), false, false, SubjectType.PROPERTY,
                 List.of("propertyAddress", "propertyUsage", "fireProtectionLevel", "propertyValue"));
+    }
+
+    /** 财产险规则 + 显式「不允许多标的」声明（g11-06，24 参主构造器末位 Boolean.FALSE） */
+    private static ProductIssueRules propertyRulesDisallowMultiple() {
+        return new ProductIssueRules(null, null, new BigDecimal("100000"), new BigDecimal("100000000"), 100, null,
+                List.of(), List.of(), List.of(), 0, 0, null, false,
+                List.of(PaymentFrequency.ANNUAL, PaymentFrequency.LUMP_SUM), List.of(1), null, List.of(1),
+                null, new BigDecimal("5000000"), false, false, SubjectType.PROPERTY,
+                List.of("propertyAddress", "propertyUsage", "fireProtectionLevel", "propertyValue"), Boolean.FALSE);
+    }
+
+    /** 财产险规则 + 显式「允许多标的」声明（g11-06，24 参主构造器末位 Boolean.TRUE） */
+    private static ProductIssueRules propertyRulesAllowMultiple() {
+        return new ProductIssueRules(null, null, new BigDecimal("100000"), new BigDecimal("100000000"), 100, null,
+                List.of(), List.of(), List.of(), 0, 0, null, false,
+                List.of(PaymentFrequency.ANNUAL, PaymentFrequency.LUMP_SUM), List.of(1), null, List.of(1),
+                null, new BigDecimal("5000000"), false, false, SubjectType.PROPERTY,
+                List.of("propertyAddress", "propertyUsage", "fireProtectionLevel", "propertyValue"), Boolean.TRUE);
     }
 
     /** 构造一个合格的医疗险出单请求（35 岁男，保额 400 万，年缴 1 年期） */
@@ -101,6 +121,23 @@ class IssuanceEligibilityDomainServiceTest {
         return new IssuancePlanLine(1, "PROD_PROPERTY_001", ProductCategory.MAIN, null,
                 Money.of(new BigDecimal("5000000"), "CNY"), 1, null, PaymentFrequency.ANNUAL, 1,
                 List.of(subject), null);
+    }
+
+    /** 财产险标的完整必填属性（对应 propertyRules 的 required 清单，可过属性校验以测后续规则） */
+    private static Map<String, Object> completePropertyAttributes() {
+        return Map.of("propertyAddress", "上海市某路1号", "propertyUsage", "FACTORY",
+                "fireProtectionLevel", "A", "propertyValue", 5000000);
+    }
+
+    /** 构造含两个标的的财产险段（多标的形态，g11-06 校验用；两标的属性均完整） */
+    private static IssuancePlanLine twoSubjectPropertyLine() {
+        IssuancePlanLine.SubjectIntent first = new IssuancePlanLine.SubjectIntent(SubjectType.PROPERTY, null,
+                "测试厂房A", null, null, completePropertyAttributes());
+        IssuancePlanLine.SubjectIntent second = new IssuancePlanLine.SubjectIntent(SubjectType.PROPERTY, null,
+                "测试厂房B", null, null, completePropertyAttributes());
+        return new IssuancePlanLine(1, "PROD_PROPERTY_001", ProductCategory.MAIN, null,
+                Money.of(new BigDecimal("5000000"), "CNY"), 1, null, PaymentFrequency.ANNUAL, 1,
+                List.of(first, second), null);
     }
 
     /** 构造含指定年龄被保险人的参与方清单（受益人份额 100%） */
@@ -292,7 +329,8 @@ class IssuanceEligibilityDomainServiceTest {
     @Test
     @DisplayName("财产/车辆标的属性齐全时通过校验")
     void shouldAcceptObjectSubjectWhenSchemaAttributesComplete() {
-        IssuancePlanLine line = vehicleLine(Map.of("licensePlate", "沪A12345", "vin", "LSVAA000001234567",
+        // 第 9 位 2 即校验位（加权和 189 mod 11 = 2）；g11-02 起 VIN 须过 ISO 3779 校对，原样例第 9 位 0 为非法
+        IssuancePlanLine line = vehicleLine(Map.of("licensePlate", "沪A12345", "vin", "LSVAA000201234567",
                 "firstRegistrationDate", "2024-01-01"));
 
         RuleDecision decision = service.validate(requestWith(insuredParties(35), line),
@@ -313,5 +351,109 @@ class IssuanceEligibilityDomainServiceTest {
         assertFalse(decision.passed());
         assertEquals(PolicyErrorCode.ELIGIBILITY_SUBJECT_ATTRIBUTE_MISSING, decision.errorCode());
         assertEquals("propertyAddress", decision.args().get(0));
+    }
+
+    @Test
+    @DisplayName("车险非法 VIN（校验位不符）被拒绝（g11-02）")
+    void shouldRejectVehicleWhenVinCheckDigitInvalid() {
+        // 仅第 9 位由 X 改为 0（该位权重 0，加权和不变，期望校验位仍为 X）——最小定因样本
+        IssuancePlanLine line = vehicleLine(Map.of("licensePlate", "沪A12345", "vin", "1M8GDM9A0KP042788",
+                "firstRegistrationDate", "2024-01-01"));
+
+        RuleDecision decision = service.validate(requestWith(insuredParties(35), line),
+                Map.of("PROD_AUTO_001", vehicleRules()));
+
+        assertFalse(decision.passed());
+        assertEquals(PolicyErrorCode.ELIGIBILITY_VIN_INVALID, decision.errorCode());
+        assertEquals(1, decision.lineNo());
+        assertEquals("1M8GDM9A0KP042788", decision.args().get(0), "应报出非法 VIN 原文");
+    }
+
+    @Test
+    @DisplayName("车险非法 VIN（含 I/O/Q）被拒绝（g11-02）")
+    void shouldRejectVehicleWhenVinContainsIllegalLetter() {
+        IssuancePlanLine line = vehicleLine(Map.of("licensePlate", "沪A12345", "vin", "1M8GDM9AXKP04278O",
+                "firstRegistrationDate", "2024-01-01"));
+
+        RuleDecision decision = service.validate(requestWith(insuredParties(35), line),
+                Map.of("PROD_AUTO_001", vehicleRules()));
+
+        assertFalse(decision.passed());
+        assertEquals(PolicyErrorCode.ELIGIBILITY_VIN_INVALID, decision.errorCode());
+    }
+
+    @Test
+    @DisplayName("多车标的逐一校验：任一 VIN 非法即拒（g11-02）")
+    void shouldRejectWhenAnyVehicleVinInvalid() {
+        IssuancePlanLine.SubjectIntent legal = new IssuancePlanLine.SubjectIntent(SubjectType.VEHICLE, null,
+                "沪A12345", null, null, Map.of("licensePlate", "沪A12345", "vin", "1M8GDM9AXKP042788",
+                        "firstRegistrationDate", "2024-01-01"));
+        IssuancePlanLine.SubjectIntent illegal = new IssuancePlanLine.SubjectIntent(SubjectType.VEHICLE, null,
+                "沪A67890", null, null, Map.of("licensePlate", "沪A67890", "vin", "LSVAA000001234567",
+                        "firstRegistrationDate", "2024-01-01"));
+        IssuancePlanLine line = new IssuancePlanLine(1, "PROD_AUTO_001", ProductCategory.MAIN, null,
+                Money.of(new BigDecimal("200000"), "CNY"), 1, null, PaymentFrequency.ANNUAL, 1,
+                List.of(legal, illegal), null);
+
+        RuleDecision decision = service.validate(requestWith(insuredParties(35), line),
+                Map.of("PROD_AUTO_001", vehicleRules()));
+
+        assertFalse(decision.passed());
+        assertEquals(PolicyErrorCode.ELIGIBILITY_VIN_INVALID, decision.errorCode());
+        assertEquals("LSVAA000001234567", decision.args().get(0), "应报出非法 VIN 原文（第二辆车）");
+    }
+
+    @Test
+    @DisplayName("非车险段（未声明 vin 必填）不触发 VIN 校验——范围限定（g11-02）")
+    void shouldSkipVinCheckForNonVehicleSubject() {
+        // 财险产品 required 不含 vin；属性包里出现 vin 键（各险种共用同一 Map 载体）不得被校验
+        IssuancePlanLine line = propertyLine(Map.of("propertyAddress", "上海市某路1号", "propertyUsage", "FACTORY",
+                "fireProtectionLevel", "A", "propertyValue", 5000000, "vin", "NOT-A-VIN"));
+
+        RuleDecision decision = service.validate(requestWith(insuredParties(35), line),
+                Map.of("PROD_PROPERTY_001", propertyRules()));
+
+        assertTrue(decision.passed(), "非车险段不应因 vin 键触发格式校验: " + decision.defaultMessage());
+    }
+
+    @Test
+    @DisplayName("多标的段 + 产品显式声明不允许多标的 → 拒绝（g11-06）")
+    void shouldRejectMultipleSubjectsWhenProductDisallows() {
+        RuleDecision decision = service.validate(requestWith(insuredParties(35), twoSubjectPropertyLine()),
+                Map.of("PROD_PROPERTY_001", propertyRulesDisallowMultiple()));
+
+        assertFalse(decision.passed());
+        assertEquals(PolicyErrorCode.ELIGIBILITY_MULTIPLE_SUBJECTS_NOT_ALLOWED, decision.errorCode());
+        assertEquals(1, decision.lineNo());
+        assertEquals(2, decision.args().get(0), "应报出实际标的数");
+    }
+
+    @Test
+    @DisplayName("多标的段 + 产品显式声明允许多标的 → 通过（g11-06）")
+    void shouldAcceptMultipleSubjectsWhenProductAllows() {
+        RuleDecision decision = service.validate(requestWith(insuredParties(35), twoSubjectPropertyLine()),
+                Map.of("PROD_PROPERTY_001", propertyRulesAllowMultiple()));
+
+        assertTrue(decision.passed(), "预期通过，实际拒绝: " + decision.defaultMessage());
+    }
+
+    @Test
+    @DisplayName("多标的段 + 产品未声明（null=不限制）→ 放行（三态，g11-06）")
+    void shouldAcceptMultipleSubjectsWhenDeclarationAbsent() {
+        // propertyRules() 走兼容构造器 → allowMultipleSubjects=null，不得误拒多标的段
+        RuleDecision decision = service.validate(requestWith(insuredParties(35), twoSubjectPropertyLine()),
+                Map.of("PROD_PROPERTY_001", propertyRules()));
+
+        assertTrue(decision.passed(), "未声明不得误拒多标的段: " + decision.defaultMessage());
+    }
+
+    @Test
+    @DisplayName("单标的段 + 产品声明不允许多标的 → 不受约束放行（g11-06）")
+    void shouldAcceptSingleSubjectWhenProductDisallows() {
+        RuleDecision decision = service.validate(
+                requestWith(insuredParties(35), propertyLine(completePropertyAttributes())),
+                Map.of("PROD_PROPERTY_001", propertyRulesDisallowMultiple()));
+
+        assertTrue(decision.passed(), "单标的段不应触发多标的限制: " + decision.defaultMessage());
     }
 }

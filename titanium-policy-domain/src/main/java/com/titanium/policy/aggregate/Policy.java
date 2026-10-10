@@ -4,19 +4,19 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.function.Function;
 
 import org.axonframework.commandhandling.CommandHandler;
 import org.axonframework.eventsourcing.EventSourcingHandler;
 import org.axonframework.modelling.command.AggregateIdentifier;
 import org.axonframework.modelling.command.AggregateLifecycle;
 import org.axonframework.spring.stereotype.Aggregate;
-
-import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import com.titanium.common.domain.BaseAggregate;
 import com.titanium.metadata.enums.CurrencyEnum;
@@ -97,10 +97,12 @@ import com.titanium.policy.service.maintenance.PolicyMaintenanceHashing;
 import com.titanium.policy.valueobject.AnnuityPayoutPlan;
 import com.titanium.policy.valueobject.PremiumPlan;
 import com.titanium.policy.valueobject.RuleDecision;
+import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceAmountFact;
 import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceApplicationReceipt;
 import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceExecutionState;
 import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceFieldChange;
 import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceObjectId;
+import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceServiceRestriction;
 import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceSnapshotFieldValue;
 import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceSnapshotReference;
 import com.titanium.policy.valueobject.policy.ChannelInfo;
@@ -109,6 +111,7 @@ import com.titanium.policy.valueobject.policy.PolicyDocument;
 import com.titanium.policy.valueobject.policy.PolicyNo;
 import com.titanium.policy.valueobject.policy.PolicyPeriod;
 import com.titanium.policy.valueobject.policy.PolicyRelation;
+import com.titanium.policy.valueobject.policy.PolicyServiceRestrictions;
 import com.titanium.policy.valueobject.policy.PolicyStatus;
 
 import lombok.Getter;
@@ -127,9 +130,18 @@ import lombok.experimental.SuperBuilder;
 @Getter
 @SuperBuilder(toBuilder = true)
 public class Policy extends BaseAggregate {
+    /**
+     * 保单正式应用（{@code ApplyPolicyMaintenanceCommand}）可承接的保全生效方式白名单。
+     *
+     * <p>
+     * 🔴 {@code NEXT_PERIOD}（次期生效）与 {@code POLICY_ANNIVERSARY}（保单周年日）在保全域**同义**
+     * （同一快照字段、同一日期、同一调度路径），此处必须同时放行：漏登会使该方式在建案与调度全部成功之后，
+     * 于**生效回写**这一步被 {@code POLICY_MAINTENANCE_EFFECTIVE_TIME_UNSUPPORTED} 拒绝——末端才失败。
+     * </p>
+     */
     private static final Set<String> SUPPORTED_MAINTENANCE_EFFECTIVE_TIME_TYPES = Set.of(
             "IMMEDIATE", "FUTURE", "SPECIFIED_DATE", "NEXT_BILLING_DATE", "POLICY_ANNIVERSARY",
-            "RETROACTIVE");
+            "NEXT_PERIOD", "RETROACTIVE");
 
     /** 聚合根唯一标识 */
     @AggregateIdentifier
@@ -211,6 +223,16 @@ public class Policy extends BaseAggregate {
     private PremiumWaiverReason    premiumWaiverReason;
     /** 累计红利（分红险留存类领取方式累积，非分红险/现金领取为 null） */
     private Money                  accumulatedDividend;
+    /**
+     * 服务受限标记清单（挂失等）——与 {@link PolicyStatus} <b>正交</b>的一条维度：
+     * 受限不改变合同状态（挂失保单仍是 EFFECTIVE），只对部分服务关闭入口。
+     *
+     * <p>
+     * 🔴 准入判定（退保、再贷款等）须先查此清单；本字段引入前落库的存量事件回放后为 null，
+     * 故读侧一律经 {@link #serviceRestrictions()} 取归一化结果，不得直接读字段。
+     * </p>
+     */
+    private PolicyServiceRestrictions serviceRestrictions;
 
     // ==================== CommandHandler ====================
 
@@ -388,6 +410,15 @@ public class Policy extends BaseAggregate {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION",
                     "Only EFFECTIVE, SUSPENDED or LAPSED policies can be terminated");
         }
+        // 🔴 服务受限是「退保」的准入闸门（g04-09）：终止原语被多条语义不同的链路共用，只有
+        //    WITHDRAWAL（退保终止）是投保人主动解约、落在受限面上。FULL_PAYMENT（身故/全残赔付后终止）、
+        //    EXPIRATION/LAPSE/ANNIVERSARY_FINISHED 均为非投保人主动的必然终止，CONTRACT_TERMINATION 为
+        //    父单终止级联等被动终止——一律不得被受限挡住，否则挂失会连带阻断理赔给付。
+        //    🔴 守护必须落在本聚合：闸门只加在保全应用（ApplyPolicyMaintenanceCommand）路径上时，
+        //    web 端 PUT /{policyId}/terminate 就是一条绕过通道——同一业务事实（退保）须在每个入口一致。
+        if (command.terminationReason() == PolicyEnum.TerminationReason.WITHDRAWAL) {
+            requireNotServiceRestricted("退保");
+        }
         AggregateLifecycle.apply(new PolicyTerminatedEvent(this.policyId, command.reason(), command.terminationReason(),
                 LocalDateTime.now(), command.operatorId(), this.tenantId));
     }
@@ -449,8 +480,9 @@ public class Policy extends BaseAggregate {
         String calculatedRequestHash = PolicyMaintenanceHashing.requestHash(
                 command.tenantId(), command.policyId(), command.requestId(), command.sourceMaintenanceId(),
                 command.expectedPolicyVersion(), command.proposedSnapshotHash(), command.effectiveTimeType(),
-                command.effectiveAt(), command.changeSummary(), command.changes(), command.stateAction(),
-                command.stateReason(), command.terminationReason(), command.retroactiveEvidence());
+                command.effectiveAt(), command.changeSummary(), command.changes(), command.amountFact(),
+                command.serviceRestriction(), command.stateAction(), command.stateReason(),
+                command.terminationReason(), command.retroactiveEvidence());
         if (!calculatedRequestHash.equalsIgnoreCase(command.requestPayloadHash())) {
             throw new PolicyBusinessRuleException(
                     "POLICY_MAINTENANCE_REQUEST_HASH_MISMATCH", "保全请求摘要与结构化载荷不一致");
@@ -487,12 +519,19 @@ public class Policy extends BaseAggregate {
                     command.stateAction(), statusBefore, statusAfter, command.stateReason(),
                     command.terminationReason(), appliedAt, command.operatorId(), this.tenantId));
         } else {
-            PolicyDataUpdateType updateType = maintenanceUpdateType(command.changes());
+            PolicyDataUpdateType updateType = maintenanceUpdateType(command.changes(), command.amountFact());
+            // 服务受限清单在命令处理器内推进（与 statusAfter 同范式：结果由事件承载，ESH 只做赋值），
+            // 非受限类保全传 null —— 事件不为「无变化」背上整份清单快照，ESH 见 null 即保持原状。
+            PolicyServiceRestrictions restrictionsAfter = command.serviceRestriction() == null
+                    ? null
+                    : serviceRestrictions().apply(command.serviceRestriction(), command.effectiveAt());
             AggregateLifecycle.apply(new PolicyMaintenanceAppliedEvent(
                     this.policyId, command.requestId(), command.requestPayloadHash().toLowerCase(),
                     command.sourceMaintenanceId(), endorsementNo, updateType,
                     updateType.getCategory(), command.expectedPolicyVersion(),
                     actualVersion, command.effectiveAt(), command.changeSummary(),
+                    command.amountFact(),
+                    restrictionsAfter,
                     command.proposedSnapshotHash().toLowerCase(), originalSnapshotHash, snapshotStorageKey,
                     appliedSnapshotHash, applicationHash, execution.appliedFields(), execution.state(), appliedAt,
                     command.operatorId(), this.tenantId));
@@ -661,12 +700,17 @@ public class Policy extends BaseAggregate {
         }
         this.endorsements.add(new Endorsement(event.endorsementNo(), event.updateType(), event.category(),
                 currentVersion, event.endorsementEffectiveDate(), event.changeSummary(), event.originalSnapshot(),
-                event.requiresPremiumRecalc(), event.sourceMaintenanceId(), event.endorsedAt(), event.operatorId()));
+                null, event.requiresPremiumRecalc(), event.sourceMaintenanceId(), event.endorsedAt(),
+                event.operatorId()));
     }
 
     @EventSourcingHandler
     public void on(PolicyMaintenanceAppliedEvent event) {
         applyMaintenanceExecutionState(event.executionStateAfter());
+        // null = 本次保全未触及服务受限维度（存量事件亦然），保持原状；非 null 才是受限维度的一次推进。
+        if (event.serviceRestrictionsAfter() != null) {
+            this.serviceRestrictions = event.serviceRestrictionsAfter();
+        }
         incrementVersion();
         if (this.policyVersion != event.actualPolicyVersion()) {
             throw new IllegalStateException("Policy 保全应用事件版本与聚合版本不一致");
@@ -677,6 +721,7 @@ public class Policy extends BaseAggregate {
         this.endorsements.add(new Endorsement(
                 event.endorsementNo(), event.updateType(), event.category(), this.policyVersion,
                 event.effectiveAt(), event.changeSummary(), event.originalSnapshotHash(),
+                event.amountFact(),
                 event.updateType().needsPremiumRecalc(), event.sourceMaintenanceId(), event.appliedAt(),
                 event.operatorId()));
         if (this.maintenanceApplications == null) {
@@ -784,9 +829,14 @@ public class Policy extends BaseAggregate {
     // ==================== 险种段导航与保单构成 ====================
 
     /**
-     * 主险段（一张保单有且仅有一个）。
+     * **首个**主险段（按段列表顺序取第一个主险段，<b>不表示主险段唯一</b>）。
+     * <p>
+     * 🔴 G11/g11-04 方案 B：一张保单<b>可含多个主险段</b>（如交强险 + 商业车险同单），
+     * 旧语义「有且仅有一个主险段」已不成立。本方法仅供「按首个主险段导航」的既有场景使用，
+     * 不得据此认定合同唯一主险；需要完整主险段集合时，调用方自行按 {@code PolicyProduct::isMain} 过滤段列表。
+     * </p>
      *
-     * @return 主险段；段列表为空时返回 null
+     * @return 首个主险段；段列表为空或无主险段时返回 null
      */
     public PolicyProduct mainLine() {
         if (this.policyProducts == null) {
@@ -856,26 +906,6 @@ public class Policy extends BaseAggregate {
     }
 
     // ==================== 期间与收费判定 ====================
-
-    /**
-     * 当前是否处于等待期内（疾病类责任此期间不赔）。
-     *
-     * @return 在等待期内返回 {@code true}
-     */
-    @JsonIgnore
-    public boolean isInWaitingPeriod() {
-        return this.policyPeriod != null && this.policyPeriod.isInWaitingPeriod(LocalDateTime.now());
-    }
-
-    /**
-     * 当前是否处于犹豫期内（投保人可无条件退保，仅扣工本费）。
-     *
-     * @return 在犹豫期内返回 {@code true}
-     */
-    @JsonIgnore
-    public boolean isInHesitationPeriod() {
-        return this.policyPeriod != null && this.policyPeriod.isInHesitationPeriod(LocalDateTime.now());
-    }
 
     /**
      * 保单是否满足全部生效条件（收费条件 + 保障起期已到 + 当前为未生效态）。
@@ -1297,6 +1327,47 @@ public class Policy extends BaseAggregate {
         this.policyVersion++;
     }
 
+    // ==================== 服务受限（准入输入，g04-09） ====================
+
+    /**
+     * 当前服务受限标记清单。
+     *
+     * <p>
+     * 🔴 归一化在此收口：本字段引入前落库的存量事件回放后字段为 {@code null}，
+     * 直接暴露会给调用方一个「无受限」与「无此能力」不可区分的 null；统一返回空清单后，
+     * 准入判定只需问 {@link PolicyServiceRestrictions#restricted()}，无需各自判空。
+     * </p>
+     *
+     * @return 受限标记清单（可能为空，恒非 null）
+     */
+    public PolicyServiceRestrictions serviceRestrictions() {
+        return this.serviceRestrictions == null ? PolicyServiceRestrictions.EMPTY : this.serviceRestrictions;
+    }
+
+    /** 保单当前是否处于任意一种服务受限之下（退保、再贷款等准入判定的总开关）。 */
+    public boolean serviceRestricted() {
+        return serviceRestrictions().restricted();
+    }
+
+    /**
+     * 拒绝在服务受限态下执行给定服务。
+     *
+     * <p>
+     * 🔴 受限标记是<b>准入输入</b>而非展示字段：放行等于让「已挂失的保单仍可退保、仍可再贷款」。
+     * 判据取聚合当前状态（强一致），不取读模型——准入闸门若读最终一致的投影，投影滞后即失败开放。
+     * </p>
+     *
+     * @param service 被拒绝的服务名（用于失败文案，如「退保」）
+     */
+    private void requireNotServiceRestricted(String service) {
+        PolicyServiceRestrictions restrictions = serviceRestrictions();
+        if (restrictions.restricted()) {
+            throw new PolicyBusinessRuleException(
+                    PolicyErrorCode.POLICY_SERVICE_RESTRICTED,
+                    "保单处于服务受限状态 " + restrictions.activeTypes() + "，不可" + service);
+        }
+    }
+
     // ==================== 内部方法 ====================
 
     private void validateMaintenanceRequestIdentity(ApplyPolicyMaintenanceCommand command) {
@@ -1347,9 +1418,25 @@ public class Policy extends BaseAggregate {
                     "POLICY_MAINTENANCE_STATUS_INVALID", "Policy 缺少当前合同状态");
         }
         PolicyMaintenanceAction action = command.stateAction();
-        if (command.changes().isEmpty() && !action.changesStatus()) {
+        PolicyMaintenanceServiceRestriction serviceRestriction = command.serviceRestriction();
+        // 🔴 四种生效载荷（字段变更 / 金额事实 / 合同状态动作 / 服务受限事实）至少其一——空交易的最后一道闸口。
+        //    金额型保全（追加/减额缴费、追加投资、部分领取）无字段、无状态动作，其变更实质是 amountFact；
+        //    挂失类保全同形——无字段、无金额、无状态动作，其变更实质是 serviceRestriction。
+        //    漏掉任一种都会让该类案件在保单域被「不能同时为空」误拒。
+        if (command.changes().isEmpty() && !action.changesStatus() && command.amountFact() == null
+                && serviceRestriction == null) {
             throw new PolicyBusinessRuleException(
-                    "POLICY_MAINTENANCE_REQUEST_INVALID", "字段变更和状态动作不能同时为空");
+                    PolicyErrorCode.POLICY_MAINTENANCE_REQUEST_INVALID,
+                    "字段变更、金额事实、服务受限事实和状态动作不能同时为空");
+        }
+        // 🔴 载荷种类互斥：受限事实只推进「服务受限」这条正交维度，与另三种载荷混提即语义不明。
+        //    上游 MaintenanceEffectApplicationService.payloadKind() 已按案件维度拒绝混种，
+        //    此处是保单域侧的对称闸口——上游放开一类新案件时不会静默把混装载荷带进来。
+        if (serviceRestriction != null
+                && (!command.changes().isEmpty() || command.amountFact() != null || action.changesStatus())) {
+            throw new PolicyBusinessRuleException(
+                    PolicyErrorCode.POLICY_MAINTENANCE_REQUEST_INVALID,
+                    "服务受限事实不得与字段变更、金额事实或状态动作混合提交");
         }
         if (!action.changesStatus()) {
             if (this.status.statusCode() != PolicyStatusCode.EFFECTIVE) {
@@ -1402,6 +1489,9 @@ public class Policy extends BaseAggregate {
                             "POLICY_MAINTENANCE_STATUS_INVALID",
                             "仅 EFFECTIVE、SUSPENDED 或 LAPSED 保单可终止");
                 }
+                // 🔴 服务受限是终止的准入闸门：已挂失的保单若仍可退保/终止，受限标记就只是展示字段。
+                //    判据取聚合当前状态（强一致），不取读模型（投影滞后即失败开放）。
+                requireNotServiceRestricted("终止");
                 yield PolicyStatusCode.TERMINATED;
             }
         };
@@ -1453,27 +1543,78 @@ public class Policy extends BaseAggregate {
             long version,
             PolicyMaintenanceExecutionState executionState,
             PolicyStatusCode snapshotStatus) {
-        PolicyProduct mainProduct = requireMainProductForMaintenance(executionState.policyProducts());
+        List<PolicyProduct> mainProducts = requireMainProductsForMaintenance(executionState.policyProducts());
         Map<String, PolicyMaintenanceSnapshotFieldValue> fields = maintenanceSnapshotFields(
-                mainProduct, executionState.insuredPartyList(), snapshotStatus);
+                mainProducts, executionState.insuredPartyList(), snapshotStatus);
         return PolicyMaintenanceHashing.snapshotHash(
-                this.tenantId, this.policyId, version, mainProduct.productId(),
-                mainProduct.productVersion(), mainProduct.pricingPlanVersion(), fields);
+                this.tenantId, this.policyId, version,
+                joinMainProductField(mainProducts, PolicyProduct::productId),
+                joinMainProductField(mainProducts, PolicyProduct::productVersion),
+                joinMainProductField(mainProducts, PolicyProduct::pricingPlanVersion), fields);
+    }
+
+    /**
+     * 按段序号升序拼接多主险段的同一字段（G11/g11-04 D3：多主险快照标识 = 逐段值以逗号连接）。
+     * <p>
+     * 🔴 单主险时结果即该段原值——快照哈希对存量单主险保单<b>逐字不变</b>（向后兼容）；
+     * 不用「取首段」（D1 纪律）：多主险时<b>全部</b>主险段都在指纹内，任一段产品/版本/计划
+     * 变更都会改变哈希，不会漏检。
+     * </p>
+     * <p>口径实现与读侧共用：{@link PolicyMaintenanceHashing#joinMainProductField}。</p>
+     */
+    private static String joinMainProductField(
+            List<PolicyProduct> mainProducts, Function<PolicyProduct, String> extractor) {
+        return PolicyMaintenanceHashing.joinMainProductField(mainProducts.stream()
+                .sorted(Comparator.comparingInt(PolicyProduct::lineNo))
+                .map(extractor)
+                .toList());
+    }
+
+    /**
+     * 多主险段保额合计（G11/g11-04 D3，单主险时即该段保额原值）。
+     * <p>
+     * 拒不「取首段」：保单级保额语义为「各主险段之和」；全部主险段保额为空时返回 {@code null}
+     * （与旧单主险实现的可空语义一致）。
+     * </p>
+     * <p>口径实现与读侧共用：{@link PolicyMaintenanceHashing#totalMainSumInsured}。</p>
+     */
+    private static Money totalMainSumInsured(List<PolicyProduct> mainProducts) {
+        return PolicyMaintenanceHashing.totalMainSumInsured(mainProducts.stream()
+                .map(PolicyProduct::sumInsured)
+                .toList());
+    }
+
+    /**
+     * 多主险段的币种集合（去重后升序逗号连接，G11/g11-04 D3）。
+     * <p>
+     * 单主险时即该段币种原值，快照指纹逐字不变；全部为空时返回空串（调用方按 {@code null} 落指纹，
+     * 与旧实现的可空语义一致）。同保单各段币种应一致（保单级单一币种），此处用集合表达而非求和，
+     * 避免 {@code Money.add} 在币种不一致时抛异常导致保全被误阻断。
+     * </p>
+     * <p>口径实现与读侧共用：{@link PolicyMaintenanceHashing#distinctCurrencies}。</p>
+     */
+    private static String distinctMainCurrencies(List<PolicyProduct> mainProducts) {
+        return PolicyMaintenanceHashing.distinctCurrencies(mainProducts.stream()
+                .map(mainProduct -> mainProduct.premium() != null ? mainProduct.premium() : mainProduct.sumInsured())
+                .filter(Objects::nonNull)
+                .map(Money::currency)
+                .toList());
     }
 
     private Map<String, PolicyMaintenanceSnapshotFieldValue> maintenanceSnapshotFields(
-            PolicyProduct mainProduct,
+            List<PolicyProduct> mainProducts,
             InsuredPartyList parties,
             PolicyStatusCode snapshotStatus) {
         TreeMap<String, PolicyMaintenanceSnapshotFieldValue> fields = new TreeMap<>();
         InsuredPartyList.HolderInfo holder = parties != null ? parties.holderInfo() : null;
-        Money lineCurrencySource = mainProduct.premium() != null ? mainProduct.premium() : mainProduct.sumInsured();
+        String mainCurrencies = distinctMainCurrencies(mainProducts);
         fields.put("policy.collection.mode", snapshotField("ENUM",
                 this.collectionInfo != null && this.collectionInfo.collectionMode() != null
                         ? this.collectionInfo.collectionMode().getCode() : null));
-        fields.put("policy.coverage.sumInsured", snapshotField("DECIMAL", amount(mainProduct.sumInsured())));
-        fields.put("policy.currency", snapshotField("ENUM",
-                lineCurrencySource != null ? lineCurrencySource.currency() : null));
+        fields.put("policy.coverage.sumInsured", snapshotField("DECIMAL",
+                PolicyMaintenanceHashing.totalMainSumInsuredCanonical(
+                        mainProducts.stream().map(PolicyProduct::sumInsured).toList())));
+        fields.put("policy.currency", snapshotField("ENUM", mainCurrencies.isEmpty() ? null : mainCurrencies));
         fields.put("policy.holder.id", snapshotField("TEXT", holder != null ? holder.customerId() : null));
         fields.put("policy.holder.mobile", snapshotField("TEXT", holder != null ? holder.phone() : null));
         fields.put("policy.holder.name", snapshotField("TEXT", holder != null ? holder.name() : null));
@@ -1493,9 +1634,12 @@ public class Policy extends BaseAggregate {
         fields.put("policy.period.start", snapshotField("DATETIME", dateTime(
                 this.policyPeriod != null ? this.policyPeriod.insurancePeriodStart() : null)));
         fields.put("policy.premium.total", snapshotField("DECIMAL", amount(this.totalPremium)));
-        fields.put("policy.product.id", snapshotField("TEXT", mainProduct.productId()));
-        fields.put("policy.product.planVersion", snapshotField("TEXT", mainProduct.pricingPlanVersion()));
-        fields.put("policy.product.version", snapshotField("TEXT", mainProduct.productVersion()));
+        fields.put("policy.product.id", snapshotField("TEXT",
+                joinMainProductField(mainProducts, PolicyProduct::productId)));
+        fields.put("policy.product.planVersion", snapshotField("TEXT",
+                joinMainProductField(mainProducts, PolicyProduct::pricingPlanVersion)));
+        fields.put("policy.product.version", snapshotField("TEXT",
+                joinMainProductField(mainProducts, PolicyProduct::productVersion)));
         fields.put("policy.status", snapshotField("ENUM", snapshotStatus.name()));
         List<InsuredPartyList.BeneficiaryInfo> beneficiaries = parties == null || parties.beneficiaryList() == null
                 ? List.of() : parties.beneficiaryList();
@@ -1532,22 +1676,33 @@ public class Policy extends BaseAggregate {
         return objectId + ":" + fieldCode;
     }
 
-    private PolicyProduct requireMainProductForMaintenance(List<PolicyProduct> products) {
+    /**
+     * 校验并返回本保单的<b>全部主险段</b>（G11/g11-04 D3：合同级要素下沉为<b>逐主险段</b>校验）。
+     * <p>
+     * 🔴 <b>第三道「唯一主险」防线</b>：原判据「{@code mainProducts.size() != 1} 即拒」会让
+     * 交强 + 商业同单（两个主险段）保单的<b>任何保全</b>（批改 / 保额 / 退保）全部做不了。
+     * 按 D3 下沉后：无主险段 ⇒ 拒；<b>任一</b>主险段缺 productId / productVersion /
+     * pricingPlanVersion ⇒ 拒。单主险时与旧行为<b>完全等价</b>（旧判据 = size==1 且该段三要素齐备），
+     * 无行为变更、无「取首段」语义。
+     * </p>
+     */
+    private List<PolicyProduct> requireMainProductsForMaintenance(List<PolicyProduct> products) {
         List<PolicyProduct> mainProducts = products == null ? List.of() : products.stream()
                 .filter(Objects::nonNull)
                 .filter(PolicyProduct::isMain)
                 .toList();
-        if (mainProducts.size() != 1) {
+        if (mainProducts.isEmpty()) {
             throw new PolicyBusinessRuleException(
-                    "POLICY_MAINTENANCE_CONTRACT_INCOMPLETE", "Policy 必须且只能存在一个主险段");
+                    "POLICY_MAINTENANCE_CONTRACT_INCOMPLETE", "Policy 须含至少一个主险段");
         }
-        PolicyProduct mainProduct = mainProducts.getFirst();
-        if (isBlank(mainProduct.productId()) || isBlank(mainProduct.productVersion())
-                || isBlank(mainProduct.pricingPlanVersion())) {
-            throw new PolicyBusinessRuleException(
-                    "POLICY_MAINTENANCE_CONTRACT_INCOMPLETE", "Policy 缺少产品或定价计划版本");
+        for (PolicyProduct mainProduct : mainProducts) {
+            if (isBlank(mainProduct.productId()) || isBlank(mainProduct.productVersion())
+                    || isBlank(mainProduct.pricingPlanVersion())) {
+                throw new PolicyBusinessRuleException(
+                        "POLICY_MAINTENANCE_CONTRACT_INCOMPLETE", "Policy 缺少产品或定价计划版本");
+            }
         }
-        return mainProduct;
+        return mainProducts;
     }
 
     private void applyMaintenanceExecutionState(PolicyMaintenanceExecutionState executionState) {
@@ -1559,14 +1714,23 @@ public class Policy extends BaseAggregate {
         }
         if (executionState.policyProducts() != null) {
             this.policyProducts = List.copyOf(executionState.policyProducts());
-            this.sumInsured = requireMainProductForMaintenance(this.policyProducts).sumInsured();
+            this.sumInsured = totalMainSumInsured(requireMainProductsForMaintenance(this.policyProducts));
         }
         if (executionState.premiumPlan() != null) {
             this.premiumPlan = executionState.premiumPlan();
         }
     }
 
-    private PolicyDataUpdateType maintenanceUpdateType(List<PolicyMaintenanceFieldChange> changes) {
+    private PolicyDataUpdateType maintenanceUpdateType(
+            List<PolicyMaintenanceFieldChange> changes,
+            PolicyMaintenanceAmountFact amountFact) {
+        // 🔴 金额型保全没有字段变更，其批改类型只能由保全项编码推导：若在此退回下方的 changes 分支，
+        //    批改类型会恒落 POLICY_INFO_CHANGE 兜底，批单大类（PARTY/PREMIUM_TERMS/…）随之为 INFO，
+        //    下游按类型取数的对账与报送会静默错位。
+        if (amountFact != null) {
+            PolicyDataUpdateType amountType = PolicyDataUpdateType.byMaintenanceType(amountFact.itemCode());
+            return amountType == null ? PolicyDataUpdateType.POLICY_INFO_CHANGE : amountType;
+        }
         List<PolicyDataUpdateType> updateTypes = changes.stream()
                 .map(PolicyMaintenanceFieldChange::itemCode)
                 .map(PolicyDataUpdateType::byMaintenanceType)

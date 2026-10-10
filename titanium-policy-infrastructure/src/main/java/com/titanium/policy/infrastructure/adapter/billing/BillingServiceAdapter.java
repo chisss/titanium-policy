@@ -1,5 +1,8 @@
 package com.titanium.policy.infrastructure.adapter.billing;
 
+import java.math.BigDecimal;
+import java.util.List;
+
 import org.springframework.stereotype.Component;
 
 import com.titanium.billing.api.BillApi;
@@ -9,12 +12,15 @@ import com.titanium.billing.api.request.bill.CreateBillRequest;
 import com.titanium.billing.api.response.account.BillingAccountResponse;
 import com.titanium.billing.api.response.bill.BillResponse;
 import com.titanium.common.exception.BusinessException;
+import com.titanium.metadata.errorcode.PolicyErrorCode;
+import com.titanium.metadata.exception.DomainException;
 import com.titanium.metadata.response.ApiResponse;
 import com.titanium.policy.infrastructure.adapter.mapper.BillingRequestMapper;
 import com.titanium.policy.port.billing.BillingServicePort;
 import com.titanium.policy.valueobject.billing.BillingResult;
 import com.titanium.policy.valueobject.billing.PremiumBillRequest;
 import com.titanium.policy.valueobject.billing.PremiumScheduleRequest;
+import com.titanium.policy.valueobject.billing.UnpaidBill;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -60,14 +66,8 @@ public class BillingServiceAdapter implements BillingServicePort {
             throw new BusinessException("查询计费账户失败: policyId=" + request.policyId() + ", accountId为空");
         }
 
-        GenerateScheduleRequest scheduleRequest = new GenerateScheduleRequest();
-        scheduleRequest.setPaymentMode(request.paymentMode());
-        scheduleRequest.setTotalPeriods(request.totalPeriods());
-        scheduleRequest.setInstallmentAmount(request.installmentAmount());
-        scheduleRequest.setCurrency(request.currency());
-        scheduleRequest.setFirstDueDate(request.firstDueDate());
-        scheduleRequest.setOperatedBy("SYSTEM_ISSUANCE");
-        scheduleRequest.setTenantId(request.tenantId());
+        // 值对象 → Feign 契约的字段映射统一收敛到 MapStruct（operatedBy 固定为统一出单）
+        GenerateScheduleRequest scheduleRequest = billingRequestMapper.toGenerateScheduleRequest(request);
         ApiResponse<BillingAccountResponse> scheduleResponse = generateSchedule(request.policyId(), accountId,
                 scheduleRequest);
         if (scheduleResponse == null || !scheduleResponse.isSuccess() || scheduleResponse.getData() == null) {
@@ -87,5 +87,20 @@ public class BillingServiceAdapter implements BillingServicePort {
         } catch (RuntimeException ex) {
             throw new BusinessException("生成期缴计划异常: policyId=" + policyId + ", accountId=" + accountId, ex);
         }
+    }
+
+    @Override
+    public List<UnpaidBill> getUnpaidBills(String policyId) {
+        ApiResponse<List<BillResponse>> response = billApi.getBillsByPolicyId(policyId);
+        // 失败关闭：计费域正常应答但业务码失败，或响应体缺失 → 领域异常上抛，绝不返回空列表冒充「无欠费」
+        if (response == null || !response.isSuccess() || response.getData() == null) {
+            String message = response != null ? response.getMessage() : "无响应";
+            throw new DomainException(PolicyErrorCode.POLICY_FINANCIAL_DATA_MISSING,
+                    "保单欠费取数失败(计费域应答异常): policyId=" + policyId + ", message=" + message);
+        }
+        return response.getData().stream()
+                .filter(bill -> bill.getUnpaidAmount() != null && bill.getUnpaidAmount().compareTo(BigDecimal.ZERO) > 0)
+                .map(bill -> new UnpaidBill(bill.getBillId(), bill.getUnpaidAmount()))
+                .toList();
     }
 }

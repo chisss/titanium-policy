@@ -20,6 +20,7 @@ import com.titanium.policy.application.orchestration.issuance.assembler.Proposal
 import com.titanium.policy.application.orchestration.issuance.executor.RiskAssessmentExecutor;
 import com.titanium.policy.application.orchestration.issuance.service.InsuranceLinePremiumConfirmationService;
 import com.titanium.policy.application.orchestration.issuance.service.InsuranceLinePremiumConfirmationService.ConfirmationSummary;
+import com.titanium.policy.application.orchestration.issuance.service.ProductSumInsuredTiersLoader;
 import com.titanium.policy.command.ActivatePolicyCommand;
 import com.titanium.policy.command.SubmitProposalCommand;
 import com.titanium.policy.command.SubmitUnderwritingCommand;
@@ -39,6 +40,7 @@ import com.titanium.policy.valueobject.issuance.IssuanceResult;
 import com.titanium.policy.valueobject.policy.CollectionResult;
 import com.titanium.policy.valueobject.policy.PolicyPeriod;
 import com.titanium.policy.valueobject.product.ProductIssueRules;
+import com.titanium.policy.valueobject.product.ProductSumInsuredTiers;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -89,6 +91,7 @@ public class IssuanceOrchestrator {
     private final CreatePolicyDirectlyCommandAssembler    createPolicyDirectlyCommandAssembler;
     private final CreateInsuranceDirectlyCommandAssembler createInsuranceDirectlyCommandAssembler;
     private final InsuranceLinePremiumConfirmationService premiumConfirmationService;
+    private final ProductSumInsuredTiersLoader          productSumInsuredTiersLoader;
     private final PremiumCollectionOrchestrator           premiumCollectionOrchestrator;
     private final PremiumScheduleOrchestrator             premiumScheduleOrchestrator;
 
@@ -206,9 +209,10 @@ public class IssuanceOrchestrator {
         String insuranceNo = policyNoGenerator.generateInsuranceNo(request.tenantId());
         List<InsuranceLine> lines = insuranceLineAssembler.assemble(request);
         IssuancePlanLine mainPlan = request.mainLine();
+        List<ProductSumInsuredTiers> sumInsuredTiers = loadSumInsuredTiers(lines);
 
         commandGateway.sendAndWait(createInsuranceDirectlyCommandAssembler.assemble(request, insuranceId, insuranceNo,
-                lines, resolvePolicyForm(request), mainPlan));
+                lines, resolvePolicyForm(request), mainPlan, sumInsuredTiers));
         IssuanceResult partialResult = IssuanceResult.insuranceCreated(request.bizNo(), insuranceId, insuranceNo,
                 request.quotedPremium());
         try {
@@ -262,14 +266,29 @@ public class IssuanceOrchestrator {
     }
 
     /**
-     * 保单期间：等待期与犹豫期取主险产品投保条件配置（此前 policy 域完全未消费该配置）。
+     * 保单期间：仅承载保单级保障起止期。
+     * <p>
+     * 🔴 等待期/犹豫期自 G11/g11-04（D2 裁决）<b>下沉段级</b>——随各险种段的
+     * {@code LineCoveragePeriod} 由 {@code PolicyProductAssembler} 按段装配（各段取值本就不同，
+     * 保单级单值表达不了），本方法不再取产品投保条件。
+     * </p>
      */
     private PolicyPeriod buildPolicyPeriod(IssuanceRequest request) {
-        ProductIssueRules rules = productServicePort.getIssueRules(request.mainProductId());
-        // ProductIssueRules 的等待期/犹豫期是可选配置，保持 Integer 以便 PolicyPeriod.of 做空值归零。
-        Integer waitingPeriodDays = rules != null ? rules.waitingPeriodDays() : null;
-        Integer hesitationPeriodDays = rules != null ? rules.hesitationPeriodDays() : null;
-        return PolicyPeriod.of(request.periodStart(), request.periodEnd(), waitingPeriodDays, hesitationPeriodDays);
+        return PolicyPeriod.of(request.periodStart(), request.periodEnd());
+    }
+
+    /**
+     * 取各险种段产品的责任级保额档次配置（G02/AC-09）。
+     * <p>
+     * 取数动作收敛在 {@link ProductSumInsuredTiersLoader}：两条建单链路（本编排器的两步出单与
+     * 三步出单的 {@code ProposalIssuanceSaga}）共用同一份规则，避免两处各写一份而漂移。
+     * </p>
+     *
+     * @param lines 已装配的险种段列表
+     * @return 各产品的档次配置载体
+     */
+    private List<ProductSumInsuredTiers> loadSumInsuredTiers(List<InsuranceLine> lines) {
+        return productSumInsuredTiersLoader.load(lines);
     }
 
     /**

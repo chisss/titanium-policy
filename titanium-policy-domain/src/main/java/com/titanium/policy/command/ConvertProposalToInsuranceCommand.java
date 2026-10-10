@@ -13,6 +13,7 @@ import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.entity.insurance.InsuranceLine;
 import com.titanium.policy.entity.insurance.InsuredPartyList;
 import com.titanium.policy.valueobject.policy.ChannelInfo;
+import com.titanium.policy.valueobject.product.ProductSumInsuredTiers;
 
 import lombok.Builder;
 
@@ -45,6 +46,10 @@ import lombok.Builder;
  * @param sumInsured           主险基本保额（billing 保费计算入参）
  * @param paymentMode          主险缴费模式 code
  * @param premiumPaymentYears  主险缴费年数（0 表示未知）
+ * @param sumInsuredTiers      各险种段产品的责任级保额档次配置（G02/AC-09：由 application 编排经
+ *                             {@code ProductServicePort} 取回后传入，聚合据此校验段级保额；传
+ *                             {@code null} 表示未接线，聚合 fail-closed 拒绝；显式传空集合表示
+ *                             「该产品未配置档次」，放行）
  */
 @Builder
 public record ConvertProposalToInsuranceCommand(@TargetAggregateIdentifier String insuranceId, String insuranceNo,
@@ -56,5 +61,6 @@ public record ConvertProposalToInsuranceCommand(@TargetAggregateIdentifier Strin
                                                 InsuranceProductType insuranceType,
                                                 PremiumCollectionMode collectionMode, ChannelInfo channelInfo,
                                                 String bizNo, String marketPackageId, String tenantId,
-                                                BigDecimal sumInsured, String paymentMode, int premiumPaymentYears) {
+                                                BigDecimal sumInsured, String paymentMode, int premiumPaymentYears,
+                                                List<ProductSumInsuredTiers> sumInsuredTiers) {
 }

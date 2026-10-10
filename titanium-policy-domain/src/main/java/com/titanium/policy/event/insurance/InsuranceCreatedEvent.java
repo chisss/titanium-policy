@@ -72,9 +72,13 @@ public record InsuranceCreatedEvent(String insuranceId, String insuranceNo, Stri
     }
 
     /**
-     * 主险段（一张投保单有且仅有一个）。
+     * **首个**主险段（按段列表顺序取第一个主险段，<b>不表示主险段唯一</b>）。
+     * <p>
+     * 🔴 G11/g11-04 方案 B：一张投保单可含多个主险段（交强 + 商业同单）；
+     * 合同构成的权威表述是段列表 {@link #insuranceLines()} 本身。
+     * </p>
      *
-     * @return 主险段；无段时返回 null
+     * @return 首个主险段；无段时返回 null
      */
     public InsuranceLine mainLine() {
         if (insuranceLines == null) {

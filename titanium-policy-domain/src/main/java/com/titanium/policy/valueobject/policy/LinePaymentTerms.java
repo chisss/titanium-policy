@@ -106,4 +106,33 @@ public record LinePaymentTerms(PaymentFrequency paymentFrequency, int premiumPay
                 .divide(BigDecimal.valueOf(periods), AMOUNT_SCALE, RoundingMode.HALF_UP);
         return Money.of(perPeriod, totalPremium.currency());
     }
+
+    /**
+     * 年缴保费（该险种段总保费 ÷ 缴费年数，四舍五入到分）。
+     * <p>
+     * 🔴 <b>年保费 ≠ 每期保费</b>：二者仅在年缴时相等，月缴时一年是 12 期之和。故本方法
+     * <b>不得</b>由 {@link #installmentAmount(Money)} 再乘每年期数推得——每期金额已四舍五入到分，
+     * 乘回去会产生分位漂移（3650 元月缴 1 年：每期 304.17 × 12 = 3650.04 ≠ 3650.00）。
+     * </p>
+     * <p>
+     * 「缴费频次 → 每年期数」的换算表由 {@link #totalPeriods()} 唯一持有，故年保费口径也只能由本
+     * 值对象提供：任何消费方按缴费频次自行还原年保费，都等于把那张表再抄一份。
+     * </p>
+     *
+     * @param totalPremium 该险种段总保费
+     * @return 年缴保费；总保费为空时返回 null
+     */
+    public Money annualPremium(Money totalPremium) {
+        if (totalPremium == null) {
+            return null;
+        }
+        // 缴费年数非正时按 1 年兜底（与 totalPeriods() 同一兜底口径），避免除零与放大
+        int years = premiumPaymentYears <= 0 ? 1 : premiumPaymentYears;
+        if (years == 1) {
+            return totalPremium;
+        }
+        BigDecimal perYear = totalPremium.value()
+                .divide(BigDecimal.valueOf(years), AMOUNT_SCALE, RoundingMode.HALF_UP);
+        return Money.of(perYear, totalPremium.currency());
+    }
 }

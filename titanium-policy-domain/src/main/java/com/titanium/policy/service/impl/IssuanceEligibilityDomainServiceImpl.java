@@ -9,6 +9,7 @@ import static com.titanium.metadata.errorcode.PolicyErrorCode.ELIGIBILITY_HOLDER
 import static com.titanium.metadata.errorcode.PolicyErrorCode.ELIGIBILITY_INSURED_COUNT_BELOW_MIN;
 import static com.titanium.metadata.errorcode.PolicyErrorCode.ELIGIBILITY_INSURED_COUNT_EXCEEDS_MAX;
 import static com.titanium.metadata.errorcode.PolicyErrorCode.ELIGIBILITY_INSURED_REQUIRED;
+import static com.titanium.metadata.errorcode.PolicyErrorCode.ELIGIBILITY_MULTIPLE_SUBJECTS_NOT_ALLOWED;
 import static com.titanium.metadata.errorcode.PolicyErrorCode.ELIGIBILITY_OCCUPATION_FORBIDDEN;
 import static com.titanium.metadata.errorcode.PolicyErrorCode.ELIGIBILITY_PAYMENT_FREQUENCY_NOT_ALLOWED;
 import static com.titanium.metadata.errorcode.PolicyErrorCode.ELIGIBILITY_PAYMENT_TERM_NOT_ALLOWED;
@@ -18,6 +19,7 @@ import static com.titanium.metadata.errorcode.PolicyErrorCode.ELIGIBILITY_SUBJEC
 import static com.titanium.metadata.errorcode.PolicyErrorCode.ELIGIBILITY_SUM_INSURED_BELOW_MIN;
 import static com.titanium.metadata.errorcode.PolicyErrorCode.ELIGIBILITY_SUM_INSURED_EXCEEDS_MAX;
 import static com.titanium.metadata.errorcode.PolicyErrorCode.ELIGIBILITY_SUM_INSURED_REQUIRED;
+import static com.titanium.metadata.errorcode.PolicyErrorCode.ELIGIBILITY_VIN_INVALID;
 
 import java.util.List;
 import java.util.Map;
@@ -27,6 +29,7 @@ import org.springframework.stereotype.Service;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.entity.insurance.InsuredPartyList;
 import com.titanium.policy.service.IssuanceEligibilityDomainService;
+import com.titanium.policy.service.VinValidator;
 import com.titanium.policy.valueobject.RuleDecision;
 import com.titanium.policy.valueobject.issuance.IssuancePlanLine;
 import com.titanium.policy.valueobject.issuance.IssuanceRequest;
@@ -38,7 +41,7 @@ import com.titanium.policy.valueobject.product.ProductIssueRules;
  * 无 Port / 仓储 / 基础设施依赖，入参出参仅值对象。标注 {@code @Service} 仅为便于容器注入。
  * </p>
  * <p>
- * <b>三条实现原则</b>：
+ * <b>四条实现原则</b>：
  * </p>
  * <ol>
  *   <li><b>区间与清单判定内聚到 {@link ProductIssueRules}</b>（充血）——本类不手写
@@ -47,6 +50,9 @@ import com.titanium.policy.valueobject.product.ProductIssueRules;
  *       {@code Accept-Language} 经 {@code MessageSource} 渲染；</li>
  *   <li><b>取值逻辑内聚到 {@link IssuancePlanLine}</b>——标的属性提取由方案行自己负责，
  *       本类不重复实现 Map 取值与类型收窄。</li>
+ *   <li><b>法定编码算法委托 {@link VinValidator}</b>——VIN 校验（ISO 3779）是法定固定算法，
+ *       不属于「产品区间/清单」（不因产品而异，故不下沉 {@link ProductIssueRules}），
+ *       独立成纯算法组件；本类只编排「何时校验、违反给哪个码」。</li>
  * </ol>
  */
 @Service
@@ -58,6 +64,21 @@ public class IssuanceEligibilityDomainServiceImpl implements IssuanceEligibility
     private static final String ATTR_OCCUPATION = "occupation";
     /** 标的属性中的地域键 */
     private static final String ATTR_REGION = "region";
+    /** 标的属性中的车辆识别代号键（车险段必填，ISO 3779 格式校验用） */
+    private static final String ATTR_VIN = "vin";
+
+    /** VIN 格式校验器（车险段专用纯算法，归属见类 javadoc 原则④） */
+    private final VinValidator vinValidator;
+
+    /**
+     * 构造注入 VIN 校验器。
+     * <p>
+     * 🔴 测试仍可脱离 Spring 直测：{@code new IssuanceEligibilityDomainServiceImpl(new VinValidatorImpl())}。
+     * </p>
+     */
+    public IssuanceEligibilityDomainServiceImpl(VinValidator vinValidator) {
+        this.vinValidator = vinValidator;
+    }
 
     @Override
     public RuleDecision validate(IssuanceRequest request, Map<String, ProductIssueRules> rulesByProduct) {
@@ -123,6 +144,14 @@ public class IssuanceEligibilityDomainServiceImpl implements IssuanceEligibility
         if (!subject.passed()) {
             return subject;
         }
+        RuleDecision vin = validateSubjectVin(line, rules);
+        if (!vin.passed()) {
+            return vin;
+        }
+        RuleDecision multipleSubjects = validateMultipleSubjects(line, rules);
+        if (!multipleSubjects.passed()) {
+            return multipleSubjects;
+        }
         RuleDecision insuredCount = validateInsuredCount(request, line, rules);
         if (!insuredCount.passed()) {
             return insuredCount;
@@ -156,6 +185,51 @@ public class IssuanceEligibilityDomainServiceImpl implements IssuanceEligibility
             }
         }
         return RuleDecision.accepted();
+    }
+
+    /**
+     * 车险标的 VIN 格式校验（ISO 3779，G11/g11-02）。
+     * <p>
+     * 🔴 <b>范围限定</b>：仅当产品声明 {@code vin} 为必填属性（即车险段）时执行——不得对非车险
+     * 标的属性包中偶然出现的 {@code vin} 键做全局校验（各险种标的属性共用同一 Map 载体）。
+     * </p>
+     * <p>
+     * 置于 {@link #validateSubjectAttributes} <b>之后</b>：必填缺失先报「缺属性」、格式非法才报
+     * 「VIN 不合法」，同段两码不混报。多标的（多车）逐一校验，任一非法即拒。
+     * </p>
+     */
+    private RuleDecision validateSubjectVin(IssuancePlanLine line, ProductIssueRules rules) {
+        if (!rules.requiresSubjectAttribute(ATTR_VIN) || line.subjects() == null || line.subjects().isEmpty()) {
+            return RuleDecision.accepted();
+        }
+        for (IssuancePlanLine.SubjectIntent subject : line.subjects()) {
+            String vin = subject.attributeText(ATTR_VIN);
+            // 缺失场景已由前序 validateSubjectAttributes 拒绝；此处空值仅防御，不误报为格式错
+            if (vin != null && !vinValidator.isValid(vin)) {
+                return RuleDecision.rejectedAtLine(ELIGIBILITY_VIN_INVALID, line.lineNo(), vin);
+            }
+        }
+        return RuleDecision.accepted();
+    }
+
+    /**
+     * 标的数量是否在产品允许范围内（G11/g11-06，产品模板 {@code allowMultipleSubjects} 声明）。
+     * <p>
+     * 仅当段内标的数 &gt; 1 且产品<b>显式声明</b>不允许（{@code Boolean.FALSE}）时拒绝；
+     * 声明缺失（null=无模板/未声明）视为不限制，见 {@link ProductIssueRules#allowsMultipleSubjects()}。
+     * 与 {@code PolicyCompositionDomainServiceImpl} 的分项保额守恒（G11/g11-05）互补——
+     * 守恒管「多标的段数额怎么分」，本条管「该产品是否允许多标段」。
+     * </p>
+     */
+    private RuleDecision validateMultipleSubjects(IssuancePlanLine line, ProductIssueRules rules) {
+        if (line.subjects() == null || line.subjects().size() <= 1) {
+            return RuleDecision.accepted();
+        }
+        if (rules.allowsMultipleSubjects()) {
+            return RuleDecision.accepted();
+        }
+        return RuleDecision.rejectedAtLine(ELIGIBILITY_MULTIPLE_SUBJECTS_NOT_ALLOWED,
+                line.lineNo(), line.subjects().size());
     }
 
     /**

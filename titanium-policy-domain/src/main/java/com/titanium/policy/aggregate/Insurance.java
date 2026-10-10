@@ -1,8 +1,11 @@
 package com.titanium.policy.aggregate;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.axonframework.commandhandling.CommandHandler;
 import org.axonframework.eventsourcing.EventSourcingHandler;
@@ -31,13 +34,16 @@ import com.titanium.policy.event.insurance.InsuranceIssuedEvent;
 import com.titanium.policy.event.insurance.InsuranceSubmittedForUnderwritingEvent;
 import com.titanium.policy.event.insurance.UnderwritingResultReceivedEvent;
 import com.titanium.policy.exception.PolicyBusinessRuleException;
+import com.titanium.policy.valueobject.RuleDecision;
 import com.titanium.policy.valueobject.insurance.InsuranceBasicInfo;
 import com.titanium.policy.valueobject.insurance.InsuranceStatus;
 import com.titanium.policy.valueobject.insurance.UnderwritingResult;
 import com.titanium.policy.valueobject.policy.ChannelInfo;
+import com.titanium.policy.valueobject.product.ProductSumInsuredTiers;
 
 import lombok.Getter;
 import lombok.experimental.SuperBuilder;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * 投保单聚合根
@@ -47,6 +53,7 @@ import lombok.experimental.SuperBuilder;
  */
 @Aggregate
 @Getter
+@Slf4j
 @SuperBuilder(toBuilder = true)
 public class Insurance extends BaseAggregate {
     /** 聚合根唯一标识 */
@@ -101,6 +108,7 @@ public class Insurance extends BaseAggregate {
     @CommandHandler
     public Insurance(ConvertProposalToInsuranceCommand command) {
         validateInsuranceLines(command.insuranceLines());
+        validateSumInsuredTiers(command.insuranceLines(), command.sumInsuredTiers());
         AggregateLifecycle.apply(new InsuranceCreatedEvent(command.insuranceId(), command.insuranceNo(),
                 command.proposalId(), command.policyForm(), command.applicantId(), command.insuredCount(),
                 command.exactPremium() != null ? command.exactPremium().value() : null, command.insurancePeriodStart(),
@@ -116,6 +124,7 @@ public class Insurance extends BaseAggregate {
     @CommandHandler
     public Insurance(CreateInsuranceDirectlyCommand command) {
         validateInsuranceLines(command.insuranceLines());
+        validateSumInsuredTiers(command.insuranceLines(), command.sumInsuredTiers());
         AggregateLifecycle.apply(new InsuranceCreatedEvent(command.insuranceId(), command.insuranceNo(), null,
                 command.policyForm(), command.holderId(), command.insuredCount(), command.exactPremium(),
                 command.insurancePeriodStart(), command.insurancePeriodEnd(), command.insuranceLines(),
@@ -284,9 +293,14 @@ public class Insurance extends BaseAggregate {
     // ==================== 业务方法 ====================
 
     /**
-     * 主险段（一张投保单有且仅有一个）。
+     * **首个**主险段（按段列表顺序取第一个主险段，<b>不表示主险段唯一</b>）。
+     * <p>
+     * 🔴 G11/g11-04 方案 B：一张投保单<b>可含多个主险段</b>（如交强险 + 商业车险同单），
+     * 旧语义「有且仅有一个主险段」已不成立。本方法仅供「按首个主险段导航」的既有场景使用，
+     * 不得据此认定唯一主险；需要完整主险段集合时，调用方自行按 {@code InsuranceLine::isMain} 过滤段列表。
+     * </p>
      *
-     * @return 主险段；无段时返回 null
+     * @return 首个主险段；无段时返回 null
      */
     public InsuranceLine mainLine() {
         if (this.insuranceLines == null) {
@@ -394,8 +408,14 @@ public class Insurance extends BaseAggregate {
      * 校验险种段构成：至少一段、有且仅一个主险、附加险依附合法。
      * <p>
      * 段级不变量在提交核保前校验（核保按段出结论，段结构非法则核保无从进行）。
-     * 投保要素的业务校验（年龄/保额/职业等依产品条件）由 application 层的
+     * 投保要素的业务校验（年龄/职业等依产品条件）由 application 层的
      * {@code IssuanceEligibilityDomainService} 在出单受理阶段完成，不在此重复。
+     * </p>
+     * <p>
+     * 🔴 <b>例外——段级保额的责任档次接纳性</b>（G02/AC-09）落在创建构造器而非受理阶段：
+     * 档次配置是产品域的<b>责任级</b>契约，与受理阶段读的 {@code ProductIssueRules}
+     * （{@code insureCondition} 的 min/max 保额）<b>不同源</b>；且直连建单端点不经受理阶段，
+     * 放在那里会被整条路径绕过。实现见 {@link #validateSumInsuredTiers}。
      * </p>
      */
     private void validateInsuranceLines() {
@@ -404,6 +424,16 @@ public class Insurance extends BaseAggregate {
 
     /**
      * 在首个事件写入前校验投保险种段，避免创建无法进入核保和承保流程的坏草稿。
+     * <p>
+     * 🔴 <b>G11/g11-04 ⑨（第二道「唯一主险」防线）</b>：交强 + 商业同单（方案 B）下本单可含
+     * <b>多个主险段</b>，原「有且仅有一个主险」判据会在<b>投保单创建</b>即拒——比保单段构成
+     * （不变量①）更早，只改保单侧会被此处的硬约束拦在门外。放宽口径与
+     * {@code PolicyCompositionDomainServiceImpl.validateMainLines/validateRiderParents} 逐字一致：
+     * <b>≥1 个主险段</b>（{@code mainCount == 0} 仍拒）+ 主险段间 <b>productId 唯一</b>
+     * （🔴 互斥键必须是 productId：交强与商业同属 AUTO 一个险种，用险种或险别做键会把要放行的
+     * 双主险单自己拒掉）+ 附加险父段 ∈ <b>主险段 id 集合</b>（原 {@code findFirst()} 只认首个主险，
+     * 挂第二个主险的附加险会被误拒）。
+     * </p>
      */
     private static void validateInsuranceLines(List<InsuranceLine> lines) {
         if (lines == null || lines.isEmpty()) {
@@ -415,18 +445,113 @@ public class Insurance extends BaseAggregate {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "投保险种段必须包含产品ID和产品编码");
         }
         long mainCount = lines.stream().filter(InsuranceLine::isMain).count();
-        if (mainCount != 1) {
-            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION",
-                    "投保单须含且仅含一个主险段，当前有 " + mainCount + " 个");
+        if (mainCount == 0) {
+            throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "投保单须含至少一个主险段");
         }
-        String mainLineId = lines.stream().filter(InsuranceLine::isMain).map(InsuranceLine::lineId).findFirst()
-                .orElse(null);
+        Set<String> mainProductIds = new HashSet<>();
+        Set<String> mainLineIds = new HashSet<>();
         for (InsuranceLine line : lines) {
-            if (line.isRider() && (line.parentLineId() == null || !line.parentLineId().equals(mainLineId))) {
+            if (!line.isMain()) {
+                continue;
+            }
+            if (!mainProductIds.add(line.productId())) {
+                throw new PolicyBusinessRuleException(PolicyErrorCode.COMPOSITION_MULTIPLE_MAIN_LINES,
+                        "同一险种只能有一个主险段：产品 " + line.productId() + " 出现多个主险段");
+            }
+            mainLineIds.add(line.lineId());
+        }
+        for (InsuranceLine line : lines) {
+            if (line.isRider() && (line.parentLineId() == null || !mainLineIds.contains(line.parentLineId()))) {
                 throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION",
                         "附加险段须依附于本单主险段: 段序号 " + line.lineNo());
             }
         }
+    }
+
+    /**
+     * 校验各险种段的保额是否被产品已配置的责任档次接纳（G02/AC-09）。
+     * <p>
+     * 产品域为每条责任配置「档位清单 + 可填区间 + 是否开放自由填」，段级录入的保额须被
+     * <b>至少一条</b>责任接纳。配置由 application 编排经 {@code ProductServicePort} 取回后
+     * 作为<b>命令分量</b>传入——聚合不得依赖 Port（领域纯粹性）。
+     * </p>
+     * <p>
+     * 🔴 <b>三态语义</b>：
+     * </p>
+     * <ol>
+     *   <li>{@code tiers} 为 {@code null}（调用方未接线）而段上确有保额 ⇒ <b>拒绝</b>：
+     *       失败关闭，防止新增建单入口漏传配置后静默绕过档次校验；</li>
+     *   <li>产品无对应条目或条目内无任何责任档次 ⇒ <b>放行 + 留痕</b>：G01 已定「不配置是
+     *       合法的中间状态」，在此拒绝会让存量未配置档次的产品全部出不了单；</li>
+     *   <li>有条目但 0/N 条责任接纳 ⇒ <b>拒绝</b>，报文携带各责任可选档位与区间便于改选。</li>
+     * </ol>
+     * <p>
+     * 段上保额为空时跳过本规则——「保额必填」由受理阶段的产品投保条件校验守护，
+     * 不在两处各写一份判据。
+     * </p>
+     *
+     * @param lines 投保险种段列表
+     * @param tiers 各产品责任级档次配置；{@code null} 表示调用方未提供
+     */
+    private static void validateSumInsuredTiers(List<InsuranceLine> lines, List<ProductSumInsuredTiers> tiers) {
+        RuleDecision decision = checkSumInsuredTiers(lines, tiers);
+        if (!decision.passed()) {
+            throw new PolicyBusinessRuleException(decision.errorCode(), decision.defaultMessage());
+        }
+    }
+
+    /**
+     * 判定各险种段的保额是否被产品档次接纳（纯函数，无副作用，便于单测）。
+     *
+     * @param lines 投保险种段列表
+     * @param tiers 各产品责任级档次配置；{@code null} 表示调用方未提供
+     * @return 判定结果；拒绝时携带错误码与首个不接纳的段序号
+     */
+    private static RuleDecision checkSumInsuredTiers(List<InsuranceLine> lines, List<ProductSumInsuredTiers> tiers) {
+        if (lines == null) {
+            return RuleDecision.accepted();
+        }
+        for (InsuranceLine line : lines) {
+            if (line == null || line.sumInsured() == null || line.sumInsured().value() == null) {
+                continue;
+            }
+            BigDecimal amount = line.sumInsured().value();
+            if (tiers == null) {
+                // 未接线：段上确有保额却拿不到任何档次配置，无从校验 ⇒ 失败关闭
+                return RuleDecision.rejectedAtLine(PolicyErrorCode.ELIGIBILITY_SUM_INSURED_TIER_CONFIG_MISSING,
+                        line.lineNo(), amount);
+            }
+            ProductSumInsuredTiers productTiers = findSumInsuredTiers(tiers, line.productId());
+            if (productTiers == null || !productTiers.hasConfig()) {
+                // 该产品未配置责任档次：合法中间状态，放行但留痕（存量产品不受阻）
+                log.warn("产品未配置责任级保额档次，段级保额档次校验放行: productId={}, lineNo={}, sumInsured={}",
+                        line.productId(), line.lineNo(), amount);
+                continue;
+            }
+            if (!productTiers.acceptsSumInsured(amount)) {
+                return RuleDecision.rejectedAtLine(PolicyErrorCode.ELIGIBILITY_SUM_INSURED_TIER_NOT_ACCEPTED,
+                        line.lineNo(), amount, line.productId(), productTiers.coverages().size(),
+                        productTiers.describeOptions());
+            }
+        }
+        return RuleDecision.accepted();
+    }
+
+    /**
+     * 在档次配置载体集合中按产品ID查找条目。
+     *
+     * @param tiers     各产品责任级档次配置
+     * @param productId 产品ID
+     * @return 匹配的条目；该产品未配置时返回 {@code null}
+     */
+    private static ProductSumInsuredTiers findSumInsuredTiers(List<ProductSumInsuredTiers> tiers, String productId) {
+        if (productId == null) {
+            return null;
+        }
+        return tiers.stream()
+                .filter(item -> item != null && productId.equals(item.productId()))
+                .findFirst()
+                .orElse(null);
     }
 
     private void ensureDraftStatus() {

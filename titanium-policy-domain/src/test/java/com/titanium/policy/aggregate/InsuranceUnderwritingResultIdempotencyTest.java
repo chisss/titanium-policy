@@ -58,6 +58,26 @@ class InsuranceUnderwritingResultIdempotencyTest {
     }
 
     @Test
+    @DisplayName("跨轨重投（同步轨先落、异步轨后到）：只认核保单号+结论，零事件零状态变更")
+    void shouldTreatAsyncTrackRedeliveryAsIdempotentAfterSyncTrackLanded() {
+        fixture()
+                .given(createdEvent(), submittedEvent(), receivedEvent(syncTrackResult(ConclusionType.ACCEPT)))
+                .when(command(asyncTrackResult(ConclusionType.ACCEPT)))
+                .expectNoEvents()
+                .expectSuccessfulHandlerExecution();
+    }
+
+    @Test
+    @DisplayName("跨轨重投（异步轨先到、同步轨后到）：同样零事件（两轨到达次序不固定）")
+    void shouldTreatSyncTrackRedeliveryAsIdempotentAfterAsyncTrackLanded() {
+        fixture()
+                .given(createdEvent(), submittedEvent(), receivedEvent(asyncTrackResult(ConclusionType.ACCEPT)))
+                .when(command(syncTrackResult(ConclusionType.ACCEPT)))
+                .expectNoEvents()
+                .expectSuccessfulHandlerExecution();
+    }
+
+    @Test
     @DisplayName("同核保单号但结论被改判：仍须抛异常，不得按重投静默吞掉")
     void shouldRejectSameUnderwritingIdWithDifferentConclusion() {
         fixture()
@@ -131,6 +151,35 @@ class InsuranceUnderwritingResultIdempotencyTest {
     private UnderwritingResult result(ConclusionType conclusion) {
         return new UnderwritingResult(UNDERWRITING_ID, conclusion, "核保意见", "UW_001", LocalDateTime.now(), null,
                 null);
+    }
+
+    /**
+     * 同步轨形态的结论（忠实复刻 {@code SyncUnderwritingDecisionAdapter} 的装配）：
+     * opinion 取核保意见、underwriterId 取核保人、condition 取加费原因。
+     *
+     * @param conclusion 核保结论
+     * @return 同步轨结论
+     */
+    private UnderwritingResult syncTrackResult(ConclusionType conclusion) {
+        return new UnderwritingResult(UNDERWRITING_ID, conclusion, "核保意见：标准承保", "UW_001",
+                LocalDateTime.now(), "职业类别加费", new BigDecimal("0.15"));
+    }
+
+    /**
+     * 异步轨形态的结论（忠实复刻 {@code UnderwritingDecidedEventListener} 的装配）：
+     * opinion 与 underwriterId 同取决策人、condition 恒为 {@code null}。
+     * <p>
+     * 🔴 与 {@link #syncTrackResult(ConclusionType)} 的差异（opinion / condition）是<b>真实存在</b>的：
+     * 两轨各自从不同来源字段装配同一决策。跨轨用例正是要锁死「幂等只看核保单号 + 结论」——
+     * 若日后有人把 opinion/condition 也纳入比较，跨轨重投会退化为抛异常（Kafka 消费位点阻塞），用例即变红。
+     * </p>
+     *
+     * @param conclusion 核保结论
+     * @return 异步轨结论
+     */
+    private UnderwritingResult asyncTrackResult(ConclusionType conclusion) {
+        return new UnderwritingResult(UNDERWRITING_ID, conclusion, "UW_001", "UW_001", LocalDateTime.now(), null,
+                new BigDecimal("0.15"));
     }
 
     /**

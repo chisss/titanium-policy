@@ -40,4 +40,8 @@
     <include file="classpath:liquibase/ddl/policy_field_catalog_row_version_202610021120_weisun_ddl.sql"/>
     <!-- G10/g10-02：险种三级分类列宽 64 → 32 统一（4 处：3 张读模型表 + t_policy_product） -->
     <include file="classpath:liquibase/ddl/policy_view_insurance_width_202610091849_weisun_ddl.sql"/>
+    <!-- G11/g11-04：段级险别（⑦）+ 段级宽限期（D2，保单级两列 DROP） -->
+    <include file="classpath:liquibase/ddl/policy_mandate_grace_202610101500_weisun_ddl.sql"/>
+    <!-- G11/g11-03：NCD 反算取证六列（条数/区间/规则版本；可空无默认——未反算即 NULL，不以 1.0 代填） -->
+    <include file="classpath:liquibase/ddl/policy_subject_ncd_snapshot_202610101600_weisun_ddl.sql"/>
 </databaseChangeLog>

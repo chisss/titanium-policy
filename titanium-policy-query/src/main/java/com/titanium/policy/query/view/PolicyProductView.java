@@ -82,8 +82,12 @@ public class PolicyProductView extends BaseView {
     private String        pricingPlanVersion;
 
     /** 险种三级分类码 */
-    @Column(name = "insurance_type", length = 64)
+    @Column(name = "insurance_type", length = 32)
     private String        insuranceType;
+
+    /** 险别码（COMPULSORY 法定强制 / VOLUNTARY 自愿投保；G11/g11-04：与险种正交，随产品快照冻结） */
+    @Column(name = "insurance_mandate_type", length = 32)
+    private String        insuranceMandateType;
 
     /** 本险种保额（独立于其他段） */
     @Column(name = "sum_insured", precision = 18, scale = 2)
@@ -108,6 +112,22 @@ public class PolicyProductView extends BaseView {
     /** 保障期间类型码（FIXED_TERM/WHOLE_LIFE/CUSTOM） */
     @Column(name = "period_type", length = 32)
     private String        periodType;
+
+    /** 本段等待期天数（0 表示无等待期；G11/g11-04 D2：宽限期下沉段级） */
+    @Column(name = "waiting_period_days")
+    private Integer       waitingPeriodDays;
+
+    /** 本段等待期届满日（本段起期 + 等待期天数；无等待期为空） */
+    @Column(name = "waiting_period_end_date")
+    private LocalDateTime waitingPeriodEndDate;
+
+    /** 本段犹豫期天数（0 表示无犹豫期） */
+    @Column(name = "hesitation_period_days")
+    private Integer       hesitationPeriodDays;
+
+    /** 本段犹豫期届满日（本段起期 + 犹豫期天数；无犹豫期为空） */
+    @Column(name = "hesitation_period_end_date")
+    private LocalDateTime hesitationPeriodEndDate;
 
     /** 本险种缴费频率码（缴费期 ≠ 保障期） */
     @Column(name = "payment_frequency", length = 32)

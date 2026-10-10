@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.titanium.common.jpa.BasePersistable;
+import com.titanium.metadata.enums.policy.PolicyServiceRestrictionType;
 import com.titanium.policy.entity.insurance.InsuredPartyList;
 import com.titanium.policy.entity.policy.PolicyProduct;
 import com.titanium.policy.event.PolicyEndorsedEvent;
@@ -29,6 +30,7 @@ import com.titanium.policy.query.view.PolicyProductView;
 import com.titanium.policy.query.view.PolicyView;
 import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceExecutionState;
 import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceObjectId;
+import com.titanium.policy.valueobject.policy.PolicyServiceRestrictions;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -96,6 +98,12 @@ public class EndorsementProjectionEventHandler {
         view.setPolicyVersion(Math.toIntExact(event.actualPolicyVersion()));
         view.setEffectiveDate(event.effectiveAt());
         view.setChangeSummary(event.changeSummary());
+        // 金额型保全的收付差额事实（字段型/状态型事件该字段为 null，届时四列一并置空，
+        // 避免 upsert 复用既有行时残留上一笔金额）
+        view.setAmountItemCode(event.amountFact() == null ? null : event.amountFact().itemCode());
+        view.setAmountValue(event.amountFact() == null ? null : event.amountFact().amount());
+        view.setAmountDirection(event.amountFact() == null ? null : event.amountFact().direction().getCode());
+        view.setAmountCurrency(event.amountFact() == null ? null : event.amountFact().currency());
         view.setRequiresPremiumRecalc(event.updateType().needsPremiumRecalc());
         view.setSourceMaintenanceId(event.sourceMaintenanceId());
         view.setOperatorId(event.operatorId());
@@ -107,9 +115,22 @@ public class EndorsementProjectionEventHandler {
         policyViewRepository.findByPolicyIdAndTenantId(event.policyId(), event.tenantId()).ifPresent(policy -> {
             policy.setCurrentVersion(Math.toIntExact(event.actualPolicyVersion()));
             applyExecutionState(event.policyId(), event.tenantId(), policy, event.executionStateAfter());
+            // null = 本次保全未触及服务受限维度（含存量事件），保持既有列值不动；
+            // 非 null 才覆盖——受限类保全生效与解除都会带来一份完整清单，直接重算列值。
+            if (event.serviceRestrictionsAfter() != null) {
+                policy.setServiceRestrictionTypes(activeRestrictionCodes(event.serviceRestrictionsAfter()));
+            }
             policy.setUpdateTime(LocalDateTime.now());
             policyViewRepository.save(policy);
         });
+    }
+
+    /** 生效中的受限种类码，逗号连接；无受限时返回 {@code null}（列语义：空即无受限）。 */
+    private String activeRestrictionCodes(PolicyServiceRestrictions restrictions) {
+        List<String> codes = restrictions.activeTypes().stream()
+                .map(PolicyServiceRestrictionType::getCode)
+                .toList();
+        return codes.isEmpty() ? null : String.join(",", codes);
     }
 
     /** 投影状态类保全的统一批单、版本和字段实际值。 */
@@ -192,9 +213,17 @@ public class EndorsementProjectionEventHandler {
                         view.setUpdateTime(LocalDateTime.now());
                         policyProductViewRepository.save(view);
                     });
-            if (product.isMain()) {
-                policy.setSumInsured(product.sumInsured() == null ? null : product.sumInsured().value());
-            }
+        }
+        // 🔴 G11/g11-04 ⑥：保单级保额冗余列仅在「本快照恰含一个主险段」时同步。
+        // 多主险（交强 + 商业同单）时保单级单值冗余无对应语义——按段逐个覆盖会随快照顺序漂移
+        // （最后一个 MAIN 段胜出，其 sumInsured 为 null 时还会把列清空），故多主险时保持既有列值
+        // 不动，结果与快照顺序无关；段级保额以 t_policy_product 逐段为准（上方循环已逐段回写）。
+        List<PolicyProduct> mainProducts = executionState.policyProducts().stream()
+                .filter(PolicyProduct::isMain)
+                .toList();
+        if (mainProducts.size() == 1) {
+            PolicyProduct mainProduct = mainProducts.getFirst();
+            policy.setSumInsured(mainProduct.sumInsured() == null ? null : mainProduct.sumInsured().value());
         }
     }
 

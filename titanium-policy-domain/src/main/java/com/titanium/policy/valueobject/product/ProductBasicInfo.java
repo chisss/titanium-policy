@@ -2,6 +2,7 @@ package com.titanium.policy.valueobject.product;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
+import com.titanium.metadata.enums.insurance.InsuranceMandateType;
 import com.titanium.metadata.enums.insurance.InsuranceProductType;
 
 /**
@@ -12,15 +13,25 @@ import com.titanium.metadata.enums.insurance.InsuranceProductType;
  * 不是 Port 的组成部分（详见 {@link ProductIssueRules} 的包位置说明）。
  * </p>
  *
- * @param productId      产品ID
- * @param productCode    产品编码
- * @param productName    产品名称
- * @param productVersion 产品版本
- * @param insuranceType  险种三级分类
- * @param status         产品状态码
+ * @param productId           产品ID
+ * @param productCode         产品编码
+ * @param productName         产品名称
+ * @param productVersion      产品版本
+ * @param insuranceType       险种三级分类
+ * @param status              产品状态码
+ * @param insuranceMandateType 险别（法定强制/自愿投保，G11/g11-04；与险种正交，{@code null} = 产品未声明）
  */
 public record ProductBasicInfo(String productId, String productCode, String productName, String productVersion,
-                               InsuranceProductType insuranceType, String status) {
+                               InsuranceProductType insuranceType, String status,
+                               InsuranceMandateType insuranceMandateType) {
+
+    /**
+     * 兼容险别字段加入前的调用方（未声明险别）。
+     */
+    public ProductBasicInfo(String productId, String productCode, String productName, String productVersion,
+                            InsuranceProductType insuranceType, String status) {
+        this(productId, productCode, productName, productVersion, insuranceType, status, null);
+    }
 
     /** 产品生效状态码 */
     private static final String STATUS_EFFECTIVE = "EFFECTIVE";

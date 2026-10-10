@@ -1,6 +1,7 @@
 package com.titanium.policy.query.view;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 import com.titanium.common.jpa.BaseView;
 
@@ -84,4 +85,34 @@ public class PolicySubjectView extends BaseView {
     @Lob
     @Column(name = "attributes_json", columnDefinition = "TEXT")
     private String     attributesJson;
+
+    /**
+     * NCD 系数反算结果（G11/g11-03 AC-04）
+     * <p>
+     * 🔴 {@code null} 表示**未反算**，不得以 1.0 代填：「查不到历史」与「确无赔款」必须可区分，
+     * 前者会在列上留空、后者由 {@link #ncdClaimCount} = 0 与命中 0 次档位的系数共同表达。
+     * </p>
+     */
+    @Column(name = "ncd_coefficient", precision = 18, scale = 8)
+    private BigDecimal ncdCoefficient;
+
+    /** 反算取证：统计区间内计入的历史赔案条数（{@code null}=未反算；0=确无赔款） */
+    @Column(name = "ncd_claim_count")
+    private Integer    ncdClaimCount;
+
+    /** 反算取证：统计区间起点（含） */
+    @Column(name = "ncd_period_from")
+    private LocalDateTime ncdPeriodFrom;
+
+    /** 反算取证：统计区间止点（**不含**，与产品域 {@code NcdLookbackWindow} 半开口径一致） */
+    @Column(name = "ncd_period_to")
+    private LocalDateTime ncdPeriodTo;
+
+    /** 反算取证：所用规则集编码 */
+    @Column(name = "ncd_rule_code", length = 64)
+    private String     ncdRuleCode;
+
+    /** 反算取证：所用规则集版本（签发即冻结，与 {@code t_policy_clause.clause_version} 同法） */
+    @Column(name = "ncd_rule_version", length = 32)
+    private String     ncdRuleVersion;
 }

@@ -1,5 +1,6 @@
 package com.titanium.policy.query.result;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 import lombok.Data;
@@ -35,6 +36,18 @@ public class PolicyEndorsementQueryResult {
 
     /** 变更摘要 */
     private String        changeSummary;
+
+    /** 金额型保全项编码（非金额型批单为空） */
+    private String        amountItemCode;
+
+    /** 收付金额（正数绝对值，非金额型批单为空） */
+    private BigDecimal    amountValue;
+
+    /** 收付方向（DEBIT/CREDIT，非金额型批单为空） */
+    private String        amountDirection;
+
+    /** 币种（三字母代码，非金额型批单为空） */
+    private String        amountCurrency;
 
     /** 是否触发保费重算 */
     private boolean       requiresPremiumRecalc;

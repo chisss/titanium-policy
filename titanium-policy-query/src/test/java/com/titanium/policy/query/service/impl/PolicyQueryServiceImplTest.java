@@ -9,7 +9,9 @@ import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
@@ -29,6 +31,8 @@ import com.titanium.policy.query.view.PolicyBeneficiaryView;
 import com.titanium.policy.query.view.PolicyInsuredView;
 import com.titanium.policy.query.view.PolicyProductView;
 import com.titanium.policy.query.view.PolicyView;
+import com.titanium.policy.service.maintenance.PolicyMaintenanceHashing;
+import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceSnapshotFieldValue;
 
 class PolicyQueryServiceImplTest {
 
@@ -38,8 +42,6 @@ class PolicyQueryServiceImplTest {
     @Test
     void mapsProjectedPolicyDetailFields() throws Exception {
         PolicyView view = new PolicyView();
-        LocalDateTime waitingPeriodEndDate = LocalDateTime.of(2026, 8, 20, 0, 0);
-        LocalDateTime hesitationPeriodEndDate = LocalDateTime.of(2026, 8, 27, 0, 0);
         view.setProposalId("proposal-1");
         view.setUnderwritingId("underwriting-1");
         view.setMarketPackageId("package-1");
@@ -47,8 +49,6 @@ class PolicyQueryServiceImplTest {
         view.setSumInsured(new BigDecimal("100000.00"));
         view.setTotalPremium(new BigDecimal("1200.00"));
         view.setLineCount(2);
-        view.setWaitingPeriodEndDate(waitingPeriodEndDate);
-        view.setHesitationPeriodEndDate(hesitationPeriodEndDate);
         view.setCollectionMode("ONLINE");
         view.setCollectionStatus("COLLECTED");
         view.setCollectedAmount(new BigDecimal("1200.00"));
@@ -69,8 +69,6 @@ class PolicyQueryServiceImplTest {
         assertEquals(100000.00, result.getSumInsured());
         assertEquals(new BigDecimal("1200.00"), result.getTotalPremium());
         assertEquals(2, result.getLineCount());
-        assertEquals(waitingPeriodEndDate, result.getWaitingPeriodEndDate());
-        assertEquals(hesitationPeriodEndDate, result.getHesitationPeriodEndDate());
         assertEquals("ONLINE", result.getCollectionMode());
         assertEquals("COLLECTED", result.getCollectionStatus());
         assertEquals(new BigDecimal("1200.00"), result.getCollectedAmount());
@@ -158,8 +156,14 @@ class PolicyQueryServiceImplTest {
         assertEquals("1990-05-20",
                 first.fieldValues().get("policy.holder.birthDate").canonicalValue());
         assertEquals("DATE", first.fieldValues().get("policy.holder.birthDate").dataType());
+        // 保额逐主险段对象化发布（G11/g11-04 缺口②）：键含段前缀、objectId 即段 ID，
+        // 与受益人/被保人集合字段同构；维护域 Key 规范化后对外可见形态与单键时代逐字相同
         assertEquals("policy-product-1",
-                first.fieldValues().get("policy.coverage.sumInsured").objectId());
+                first.fieldValues().get("policy-product-1:policy.coverage.sumInsured").objectId());
+        assertEquals("100000",
+                first.fieldValues().get("policy-product-1:policy.coverage.sumInsured").canonicalValue());
+        assertEquals("DECIMAL",
+                first.fieldValues().get("policy-product-1:policy.coverage.sumInsured").dataType());
         assertEquals("beneficiary-1",
                 first.fieldValues().get("beneficiary-1:policy.beneficiary.name").objectId());
         assertEquals("100",
@@ -174,6 +178,22 @@ class PolicyQueryServiceImplTest {
                 first.fieldValues().get("insured-1:policy.insured.documentNumber").canonicalValue());
         assertEquals("TEXT",
                 first.fieldValues().get("insured-1:policy.insured.documentNumber").dataType());
+        // 🔴 快照指纹的发布/指纹双形态（G11/g11-04 缺口②）：对外逐段发布，但指纹输入中段级保额键
+        //    被排除、折叠为裸码合计（保单级，单主险时数值即该段原值）——与写侧
+        //    Policy.maintenanceSnapshotHash 同口径。此处独立重建「排除段级键 + 裸码合计」的指纹输入，
+        //    再走同一哈希算法比对：漏折叠（段级键混入指纹）或合计口径错误都会判红。
+        Map<String, PolicyMaintenanceSnapshotFieldValue> fingerprintInput = new HashMap<>();
+        first.fieldValues().forEach((key, value) -> {
+            if (!key.endsWith(":policy.coverage.sumInsured")) {
+                fingerprintInput.put(key,
+                        new PolicyMaintenanceSnapshotFieldValue(value.dataType(), value.canonicalValue()));
+            }
+        });
+        fingerprintInput.put("policy.coverage.sumInsured",
+                new PolicyMaintenanceSnapshotFieldValue("DECIMAL", "100000"));
+        assertEquals(PolicyMaintenanceHashing.snapshotHash(
+                        TENANT_ID, POLICY_ID, 7L, "product-1", "product-v3", "plan-v8", fingerprintInput),
+                first.snapshotContentHash());
         assertNotNull(first.nextBillingDateAt());
         assertNotNull(first.nextPolicyAnniversaryAt());
     }
@@ -194,6 +214,94 @@ class PolicyQueryServiceImplTest {
         assertThrows(BusinessException.class, () -> new PolicyQueryServiceImpl(
                 policyRepository, productRepository, Mockito.mock(PolicyInsuredViewRepository.class), null,
                 beneficiaryRepository)
+                .findMaintenanceSnapshot(POLICY_ID, TENANT_ID));
+    }
+
+    @Test
+    void publishesPerSegmentFieldsForMultiMainProducts() {
+        PolicyViewRepository policyRepository = Mockito.mock(PolicyViewRepository.class);
+        PolicyProductViewRepository productRepository = Mockito.mock(PolicyProductViewRepository.class);
+        when(policyRepository.findByPolicyIdAndTenantId(POLICY_ID, TENANT_ID))
+                .thenReturn(Optional.of(maintenancePolicyView()));
+        when(productRepository.findByPolicyIdAndTenantIdOrderByLineNoAsc(POLICY_ID, TENANT_ID))
+                .thenReturn(List.of(maintenanceMainProduct(), maintenanceSecondMainProduct()));
+        PolicyQueryServiceImpl service = new PolicyQueryServiceImpl(
+                policyRepository, productRepository, Mockito.mock(PolicyInsuredViewRepository.class), null,
+                Mockito.mock(PolicyBeneficiaryViewRepository.class));
+
+        var snapshot = service.findMaintenanceSnapshot(POLICY_ID, TENANT_ID);
+
+        // ① 逐主险段保额各自成键发布（G11/g11-04 缺口②：多主险下不再「后段覆盖前段」）
+        assertEquals("100000",
+                snapshot.fieldValues().get("policy-product-1:policy.coverage.sumInsured").canonicalValue());
+        assertEquals("policy-product-1",
+                snapshot.fieldValues().get("policy-product-1:policy.coverage.sumInsured").objectId());
+        assertEquals("200000",
+                snapshot.fieldValues().get("policy-product-2:policy.coverage.sumInsured").canonicalValue());
+        assertEquals("policy-product-2",
+                snapshot.fieldValues().get("policy-product-2:policy.coverage.sumInsured").objectId());
+        // ② 合同级要素 = 逐段值逗号连接（D3：不取首段，全部主险段都在值内）
+        assertEquals("product-1,product-2", snapshot.productId());
+        assertEquals("product-v3,product-v9", snapshot.productVersion());
+        assertEquals("plan-v8,plan-v10", snapshot.planVersion());
+        assertEquals("product-1,product-2",
+                snapshot.fieldValues().get("policy.product.id").canonicalValue());
+        // ③ 保单级币种 = 各段币种集合（此处均为 CNY，单值即原值）
+        assertEquals("CNY", snapshot.fieldValues().get("policy.currency").canonicalValue());
+        // ④ 快照指纹含各段保额合计（裸码、保单级键）：两段合计 300000，与任一单段值都不同——
+        //    漏合计（如误用首段）或段级键混入指纹都会判红
+        Map<String, PolicyMaintenanceSnapshotFieldValue> fingerprintInput = new HashMap<>();
+        snapshot.fieldValues().forEach((key, value) -> {
+            if (!key.endsWith(":policy.coverage.sumInsured")) {
+                fingerprintInput.put(key,
+                        new PolicyMaintenanceSnapshotFieldValue(value.dataType(), value.canonicalValue()));
+            }
+        });
+        fingerprintInput.put("policy.coverage.sumInsured",
+                new PolicyMaintenanceSnapshotFieldValue("DECIMAL", "300000"));
+        assertEquals(PolicyMaintenanceHashing.snapshotHash(
+                        TENANT_ID, POLICY_ID, 7L, "product-1,product-2", "product-v3,product-v9",
+                        "plan-v8,plan-v10", fingerprintInput),
+                snapshot.snapshotContentHash());
+        // ⑤ 保单级「下一缴费日」= 各段候选最早者（段 2 锚点 07-01 早于段 1 的 08-01）：
+        //    若按段顺序取首段（D1 违规）或取值不确定，月日断言会判红
+        assertNotNull(snapshot.nextBillingDateAt());
+        assertEquals(7, snapshot.nextBillingDateAt().getMonthValue());
+        assertEquals(1, snapshot.nextBillingDateAt().getDayOfMonth());
+    }
+
+    @Test
+    void rejectsMaintenanceSnapshotWithoutMainSegment() {
+        PolicyViewRepository policyRepository = Mockito.mock(PolicyViewRepository.class);
+        PolicyProductViewRepository productRepository = Mockito.mock(PolicyProductViewRepository.class);
+        PolicyProductView rider = maintenanceMainProduct();
+        rider.setProductCategory("RIDER");
+        when(policyRepository.findByPolicyIdAndTenantId(POLICY_ID, TENANT_ID))
+                .thenReturn(Optional.of(maintenancePolicyView()));
+        when(productRepository.findByPolicyIdAndTenantIdOrderByLineNoAsc(POLICY_ID, TENANT_ID))
+                .thenReturn(List.of(rider));
+
+        assertThrows(BusinessException.class, () -> new PolicyQueryServiceImpl(
+                policyRepository, productRepository, Mockito.mock(PolicyInsuredViewRepository.class), null,
+                Mockito.mock(PolicyBeneficiaryViewRepository.class))
+                .findMaintenanceSnapshot(POLICY_ID, TENANT_ID));
+    }
+
+    @Test
+    void rejectsMaintenanceSnapshotWhenNonFirstMainSegmentLacksContractElement() {
+        // 逐段校验（D3）：缺陷落在「非首段」时同样必须拒绝——只校验首段的实现会漏放并判红
+        PolicyViewRepository policyRepository = Mockito.mock(PolicyViewRepository.class);
+        PolicyProductViewRepository productRepository = Mockito.mock(PolicyProductViewRepository.class);
+        PolicyProductView secondSegment = maintenanceSecondMainProduct();
+        secondSegment.setPricingPlanVersion(null);
+        when(policyRepository.findByPolicyIdAndTenantId(POLICY_ID, TENANT_ID))
+                .thenReturn(Optional.of(maintenancePolicyView()));
+        when(productRepository.findByPolicyIdAndTenantIdOrderByLineNoAsc(POLICY_ID, TENANT_ID))
+                .thenReturn(List.of(maintenanceMainProduct(), secondSegment));
+
+        assertThrows(BusinessException.class, () -> new PolicyQueryServiceImpl(
+                policyRepository, productRepository, Mockito.mock(PolicyInsuredViewRepository.class), null,
+                Mockito.mock(PolicyBeneficiaryViewRepository.class))
                 .findMaintenanceSnapshot(POLICY_ID, TENANT_ID));
     }
 
@@ -228,6 +336,21 @@ class PolicyQueryServiceImplTest {
         view.setPaymentFrequency("ANNUAL");
         view.setPremiumPaymentYears(10);
         view.setSumInsured(new BigDecimal("100000"));
+        view.setCurrency("CNY");
+        return view;
+    }
+
+    /** 第二主险段（交强 + 商业同单场景）：产品/保额与首段不同，缴费锚点 07-01 早于首段（08-01）。 */
+    private PolicyProductView maintenanceSecondMainProduct() {
+        PolicyProductView view = new PolicyProductView();
+        view.setPolicyProductId("policy-product-2");
+        view.setProductCategory("MAIN");
+        view.setProductId("product-2");
+        view.setProductVersion("product-v9");
+        view.setPricingPlanVersion("plan-v10");
+        view.setPaymentFrequency("ANNUAL");
+        view.setPeriodStart(LocalDateTime.of(2020, 7, 1, 0, 0));
+        view.setSumInsured(new BigDecimal("200000"));
         view.setCurrency("CNY");
         return view;
     }

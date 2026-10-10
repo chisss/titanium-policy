@@ -20,6 +20,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility;
 
+import com.titanium.common.context.RequestContextHolder;
 import com.titanium.metadata.enums.BaseEnum;
 import com.titanium.metadata.enums.CurrencyEnum;
 import com.titanium.metadata.enums.billing.PremiumCollectionMode;
@@ -30,6 +31,7 @@ import com.titanium.metadata.enums.policy.PolicyLineStatus;
 import com.titanium.metadata.enums.product.ProductEnum.PaymentFrequency;
 import com.titanium.metadata.enums.product.ProductEnum.ProductCategory;
 import com.titanium.metadata.valueobject.Money;
+import com.titanium.policy.application.orchestration.issuance.service.ProductSumInsuredTiersLoader;
 import com.titanium.policy.command.ConvertProposalCommand;
 import com.titanium.policy.command.ConvertProposalToInsuranceCommand;
 import com.titanium.policy.command.SubmitUnderwritingCommand;
@@ -89,6 +91,14 @@ public class ProposalIssuanceSaga {
     @Autowired
     private transient PolicyNoGenerator policyNoGenerator;
 
+    /**
+     * 段级保额档次配置取数器（G02/AC-09）。
+     * <p>与 {@code IssuanceOrchestrator} 共用同一份取数规则（按产品去重、远程失败不兜底），
+     * 结果作为命令分量交给投保单聚合——聚合不得依赖 Port。</p>
+     */
+    @Autowired
+    private transient ProductSumInsuredTiersLoader productSumInsuredTiersLoader;
+
     /** 保单形态 */
     private PolicyForm policyForm;
     /** 客户ID（投保人），供构造投保单命令的 applicantId */
@@ -132,6 +142,11 @@ public class ProposalIssuanceSaga {
     @StartSaga
     @SagaEventHandler(associationProperty = "proposalId")
     public void on(ProposalCreatedEvent event) {
+        inTenantScope(event.tenantId(), event.proposalId(), () -> rememberProposalCreation(event));
+    }
+
+    /** 【意向单创建】记忆后续构造投保单命令所需数据。 */
+    private void rememberProposalCreation(ProposalCreatedEvent event) {
         log.info("[ProposalIssuanceSaga] 启动: proposalId={}, tenantId={}",
                 event.proposalId(), event.tenantId());
         this.policyForm = event.policyForm();
@@ -168,7 +183,9 @@ public class ProposalIssuanceSaga {
      * @return 投保段列表
      */
     private List<InsuranceLine> refineToInsuranceLines() {
-        LinePaymentTerms mainPaymentTerms = resolveMainPaymentTerms();
+        // 🔴 G11/g11-04 D4：单据级缴费摘要仅用于「无段列表」历史回退路径与段级缺失时的回退；
+        // 有段列表时各主险段**各自解析**（resolveLinePaymentTerms），不得再共用一份。
+        LinePaymentTerms documentPaymentTerms = resolveMainPaymentTerms();
         LineCoveragePeriod coveragePeriod = resolveCoveragePeriod();
         if (proposalLines == null || proposalLines.isEmpty()) {
             if (expectedProductCode == null) {
@@ -178,7 +195,7 @@ public class ProposalIssuanceSaga {
             Money sumInsured = intendedSumInsured != null ? Money.of(intendedSumInsured, CurrencyEnum.CNY.getCode()) : null;
             return List.of(new InsuranceLine(lineId, 1, ProductCategory.MAIN, null, null,
                     expectedProductCode, null, null, insuranceType,
-                    sumInsured, null, coveragePeriod, mainPaymentTerms, subjectsForLine(insuranceType, sumInsured),
+                    sumInsured, null, coveragePeriod, documentPaymentTerms, subjectsForLine(insuranceType, sumInsured),
                     null, null, PolicyLineStatus.UNDERWRITING));
         }
         Map<Integer, String> lineIdByNo = new HashMap<>();
@@ -190,7 +207,7 @@ public class ProposalIssuanceSaga {
             lines.add(new InsuranceLine(lineIdByNo.get(line.lineNo()), line.lineNo(), line.productCategory(),
                     line.parentLineNo() != null ? lineIdByNo.get(line.parentLineNo()) : null, line.productId(),
                     line.productCode(), null, line.productVersion(), line.insuranceType(), line.intendedSumInsured(),
-                    null, coveragePeriod, line.productCategory() == ProductCategory.MAIN ? mainPaymentTerms : null,
+                    null, coveragePeriod, line.productCategory() == ProductCategory.MAIN ? resolveLinePaymentTerms(line) : null,
                     subjectsForLine(line.insuranceType(), line.intendedSumInsured()), null, null,
                     PolicyLineStatus.UNDERWRITING));
         }
@@ -204,9 +221,38 @@ public class ProposalIssuanceSaga {
         return LineCoveragePeriod.fixedTerm(insurancePeriodStart, insurancePeriodEnd, null, null);
     }
 
+    /**
+     * 单据级缴费摘要（回退口径）：由事件携带的 {@code paymentMode}/{@code premiumPaymentYears} 解析。
+     * <p>
+     * 仅用于无段列表的历史回退路径，以及段级缴费条件缺失时的逐段回退。
+     * </p>
+     */
     private LinePaymentTerms resolveMainPaymentTerms() {
         PaymentFrequency paymentFrequency = BaseEnum.fromCode(PaymentFrequency.class, paymentMode);
         return paymentFrequency != null ? new LinePaymentTerms(paymentFrequency, premiumPaymentYears) : null;
+    }
+
+    /**
+     * 逐段解析主险段缴费条款（🔴 G11/g11-04 D4：由「一份共用」改「逐段各自解析」）。
+     * <p>
+     * 段级显式缴费条件优先（意向段携带的出单方案行原值）；段上缺失（存量事件或单险种意向）
+     * 回退单据级 {@link #resolveMainPaymentTerms()}。年数缺失按 1 兜底，与直接出单链路的
+     * {@code InsuranceLineAssembler.assemblePaymentTerms} 同口径。
+     * </p>
+     * <p>
+     * 🔴 多主险（交强 + 商业同单）下各主险段<b>各自解析</b>——共用一份会在「交强年缴 + 商业分期」时
+     * 静默串用，且串用结果随段顺序变化。
+     * </p>
+     *
+     * @param line 主险意向段
+     * @return 该段缴费条款；段级与单据级均无有效缴费频率时返回 null
+     */
+    private LinePaymentTerms resolveLinePaymentTerms(ProposalLine line) {
+        if (line.paymentFrequency() == null) {
+            return resolveMainPaymentTerms();
+        }
+        return new LinePaymentTerms(line.paymentFrequency(),
+                line.premiumPaymentYears() != null ? line.premiumPaymentYears() : 1);
     }
 
     /**
@@ -265,6 +311,17 @@ public class ProposalIssuanceSaga {
      */
     @SagaEventHandler(associationProperty = "proposalId")
     public void on(ProposalSubmittedEvent event) {
+        inTenantScope(event.tenantId(), event.proposalId(), () -> convertSubmittedProposal(event));
+    }
+
+    /**
+     * 【意向单提交】意向单已提交 -> 自动发转换命令，将其状态推进至 CONVERTED_TO_APPLICATION。
+     * <p>
+     * 本步骤自身不经 Feign，但 {@code sendAndWait} 同步触发的后续事件处理（{@code ProposalConvertedEvent}）
+     * 会发起段级保额档次取数——出站身份由外层作用域统一提供，故此处同样必须包租户作用域。
+     * </p>
+     */
+    private void convertSubmittedProposal(ProposalSubmittedEvent event) {
         log.info("[ProposalIssuanceSaga] 意向单已提交，自动转投保单: proposalId={}", event.proposalId());
         commandGateway.sendAndWait(ConvertProposalCommand.builder()
                 .proposalId(event.proposalId())
@@ -282,6 +339,20 @@ public class ProposalIssuanceSaga {
     @EndSaga
     @SagaEventHandler(associationProperty = "proposalId")
     public void on(ProposalConvertedEvent event) {
+        inTenantScope(event.tenantId(), event.proposalId(), () -> createInsuranceFromProposal(event));
+    }
+
+    /**
+     * 【意向单转换】Proposal 已 CONVERTED -> 构造投保单命令，创建 Insurance 聚合，结束 Saga
+     * <p>
+     * InsuranceCreatedEvent 触发 {@code IssuanceSaga} 以 insuranceId 接力完成后续核保/承保/出单流程。
+     * </p>
+     * <p>
+     * 🔴 本步骤含<b>出站 Feign 调用</b>（{@link ProductSumInsuredTiersLoader#load} 取段级保额档次），
+     * 是 g02-06 真机缺陷的第二处命中点，故外层必须已建立租户作用域——见 {@link #inTenantScope}。
+     * </p>
+     */
+    private void createInsuranceFromProposal(ProposalConvertedEvent event) {
         if (tenantId == null || tenantId.isBlank()) {
             log.error("[ProposalIssuanceSaga] Saga 持久化状态缺失，终止不可恢复的转换事件: proposalId={}",
                     event.proposalId());
@@ -304,6 +375,7 @@ public class ProposalIssuanceSaga {
                 .insurancePeriodStart(insurancePeriodStart)
                 .insurancePeriodEnd(insurancePeriodEnd)
                 .insuranceLines(insuranceLines)
+                .sumInsuredTiers(productSumInsuredTiersLoader.load(insuranceLines))
                 .underwritingPriority(0)
                 .changeReason("意向单自动转投保单")
                 .insuredPartyList(insuredPartyList)
@@ -330,7 +402,42 @@ public class ProposalIssuanceSaga {
     @EndSaga
     @SagaEventHandler(associationProperty = "proposalId")
     public void on(ProposalVoidedEvent event) {
+        inTenantScope(event.tenantId(), event.proposalId(), () -> abandonVoidedProposal(event));
+    }
+
+    /** 【意向单作废】提前结束 Saga，无后续流程。 */
+    private void abandonVoidedProposal(ProposalVoidedEvent event) {
         log.warn("[ProposalIssuanceSaga] 意向单已作废，结束 Saga: proposalId={}", event.proposalId());
         SagaLifecycle.end();
+    }
+
+    /**
+     * 在事件携带的租户作用域内执行 Saga 步骤。
+     * <p>
+     * 🔴 <b>成因（2026-09-27 g02-06 真机实测）</b>：Saga 事件处理器运行在 Axon 的 tracking
+     * processor 线程上，与创建 Saga 的 Web 请求线程不是同一个线程；{@code RequestContextHolder}
+     * 基于 {@code ThreadLocal}，上下文不跨线程传播。本类步骤的出站调用（{@link ProductSumInsuredTiersLoader}
+     * 取段级保额档次）依赖线程上下文提供租户——出站拦截器是「上下文有才注入」策略，上下文为空时
+     * <b>静默</b>不加 {@code X-Tenant-Id}，对端契约入口随即 400（{@code TENANT_HEADER_MISSING}），
+     * 且取数器「远程失败不兜底」会把异常抛给 Saga，使该次出单挂起重试。
+     * </p>
+     * <p>
+     * 故每个 {@code @SagaEventHandler} 的<b>首条语句</b>一律调用本方法，由结构守卫
+     * {@code SagaTenantScopeGuardTest} 机械保证。
+     * </p>
+     *
+     * @param tenantId   事件携带的租户ID
+     * @param proposalId 意向单号（仅用于告警定位）
+     * @param step       在该租户作用域内执行的步骤
+     */
+    private void inTenantScope(String tenantId, String proposalId, Runnable step) {
+        if (tenantId == null || tenantId.isBlank()) {
+            // 保持改造前行为（不建立作用域），但留下可检索告警——静默降级会让「出站缺租户头」无从反查
+            log.warn("[ProposalIssuanceSaga] 事件未携带租户，跳过身份作用域建立（本步骤出站调用将缺少租户头）: proposalId={}",
+                    proposalId);
+            step.run();
+            return;
+        }
+        RequestContextHolder.runAsTenant(tenantId, step);
     }
 }

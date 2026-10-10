@@ -54,7 +54,7 @@ class PolicyLifeBenefitTest {
     private PolicyCreatedEvent createdEvent(InsuranceProductType type) {
         LocalDateTime now = LocalDateTime.now();
         return new PolicyCreatedEvent(POLICY_ID, new PolicyNo("POL-2024-0001"), PolicyForm.INDIVIDUAL, null, null, null, null, null,
-                PolicyPeriod.of(now, now.plusYears(10), 0, 0), null, null, java.util.List.of(), null, null, null, new PolicyStatus(PolicyStatusCode.NOT_EFFECTIVE, now, "创建", "system"),
+                PolicyPeriod.of(now, now.plusYears(10)), null, null, java.util.List.of(), null, null, null, new PolicyStatus(PolicyStatusCode.NOT_EFFECTIVE, now, "创建", "system"),
                 null, type, TENANT_ID);
     }
 
@@ -117,7 +117,7 @@ class PolicyLifeBenefitTest {
     private PolicyCreatedEvent createdEventWithSumInsured(InsuranceProductType type, BigDecimal sumInsured) {
         LocalDateTime now = LocalDateTime.now();
         return new PolicyCreatedEvent(POLICY_ID, new PolicyNo("POL-2024-0003"), PolicyForm.INDIVIDUAL, null, null, null,
-                null, null, PolicyPeriod.of(now, now.plusYears(10), 0, 0), null,
+                null, null, PolicyPeriod.of(now, now.plusYears(10)), null,
                 com.titanium.metadata.valueobject.Money.of(sumInsured, "CNY"), java.util.List.of(), null, null, null,
                 new PolicyStatus(PolicyStatusCode.NOT_EFFECTIVE, now, "创建", "system"), null, type, TENANT_ID);
     }
@@ -245,7 +245,7 @@ class PolicyLifeBenefitTest {
     private PolicyCreatedEvent universalCreatedEvent() {
         LocalDateTime now = LocalDateTime.now();
         return new PolicyCreatedEvent(POLICY_ID, new PolicyNo("POL-2024-0002"), PolicyForm.UNIVERSAL, null, null, null, null, null,
-                PolicyPeriod.of(now, now.plusYears(10), 0, 0), null, null, java.util.List.of(), null, null, null, new PolicyStatus(PolicyStatusCode.NOT_EFFECTIVE, now, "创建", "system"),
+                PolicyPeriod.of(now, now.plusYears(10)), null, null, java.util.List.of(), null, null, null, new PolicyStatus(PolicyStatusCode.NOT_EFFECTIVE, now, "创建", "system"),
                 null, InsuranceProductType.WHOLE_LIFE, TENANT_ID);
     }
 }

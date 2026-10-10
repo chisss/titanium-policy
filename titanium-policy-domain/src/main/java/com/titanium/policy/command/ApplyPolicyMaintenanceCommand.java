@@ -7,8 +7,10 @@ import org.axonframework.modelling.command.TargetAggregateIdentifier;
 
 import com.titanium.metadata.enums.maintenance.PolicyMaintenanceAction;
 import com.titanium.metadata.enums.policy.PolicyEnum.TerminationReason;
+import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceAmountFact;
 import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceFieldChange;
 import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceRetroactiveEvidence;
+import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceServiceRestriction;
 
 /** 应用已到生效时点的保全案件结构化变更的 Policy 正式命令。 */
 public record ApplyPolicyMaintenanceCommand(
@@ -22,6 +24,8 @@ public record ApplyPolicyMaintenanceCommand(
         LocalDateTime effectiveAt,
         String changeSummary,
         List<PolicyMaintenanceFieldChange> changes,
+        PolicyMaintenanceAmountFact amountFact,
+        PolicyMaintenanceServiceRestriction serviceRestriction,
         PolicyMaintenanceAction stateAction,
         String stateReason,
         TerminationReason terminationReason,
@@ -50,7 +54,7 @@ public record ApplyPolicyMaintenanceCommand(
             String tenantId) {
         this(policyId, requestId, sourceMaintenanceId, expectedPolicyVersion, requestPayloadHash,
                 proposedSnapshotHash, effectiveTimeType, effectiveAt, changeSummary, changes,
-                PolicyMaintenanceAction.NONE, null, null, null, operatorId, tenantId);
+                null, null, PolicyMaintenanceAction.NONE, null, null, null, operatorId, tenantId);
     }
 
     /** 兼容 M5-03 状态类命令。 */
@@ -72,6 +76,6 @@ public record ApplyPolicyMaintenanceCommand(
             String tenantId) {
         this(policyId, requestId, sourceMaintenanceId, expectedPolicyVersion, requestPayloadHash,
                 proposedSnapshotHash, effectiveTimeType, effectiveAt, changeSummary, changes,
-                stateAction, stateReason, terminationReason, null, operatorId, tenantId);
+                null, null, stateAction, stateReason, terminationReason, null, operatorId, tenantId);
     }
 }

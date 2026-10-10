@@ -7,16 +7,19 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.Named;
 
+import com.titanium.billing.api.request.account.GenerateScheduleRequest;
 import com.titanium.billing.api.request.bill.ConfirmedPremiumReferenceRequest;
 import com.titanium.billing.api.request.bill.CreateBillRequest;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.valueobject.billing.PremiumBillRequest;
+import com.titanium.policy.valueobject.billing.PremiumScheduleRequest;
 import com.titanium.policy.valueobject.pricing.PremiumCalculationReference;
 
 /**
  * 计费请求映射器（policy 域跨域出站防腐映射）
  * <p>
- * 将保单域值对象 {@link PremiumBillRequest} 映射为计费域 Feign 契约 {@link CreateBillRequest}，
+ * 将保单域值对象 {@link PremiumBillRequest} 映射为计费域 Feign 契约 {@link CreateBillRequest}、
+ * {@link PremiumScheduleRequest} 映射为 {@link GenerateScheduleRequest}，
  * 取代 {@code BillingServiceAdapter} 中逐字段 set。金额值对象 {@link Money} 经 {@link #moneyToAmount}
  * 拆解为 {@link BigDecimal}；计费类型固定为保费、出账日取当前日期（承保出单即开单），由 {@link Mapping}
  * 表达式声明，语义集中可见。
@@ -41,6 +44,16 @@ public interface BillingRequestMapper {
     CreateBillRequest toCreateBillRequest(PremiumBillRequest request);
 
     ConfirmedPremiumReferenceRequest toConfirmedPremiumReferenceRequest(PremiumCalculationReference reference);
+
+    /**
+     * 期缴计划请求 → 生成期缴计划 Feign 请求
+     * <p>
+     * 操作来源固定为统一出单（SYSTEM_ISSUANCE）；totalPremium 同名自动映射，分期分摊与尾差承接
+     * 由计费域 {@code PremiumSchedule.generate} 统一负责，本域不自行整除。
+     * </p>
+     */
+    @Mapping(target = "operatedBy", constant = "SYSTEM_ISSUANCE")
+    GenerateScheduleRequest toGenerateScheduleRequest(PremiumScheduleRequest request);
 
     /** Money 值对象 → 账单金额（空安全） */
     @Named("moneyToAmount")

@@ -2,9 +2,7 @@ package com.titanium.policy.infrastructure.adapter.underwriting;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.List;
 
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 
 import com.titanium.common.context.RequestContextHolder;
@@ -16,28 +14,39 @@ import com.titanium.policy.port.underwriting.UnderwritingDecisionGateway;
 import com.titanium.policy.valueobject.insurance.UnderwritingDecisionRequest;
 import com.titanium.policy.valueobject.insurance.UnderwritingResult;
 import com.titanium.underwriting.api.UnderwritingApi;
-import com.titanium.underwriting.api.request.underwriting.CreateUnderwritingRequest;
-import com.titanium.underwriting.api.request.underwriting.DecideUnderwritingApiRequest;
-import com.titanium.underwriting.api.request.underwriting.SubmitUnderwritingInputApiRequest;
+import com.titanium.underwriting.api.request.underwriting.AutoDecideUnderwritingRequest;
 import com.titanium.underwriting.api.response.underwriting.UnderwritingResponse;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * 核保决策网关同步适配器（富核保路径）
+ * 核保决策网关同步适配器（粗粒度一次调用）
  * <p>
- * {@link UnderwritingDecisionGateway} 的当前阶段实现：注册中心/消息总线就绪前，直接经
- * {@link UnderwritingApi}（Feign）同步调用核保域，完成富核保「创建核保 → 提交结构化输入 → 触发决策 → 回传结论」。
- * 将核保域 {@link UnderwritingResponse} 翻译为保单域 {@link UnderwritingResult}，构成防腐层（ACL）。
+ * {@link UnderwritingDecisionGateway} 的当前阶段实现：经 {@link UnderwritingApi}（Feign）同步调用核保域
+ * 的**粗粒度自动决策端点**，一次远程调用完成「创建/幂等复用核保单 → 提交风险要素 → 出具决策」，
+ * 再将核保域 {@link UnderwritingResponse} 翻译为保单域 {@link UnderwritingResult}，构成防腐层（ACL）。
  * </p>
  * <p>
- * <b>UW-2 富核保切换</b>：替代原「createUnderwriting + underwrite（金额>10万兜底）」路径，改走
- * submitInput（组装当前 API 支持的职业/BMI 风险要素）+ decide（触发核保域富评分决策）。
- * 被保人要素不足时留空；年龄/性别因当前核保 API 无对应字段，暂不在同步适配器中透传。
+ * <b>g02-04 收敛（AC-05）</b>：此前本适配器自行拼装**四步**远程写（{@code getUnderwritingByPolicyId} 查重 →
+ * {@code createUnderwriting} → {@code submitInput} → {@code decide}），并因此产生两处跨域语义错配：
+ * <ol>
+ *   <li><b>标识错配</b>：把投保单号写进核保域的 {@code policyId}（「保单号」）字段，而保全核保路径写入的
+ *       {@code policyId} 是**真实保单号**——同一字段两种语义，按它做幂等键会错配；</li>
+ *   <li><b>幂等靠查重</b>：幂等依赖「先查后建」，而查询读的是**最终一致**的读模型，四次远程写之间任一环节
+ *       重试都会多建孤儿核保单。</li>
+ * </ol>
+ * 现改为一次 {@code autoDecide}：幂等键（投保单号）随请求进入核保域，由其<b>同事务内</b>判定
+ * 「复用终态 / 续跑在办 / 新建」，判据是写侧权威状态而非异步投影。本适配器不再持有任何编排职责，
+ * 只做「组装请求 → 调一次 → 翻译结论」。
  * </p>
  * <p>
- * <b>UW-3 加费回传</b>：从决策后 DTO 读取结构化加费率 {@code extraPremiumRatio} 填入
+ * <b>G02/AC-01 四要素透传（保留）</b>：年龄/性别/职业类别/BMI 四项要素仍在同一请求内透传。
+ * 🔴 <b>未提供的要素一律不写入</b>——不得用 {@code 0}／空串占位，核保域据此区分
+ * 「未提供」与「提供了 0 岁/0 类职业」；写假值会让核保域把「无输入」误判成「低风险输入」。
+ * </p>
+ * <p>
+ * <b>UW-3 加费回传（保留）</b>：从决策响应读取结构化加费率 {@code extraPremiumRatio} 填入
  * {@link UnderwritingResult}，供出单 Saga 并入保费。
  * </p>
  */
@@ -45,9 +54,6 @@ import lombok.extern.slf4j.Slf4j;
 @Component
 @RequiredArgsConstructor
 public class SyncUnderwritingDecisionAdapter implements UnderwritingDecisionGateway {
-
-    /** 自动核保方式（出单主链路默认走自动核保决策） */
-    private static final String AUDIT_TYPE_AUTOMATIC = "AUTOMATIC";
 
     /**
      * 系统主体标识：核保决策由本域自动发起，操作人是**系统**而非投保人。
@@ -61,43 +67,20 @@ public class SyncUnderwritingDecisionAdapter implements UnderwritingDecisionGate
 
     @Override
     public UnderwritingResult requestDecision(UnderwritingDecisionRequest request) {
-        log.info("[核保网关] 同步请求富核保, insuranceId={}, holderId={}, tenantId={}", request.insuranceId(),
+        log.info("[核保网关] 同步请求粗粒度自动决策, insuranceId={}, holderId={}, tenantId={}", request.insuranceId(),
                 request.holderId(), request.tenantId());
 
-        // 1. 幂等前置：先按投保单号查已有核保单，有则复用。
-        //    🔴 m21-03（审查报告 RPC-02）：原实现每次调用都新建，Saga 重试或编排器重入一次即多一张
-        //    孤儿核保单（三次远程写全无幂等键）。此处用「投保单号」这一稳定业务键做查重——
-        //    underwriting 域已有 getUnderwritingByPolicyId 只读查询，无需改契约即可获得幂等。
-        //    仍存的语义污染：本域把 insuranceId 写进对方 policyId 字段（跨域语义错配），
-        //    根治需 underwriting 域提供粗粒度 :auto-decide 接口（见批次规划 §二 m21-03 备注）。
-        String underwritingId = findExistingUnderwritingId(request);
-        if (underwritingId == null) {
-            // 创建核保单（透传险种编码供核保域按产品配置决策——UW-4）
-            // 契约仅本方法保留 ResponseEntity 外层（201 Created 状态语义），载荷仍是统一信封
-            ResponseEntity<ApiResponse<UnderwritingResponse>> createdResponse = underwritingApi.createUnderwriting(
-                    buildCreateRequest(request));
-            UnderwritingResponse created = requireSuccessfulBody(createdResponse, "创建核保", request);
-            underwritingId = requireUnderwritingId(created, "创建核保", request);
-        } else {
-            log.info("[核保网关] 命中已有核保单，跳过创建（幂等）: insuranceId={}, underwritingId={}",
-                    request.insuranceId(), underwritingId);
-        }
+        // 一次远程调用完成「创建/幂等复用 + 提交输入 + 出具决策」：
+        // 幂等键为投保单号，由核保域在写侧权威状态下判定复用/续跑/新建（本域不再查读模型做幂等前置）
+        ApiResponse<UnderwritingResponse> decisionResponse = underwritingApi
+                .autoDecide(buildAutoDecideRequest(request));
+        UnderwritingResponse decided = requireSuccessfulBody(decisionResponse, "自动决策", request);
+        String decidedUnderwritingId = requireUnderwritingId(decided, "自动决策", request);
 
-        // 2. 提交结构化核保输入（被保人风险要素 → 富核保评分依据），替代旧金额兜底
-        ApiResponse<UnderwritingResponse> submittedResponse = underwritingApi.submitInput(underwritingId,
-                buildInputRequest(request));
-        requireSuccessfulBody(submittedResponse, "提交核保输入", request);
-
-        // 3. 触发核保决策（核保域基于已提交输入产出富结论/风险等级/加费）
-        ApiResponse<UnderwritingResponse> decidedResponse = underwritingApi.decide(underwritingId,
-                buildDecideRequest(request));
-        UnderwritingResponse decided = requireSuccessfulBody(decidedResponse, "触发核保决策", request);
-        String decidedUnderwritingId = requireUnderwritingId(decided, "核保决策", request);
-
-        // 4. 核保域结果翻译为保单域核保结果（防腐层），携带结构化加费率
+        // 核保域结果翻译为保单域核保结果（防腐层），携带结构化加费率
         ConclusionType resultCode = resolveConclusion(decided, request);
         BigDecimal extraPremiumRatio = decided.getExtraPremiumRatio();
-        log.info("[核保网关] 富核保完成, insuranceId={}, underwritingId={}, 结论={}, 加费率={}", request.insuranceId(),
+        log.info("[核保网关] 自动决策完成, insuranceId={}, underwritingId={}, 结论={}, 加费率={}", request.insuranceId(),
                 decidedUnderwritingId, resultCode, extraPremiumRatio);
 
         return new UnderwritingResult(decidedUnderwritingId, resultCode, decided.getReviewComments(),
@@ -105,70 +88,52 @@ public class SyncUnderwritingDecisionAdapter implements UnderwritingDecisionGate
     }
 
     /**
-     * 构建创建核保请求（透传险种编码，供核保域 UW-4 按产品查配置）
-     */
-    private CreateUnderwritingRequest buildCreateRequest(UnderwritingDecisionRequest request) {
-        CreateUnderwritingRequest createRequest = new CreateUnderwritingRequest();
-        createRequest.setPolicyId(request.insuranceId());
-        createRequest.setCustomerId(request.holderId());
-        createRequest.setAmount(request.sumInsured());
-        createRequest.setCurrency(request.currency());
-        createRequest.setUnderwritingType(UnderwritingEnum.UnderwritingType.NEW_BUSINESS);
-        createRequest.setRequestDate(LocalDateTime.now());
-        createRequest.setRequestBy(resolveOperatorId());
-        // 险种编码取投保险种列表首个（承保主险载体）
-        createRequest.setProductCode(resolveProductCode(request));
-        return createRequest;
-    }
-
-    /**
-     * 构建结构化核保输入请求（UW-2 富核保核心）
+     * 构建粗粒度自动决策请求（G02/AC-01 四要素 + 幂等键）
      * <p>
-     * 从核保决策请求携带的被保人要素组装职业/体检输入。健康告知等更细粒度信息在 saga 尚不完整时留空，
-     * 由核保域评分兜底；至少填充职业类别/BMI 以走富评分路径，不再走金额兜底。
+     * 🔴 <b>null 一律不写入</b>：{@code setAge(null)} 与「不调用 setAge」在 JSON 序列化上等价，
+     * 但显式判空表达了「该要素未提供」的业务语义，且防止后续维护者顺手补默认值（如 {@code 0}）
+     * 把「无输入」变成「低风险输入」。
+     * </p>
+     * <p>
+     * 🔴 <b>不再写 {@code policyId}</b>：投保单号只进 {@code insuranceId}（核保域 g02-04 新增的
+     * 幂等键字段），核保域按「加新字段不动旧字段」口径自行双填兼容既有分区键——把本域的内部标识
+     * 塞进对端字段的旧做法至此终止。
      * </p>
      */
-    private SubmitUnderwritingInputApiRequest buildInputRequest(UnderwritingDecisionRequest request) {
-        SubmitUnderwritingInputApiRequest inputRequest = new SubmitUnderwritingInputApiRequest();
-        inputRequest.setSubmittedBy(resolveOperatorId());
+    private AutoDecideUnderwritingRequest buildAutoDecideRequest(UnderwritingDecisionRequest request) {
+        AutoDecideUnderwritingRequest autoRequest = new AutoDecideUnderwritingRequest();
+        // 幂等键：同一投保单在重试/重入下必然映射到同一张核保单
+        autoRequest.setInsuranceId(request.insuranceId());
+        autoRequest.setCustomerId(request.holderId());
+        autoRequest.setAmount(request.sumInsured());
+        autoRequest.setCurrency(request.currency());
+        autoRequest.setUnderwritingType(UnderwritingEnum.UnderwritingType.NEW_BUSINESS);
+        // 核保决策由系统自动作出，主体是系统而非投保人
+        autoRequest.setOperatorId(resolveOperatorId());
+        // 险种编码取投保险种列表首个（承保主险载体），供核保域按产品查核保配置
+        autoRequest.setProductCode(resolveProductCode(request));
 
-        // 职业信息：有职业类别时填充（意外险/定期寿险风险要素）
+        // 年龄：投保单被保人参与方清单直接提供（承保前置链路可得）
+        if (request.primaryInsuredAge() != null) {
+            autoRequest.setAge(request.primaryInsuredAge());
+        }
+
+        // 性别：同上；核保域只承载不评分（评级因子 vs 风险因子，见 InsuredRiskFactors javadoc）
+        if (request.primaryInsuredGender() != null) {
+            autoRequest.setGender(request.primaryInsuredGender());
+        }
+
+        // 职业类别：柜面/APP 完整录入才有，出单主链路通常取不到（意外险/定期寿险风险要素）
         if (request.primaryInsuredOccupationCategory() != null) {
-            SubmitUnderwritingInputApiRequest.OccupationInput occupation =
-                    new SubmitUnderwritingInputApiRequest.OccupationInput();
-            occupation.setOccupationCategory(request.primaryInsuredOccupationCategory());
-            inputRequest.setOccupationInfo(occupation);
+            autoRequest.setOccupationCategory(request.primaryInsuredOccupationCategory());
         }
 
-        // 体检结果：有 BMI 时填充（寿险/重疾健康风险要素）
+        // BMI：同上（寿险/重疾健康风险要素）
         if (request.primaryInsuredBmi() != null) {
-            SubmitUnderwritingInputApiRequest.PhysicalExamInput exam =
-                    new SubmitUnderwritingInputApiRequest.PhysicalExamInput();
-            exam.setBmi(request.primaryInsuredBmi());
-            inputRequest.setPhysicalExamResult(exam);
+            autoRequest.setBmi(request.primaryInsuredBmi());
         }
 
-        return inputRequest;
-    }
-
-    /**
-     * 校验核保域同步调用响应，避免空响应在 Saga 内退化为无上下文空指针异常。
-     * <p>仅 {@code createUnderwriting} 使用（契约保留 {@code ResponseEntity} 外层表达 201 Created）。</p>
-     */
-    private UnderwritingResponse requireSuccessfulBody(ResponseEntity<ApiResponse<UnderwritingResponse>> response,
-                                                        String stage, UnderwritingDecisionRequest request) {
-        if (response == null) {
-            throw new BusinessException(stage + "失败: insuranceId=" + request.insuranceId() + ", 无响应");
-        }
-        if (!response.getStatusCode().is2xxSuccessful()) {
-            throw new BusinessException(stage + "失败: insuranceId=" + request.insuranceId() + ", HTTP状态="
-                    + response.getStatusCode().value());
-        }
-        if (response.getBody() == null) {
-            // 2xx 但无载荷：与「无响应」区分（前者是契约应答了却没带信封），语义更精确便于排障
-            throw new BusinessException(stage + "响应体为空: insuranceId=" + request.insuranceId());
-        }
-        return requireSuccessfulBody(response.getBody(), stage, request);
+        return autoRequest;
     }
 
     /**
@@ -215,38 +180,6 @@ public class SyncUnderwritingDecisionAdapter implements UnderwritingDecisionGate
         }
         throw new BusinessException("核保结论为空: insuranceId=" + request.insuranceId() + ", underwritingId="
                 + response.getUnderwritingId());
-    }
-
-    /**
-     * 构建核保决策请求（出单主链路走自动核保）
-     */
-    private DecideUnderwritingApiRequest buildDecideRequest(UnderwritingDecisionRequest request) {
-        DecideUnderwritingApiRequest decideRequest = new DecideUnderwritingApiRequest();
-        decideRequest.setAuditType(AUDIT_TYPE_AUTOMATIC);
-        // 核保决策由系统自动作出，主体是系统而非投保人
-        decideRequest.setDecidedBy(SYSTEM_OPERATOR);
-        // UW-4：透传险种编码，供核保域 application 层查询产品核保配置（加费许可等）
-        decideRequest.setProductCode(resolveProductCode(request));
-        return decideRequest;
-    }
-
-    /**
-     * 查询该投保单是否已有核保单，返回其 ID；无则返回 null。
-     * <p>幂等键取「投保单号」——同一投保单在重试/重入下必然映射到同一张核保单。</p>
-     */
-    private String findExistingUnderwritingId(UnderwritingDecisionRequest request) {
-        ApiResponse<List<UnderwritingResponse>> response =
-                underwritingApi.getUnderwritingByPolicyId(request.insuranceId());
-        if (response == null || !response.isSuccess()) {
-            // 🔴 幂等前置查询失败不得并入「无既有核保单」——否则重试会再建一张孤儿核保单
-            throw new BusinessException("核保幂等前置查询失败: insuranceId=" + request.insuranceId()
-                    + (response == null ? ", 无响应" : ", 错误码=" + response.getCode()));
-        }
-        List<UnderwritingResponse> existing = response.getData();
-        if (existing == null || existing.isEmpty()) {
-            return null;
-        }
-        return existing.get(0).getUnderwritingId();
     }
 
     /**

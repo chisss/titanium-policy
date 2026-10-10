@@ -61,9 +61,13 @@ public record IssuanceRequest(String bizNo, String tenantId, String userId, Stri
                               Map<String, Object> extendData) {
 
     /**
-     * 主险方案行（有且仅有一个）。
+     * **首个**主险方案行（按方案行顺序取第一个主险行，<b>不表示主险行唯一</b>）。
+     * <p>
+     * 🔴 G11/g11-04 方案 B：一次出单可含多个主险方案行（交强 + 商业同单）；
+     * 完整构成以方案行列表 {@link #planLines()} 为准。
+     * </p>
      *
-     * @return 主险方案行；无方案行时返回 null
+     * @return 首个主险方案行；无方案行时返回 null
      */
     public IssuancePlanLine mainLine() {
         if (planLines == null) {

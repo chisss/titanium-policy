@@ -2,6 +2,7 @@ package com.titanium.policy.aggregate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.math.BigDecimal;
@@ -24,6 +25,7 @@ import com.titanium.metadata.enums.maintenance.PolicyMaintenanceAction;
 import com.titanium.metadata.enums.policy.BeneficiaryType;
 import com.titanium.metadata.enums.policy.PolicyEnum.TerminationReason;
 import com.titanium.metadata.enums.policy.PolicyForm;
+import com.titanium.metadata.enums.pricing.ChargeDirection;
 import com.titanium.metadata.enums.product.ProductEnum.ProductCategory;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.command.ApplyPolicyMaintenanceCommand;
@@ -52,6 +54,7 @@ import com.titanium.policy.service.maintenance.PaymentMethodPolicyMaintenanceFie
 import com.titanium.policy.service.maintenance.PolicyMaintenanceFieldExecutorRegistry;
 import com.titanium.policy.service.maintenance.PolicyMaintenanceHashing;
 import com.titanium.policy.valueobject.PremiumPlan;
+import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceAmountFact;
 import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceApplicationReceipt;
 import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceAppliedField;
 import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceExecutionState;
@@ -201,6 +204,55 @@ class PolicyMaintenanceApplicationTest {
     void shouldRejectUnknownPaymentMethodWithoutEvent() {
         fixture.given(createdEvent(), activatedEvent())
                 .when(paymentMethodCommand("NOT_A_METHOD"))
+                .expectException(PolicyBusinessRuleException.class)
+                .expectNoEvents();
+    }
+
+    /**
+     * 无保费计划快照 + 趸缴：就地确立缴清计划（g04-05 减额缴清的「停缴」语义载体）。
+     * <p>
+     * 出单链路不组装保费计划快照（{@code premiumPlan} 恒 null）⇒ 若维持原判空拒绝，
+     * 「减额缴清」这条链在任何真实保单上都会必然失败。而趸缴的领域含义即「一次性缴清、
+     * 此后不再缴费」——应缴为零/方式趸缴/状态已缴无需从既有计划继承。
+     * </p>
+     */
+    @Test
+    void shouldMaterializePaidUpPlanWhenPolicyHasNoPremiumPlanSnapshot() {
+        fixture.given(createdEventWithoutPremiumPlan(), activatedEvent())
+                .when(paymentMethodCommand("SINGLE_PAYMENT"))
+                .expectSuccessfulHandlerExecution()
+                .expectEventsMatching(org.axonframework.test.matchers.Matchers.payloadsMatching(
+                        org.axonframework.test.matchers.Matchers.exactSequenceOf(
+                                org.axonframework.test.matchers.Matchers.predicate(payload -> {
+                                    PolicyMaintenanceAppliedEvent event = (PolicyMaintenanceAppliedEvent) payload;
+                                    PremiumPlan plan = event.executionStateAfter().premiumPlan();
+                                    assertEquals(PremiumPaymentMethod.SINGLE_PAYMENT, plan.paymentMethod());
+                                    assertEquals(0, BigDecimal.ZERO.compareTo(plan.premiumAmount().value()));
+                                    // 币种取自主险段合同快照（保额优先），非凭空指定
+                                    assertEquals("CNY", plan.premiumAmount().currency());
+                                    assertEquals(PremiumPaymentStatus.PAID, plan.paymentStatus());
+                                    assertNull(plan.paymentCycle());
+                                    assertNull(plan.premiumDueDate());
+                                    return true;
+                                }))))
+                .expectState(policy -> {
+                    assertEquals(PremiumPaymentMethod.SINGLE_PAYMENT,
+                            policy.getPremiumPlan().paymentMethod());
+                    assertEquals(PremiumPaymentStatus.PAID, policy.getPremiumPlan().paymentStatus());
+                });
+    }
+
+    /**
+     * 无保费计划快照 + 期缴：仍失败关闭。
+     * <p>
+     * 期缴的保费金额、缴费周期、到期日缺一即无从确定，任何默认值都是编造合同要素——此处<b>不得</b>
+     * 与趸缴同样物化，否则等于凭空生成一份缴费计划。
+     * </p>
+     */
+    @Test
+    void shouldStillRejectInstallmentWhenPolicyHasNoPremiumPlanSnapshot() {
+        fixture.given(createdEventWithoutPremiumPlan(), activatedEvent())
+                .when(paymentMethodCommand("INSTALLMENT_PAYMENT"))
                 .expectException(PolicyBusinessRuleException.class)
                 .expectNoEvents();
     }
@@ -430,8 +482,102 @@ class PolicyMaintenanceApplicationTest {
                 .expectNoEvents();
     }
 
+    /**
+     * 纯金额类保全（追加/减额缴费、追加投资、部分领取）无字段变更、无合同状态动作，
+     * 其变更实质是一笔已登记的收付差额——必须作为并列载荷写入批单事件，否则案件在保单域被误判为空交易。
+     */
+    @Test
+    void shouldApplyAmountOnlyMaintenanceAndCarryRecordedDifference() {
+        ApplyPolicyMaintenanceCommand command = amountCommand("ADDITIONAL_PAYMENT", "1000.00");
+
+        fixture.given(createdEvent(), activatedEvent())
+                .when(command)
+                .expectSuccessfulHandlerExecution()
+                .expectEventsMatching(org.axonframework.test.matchers.Matchers.payloadsMatching(
+                        org.axonframework.test.matchers.Matchers.exactSequenceOf(
+                                org.axonframework.test.matchers.Matchers.predicate(payload -> {
+                                    PolicyMaintenanceAppliedEvent event = (PolicyMaintenanceAppliedEvent) payload;
+                                    assertNotNull(event.amountFact(), "金额型案件必须把差额事实写入批单事件");
+                                    assertEquals("ADDITIONAL_PAYMENT", event.amountFact().itemCode());
+                                    assertEquals(0, event.amountFact().amount()
+                                            .compareTo(new BigDecimal("1000.00")));
+                                    assertEquals(ChargeDirection.DEBIT, event.amountFact().direction());
+                                    assertEquals("CNY", event.amountFact().currency());
+                                    assertEquals("POSTING-1", event.amountFact().sourceRef());
+                                    assertEquals(PolicyDataUpdateType.ADDITIONAL_PAYMENT, event.updateType(),
+                                            "批改类型由保全项推导，不得退化为兜底类型");
+                                    return true;
+                                }))));
+    }
+
+    /**
+     * 金额项未登记批改类型映射时回落「保单信息变更」——这是<b>有意</b>的兜底而非遗漏：
+     * 自造一个批次类型会让下游按未知类型处置，而金额列自带 item_code 可供对账。
+     */
+    @Test
+    void shouldFallBackToPolicyInfoUpdateTypeForUnmappedAmountItem() {
+        ApplyPolicyMaintenanceCommand command = amountCommand("TOP_UP", "500.00");
+
+        fixture.given(createdEvent(), activatedEvent())
+                .when(command)
+                .expectSuccessfulHandlerExecution()
+                .expectEventsMatching(org.axonframework.test.matchers.Matchers.payloadsMatching(
+                        org.axonframework.test.matchers.Matchers.exactSequenceOf(
+                                org.axonframework.test.matchers.Matchers.predicate(payload -> {
+                                    PolicyMaintenanceAppliedEvent event = (PolicyMaintenanceAppliedEvent) payload;
+                                    assertEquals(PolicyDataUpdateType.POLICY_INFO_CHANGE, event.updateType());
+                                    assertEquals("TOP_UP", event.amountFact().itemCode(),
+                                            "类型可兜底，保全项编码不得丢——它是事后对账的唯一线索");
+                                    return true;
+                                }))));
+    }
+
+    /** 差额参与请求摘要：同一 requestId 换一笔金额即不同载荷，必须拒绝而非静默幂等返回旧批单。 */
+    @Test
+    void shouldRejectSameRequestIdWithDifferentAmountDifference() {
+        ApplyPolicyMaintenanceCommand applied = amountCommand("ADDITIONAL_PAYMENT", "1000.00");
+
+        fixture.given(createdEvent(), activatedEvent(), appliedEvent(applied))
+                .when(amountCommand("ADDITIONAL_PAYMENT", "2000.00"))
+                .expectException(PolicyBusinessRuleException.class)
+                .expectNoEvents();
+    }
+
+    /**
+     * 🔴 摘要文案相同、仅收付金额不同，仍必须判为载荷冲突。
+     * <p>
+     * 上一条用例（差额同时体现在文案与结构化载荷里）会被文案那条路径顺带满足，<b>证明不了金额进了摘要</b>——
+     * 已用反向注入实测：把金额从摘要计算中剔除后该用例仍全绿。金额是<b>结构化载荷</b>的组成部分，
+     * 其权威性不能寄望于展示文案恰好把它带上（文案格式可变、可被调用方定制）。
+     * </p>
+     */
+    @Test
+    void shouldRejectSameRequestIdWithIdenticalSummaryButDifferentAmount() {
+        ApplyPolicyMaintenanceCommand applied = amountCommand("ADDITIONAL_PAYMENT", "1000.00");
+        ApplyPolicyMaintenanceCommand conflicting =
+                amountCommand("ADDITIONAL_PAYMENT", "2000.00", applied.changeSummary());
+
+        fixture.given(createdEvent(), activatedEvent(), appliedEvent(applied))
+                .when(conflicting)
+                .expectException(PolicyBusinessRuleException.class)
+                .expectNoEvents();
+    }
+
+    /** 三种载荷（字段变更 / 金额事实 / 合同状态动作）全空 = 空交易，写入一条「什么都没发生」的批单不可接受。 */
+    @Test
+    void shouldRejectMaintenanceWithoutAnyEffectPayload() {
+        fixture.given(createdEvent(), activatedEvent())
+                .when(emptyPayloadCommand())
+                .expectException(PolicyBusinessRuleException.class)
+                .expectNoEvents();
+    }
+
+    // 🔴 NEXT_PERIOD（次期生效）与 POLICY_ANNIVERSARY（保单周年日）在保全域同义（同一快照字段、同一日期、
+    //    同一调度路径），保单侧必须同等放行：漏登会让该方式在建案与调度全部成功之后，于生效回写这一步被
+    //    POLICY_MAINTENANCE_EFFECTIVE_TIME_UNSUPPORTED 拒绝。删除白名单中的任一项本参数化用例即红。
     @ParameterizedTest
-    @ValueSource(strings = {"FUTURE", "SPECIFIED_DATE", "NEXT_BILLING_DATE", "POLICY_ANNIVERSARY"})
+    @ValueSource(strings = {
+            "FUTURE", "SPECIFIED_DATE", "NEXT_BILLING_DATE", "POLICY_ANNIVERSARY", "NEXT_PERIOD"})
     void shouldApplyScheduledMaintenanceAfterEffectiveTimeArrives(String effectiveTimeType) {
         ApplyPolicyMaintenanceCommand command = scheduledCommand(
                 effectiveTimeType, LocalDateTime.now().minusMinutes(1));
@@ -539,6 +685,44 @@ class PolicyMaintenanceApplicationTest {
                 .expectNoEvents();
     }
 
+    /**
+     * 🔴 G11/g11-04 ⑩ / AC-05 正例：多主险段（交强 + 商业）**各自**齐备（productId/productVersion/
+     * pricingPlanVersion）时保全放行；保单级保额按 D3 取**各主险段之和**（拒不「取首段」）。
+     */
+    @Test
+    void shouldApplyMainCoverageWhenPolicyHasMultipleCompleteMainLines() {
+        fixture.given(createdEventWithMainProducts(List.of(
+                        mainProduct("line-1", 1, "product-1", "100000"),
+                        mainProduct("line-2", 2, "product-2", "50000"))),
+                activatedEvent())
+                .when(coverageCommand("120000"))
+                .expectSuccessfulHandlerExecution()
+                .expectEventsMatching(org.axonframework.test.matchers.Matchers.payloadsMatching(
+                        org.axonframework.test.matchers.Matchers.exactSequenceOf(
+                                org.axonframework.test.matchers.Matchers.predicate(payload -> {
+                                    PolicyMaintenanceAppliedEvent event = (PolicyMaintenanceAppliedEvent) payload;
+                                    assertEquals(2, event.executionStateAfter().policyProducts().size());
+                                    return true;
+                                }))))
+                .expectState(policy -> assertEquals(new BigDecimal("170000.00"),
+                        policy.getSumInsured().value(), "多主险保单级保额 = 各主险段之和（120000 + 50000）"));
+    }
+
+    /**
+     * 🔴 G11/g11-04 ⑩ / AC-05 反-3：**任一**主险段缺 pricingPlanVersion 即拒——单主险时该判据与旧
+     * 行为等价（原「size==1 且三要素齐备」），多主险时逐段校验、不得只看首个主险段。
+     */
+    @Test
+    void shouldRejectMainCoverageWhenAnyMainLineLacksPricingPlanVersion() {
+        fixture.given(createdEventWithMainProducts(List.of(
+                        mainProduct("line-1", 1, "product-1", "100000"),
+                        mainProduct("line-2", 2, "product-2", "50000", null))),
+                activatedEvent())
+                .when(coverageCommand("120000"))
+                .expectException(PolicyBusinessRuleException.class)
+                .expectNoEvents();
+    }
+
     private void assertStateApplication(
             ApplyPolicyMaintenanceCommand command,
             Object[] history,
@@ -591,6 +775,40 @@ class PolicyMaintenanceApplicationTest {
                 effectiveTimeType, effectiveAt,
                 "maintenance=maintenance-1;fields=policy.holder.mobile", changes,
                 "operator-1", TENANT_ID);
+    }
+
+    /** 金额型保全命令：无字段变更、无状态动作，变更实质是一笔已登记的收付差额。 */
+    private ApplyPolicyMaintenanceCommand amountCommand(String itemCode, String amount) {
+        String summary = "maintenance=maintenance-1;items=" + itemCode
+                + ";fields=;action=NONE;amount=DEBIT:" + amount + ":CNY";
+        return amountCommand(itemCode, amount, summary);
+    }
+
+    /** 摘要文案由调用方给定：用于构造「文案相同、结构化载荷不同」这类只有摘要计算能区分的场景。 */
+    private ApplyPolicyMaintenanceCommand amountCommand(String itemCode, String amount, String summary) {
+        String requestId = REQUEST_ID + "-amount";
+        PolicyMaintenanceAmountFact amountFact = new PolicyMaintenanceAmountFact(
+                itemCode, new BigDecimal(amount), ChargeDirection.DEBIT, "CNY", "POSTING-1");
+        String hash = PolicyMaintenanceHashing.requestHash(
+                TENANT_ID, POLICY_ID, requestId, "maintenance-1", 0, "a".repeat(64),
+                "IMMEDIATE", EFFECTIVE_AT, summary, List.of(), amountFact, null,
+                PolicyMaintenanceAction.NONE, null, null, null);
+        return new ApplyPolicyMaintenanceCommand(
+                POLICY_ID, requestId, "maintenance-1", 0, hash, "a".repeat(64),
+                "IMMEDIATE", EFFECTIVE_AT, summary, List.of(), amountFact, null,
+                PolicyMaintenanceAction.NONE, null, null, null, "operator-1", TENANT_ID);
+    }
+
+    /** 三种载荷全空的空交易命令：用于验证闸口拒绝，而非被某个分支偶然放行。 */
+    private ApplyPolicyMaintenanceCommand emptyPayloadCommand() {
+        String requestId = REQUEST_ID + "-empty";
+        String summary = "maintenance=maintenance-1;items=;fields=;action=NONE";
+        String hash = PolicyMaintenanceHashing.requestHash(
+                TENANT_ID, POLICY_ID, requestId, "maintenance-1", 0, "a".repeat(64),
+                "IMMEDIATE", EFFECTIVE_AT, summary, List.of());
+        return new ApplyPolicyMaintenanceCommand(
+                POLICY_ID, requestId, "maintenance-1", 0, hash, "a".repeat(64),
+                "IMMEDIATE", EFFECTIVE_AT, summary, List.of(), "operator-1", TENANT_ID);
     }
 
     private ApplyPolicyMaintenanceCommand stateCommand(PolicyMaintenanceAction action) {
@@ -704,24 +922,27 @@ class PolicyMaintenanceApplicationTest {
                 TENANT_ID, POLICY_ID, REQUEST_ID + "-retroactive", "maintenance-1", 0,
                 "a".repeat(64), "RETROACTIVE", EFFECTIVE_AT.minusMonths(1),
                 "maintenance=maintenance-1;fields=policy.holder.mobile", changes,
-                PolicyMaintenanceAction.NONE, null, null, evidence);
+                null, null, PolicyMaintenanceAction.NONE, null, null, evidence);
         return new ApplyPolicyMaintenanceCommand(
                 POLICY_ID, REQUEST_ID + "-retroactive", "maintenance-1", 0, hash,
                 "a".repeat(64), "RETROACTIVE", EFFECTIVE_AT.minusMonths(1),
                 "maintenance=maintenance-1;fields=policy.holder.mobile", changes,
-                PolicyMaintenanceAction.NONE, null, null, evidence, "operator-1", TENANT_ID);
+                null, null, PolicyMaintenanceAction.NONE, null, null, evidence, "operator-1", TENANT_ID);
     }
 
     private PolicyMaintenanceAppliedEvent appliedEvent(ApplyPolicyMaintenanceCommand command) {
         InsuredPartyList updated = parties("13900000000");
         List<PolicyMaintenanceAppliedField> fields = List.of(new PolicyMaintenanceAppliedField(
                 "POLICY_INFO_CHANGE", POLICY_ID, "policy.holder.mobile", "TEXT", "13900000000"));
-        String endorsementNo = PolicyMaintenanceHashing.stableEndorsementNo(TENANT_ID, POLICY_ID, REQUEST_ID);
+        // 🔴 requestId 必须取自命令而非写死：写死会让「同 requestId 不同载荷」的用例根本走不到幂等分支
+        //    （findMaintenanceApplication 查不到回执 ⇒ 落到下游守卫上），判据被兜底路径接管而失去区分力。
+        String endorsementNo = PolicyMaintenanceHashing.stableEndorsementNo(
+                TENANT_ID, POLICY_ID, command.requestId());
         return new PolicyMaintenanceAppliedEvent(
-                POLICY_ID, REQUEST_ID, command.requestPayloadHash(), "maintenance-1", endorsementNo,
+                POLICY_ID, command.requestId(), command.requestPayloadHash(), "maintenance-1", endorsementNo,
                 com.titanium.policy.common.enums.PolicyDataUpdateType.POLICY_INFO_CHANGE,
                 com.titanium.policy.common.enums.PolicyDataUpdateType.POLICY_INFO_CHANGE.getCategory(),
-                0, 1, EFFECTIVE_AT, command.changeSummary(), "a".repeat(64), "b".repeat(64),
+                0, 1, EFFECTIVE_AT, command.changeSummary(), null, null, "a".repeat(64), "b".repeat(64),
                 "axon-event://policy/tenant-1/policy-1/maintenance-applications/effect-request-1?version=1",
                 "c".repeat(64), "d".repeat(64), fields,
                 new PolicyMaintenanceExecutionState(updated), EFFECTIVE_AT, "operator-1", TENANT_ID);
@@ -737,6 +958,18 @@ class PolicyMaintenanceApplicationTest {
     }
 
     private PolicyCreatedEvent createdEvent(InsuredPartyList partyList) {
+        return createdEvent(partyList, premiumPlan());
+    }
+
+    /**
+     * 无保费计划快照的出单事件：生产链路 {@code CreatePolicyCommand} 两个发送点均传 {@code premiumPlan=null}
+     * （实测 93 张保单 {@code payment_method} 全空），此为真实常态而非畸形数据。
+     */
+    private PolicyCreatedEvent createdEventWithoutPremiumPlan() {
+        return createdEvent(parties("13800000000"), null);
+    }
+
+    private PolicyCreatedEvent createdEvent(InsuredPartyList partyList, PremiumPlan premiumPlan) {
         Money amount = Money.of(new BigDecimal("1000.00"), "CNY");
         PolicyProduct mainProduct = new PolicyProduct(
                 "line-1", 1, ProductCategory.MAIN, null, "product-1", "P001", "测试主险",
@@ -747,13 +980,39 @@ class PolicyMaintenanceApplicationTest {
         return new PolicyCreatedEvent(
                 POLICY_ID, new PolicyNo("P202608250001"), PolicyForm.INDIVIDUAL, "product-1",
                 null, null, null, null, null,
-                PolicyPeriod.of(EFFECTIVE_AT.minusYears(1), EFFECTIVE_AT.plusYears(10), 0, 0),
-                amount, amount, amount, List.of(mainProduct), premiumPlan(), null, null, status,
+                PolicyPeriod.of(EFFECTIVE_AT.minusYears(1), EFFECTIVE_AT.plusYears(10)),
+                amount, amount, amount, List.of(mainProduct), premiumPlan, null, null, status,
                 partyList, null, TENANT_ID);
     }
 
     private PolicyActivatedEvent activatedEvent() {
         return new PolicyActivatedEvent(POLICY_ID, EFFECTIVE_AT.minusDays(1), TENANT_ID);
+    }
+
+    /** 多主险段出单事件：G11/g11-04 ⑩ 多主险保全用例的基座。 */
+    private PolicyCreatedEvent createdEventWithMainProducts(List<PolicyProduct> mainProducts) {
+        Money amount = Money.of(new BigDecimal("1000.00"), "CNY");
+        PolicyStatus status = new PolicyStatus(
+                PolicyStatusCode.NOT_EFFECTIVE, EFFECTIVE_AT.minusDays(1), "创建", "system");
+        return new PolicyCreatedEvent(
+                POLICY_ID, new PolicyNo("P202608250001"), PolicyForm.INDIVIDUAL, "product-1",
+                null, null, null, null, null,
+                PolicyPeriod.of(EFFECTIVE_AT.minusYears(1), EFFECTIVE_AT.plusYears(10)),
+                amount, amount, amount, mainProducts, premiumPlan(), null, null, status,
+                parties("13800000000"), null, TENANT_ID);
+    }
+
+    /** 测试主险段：产品/版本/定价计划三要素齐备（G11/g11-04 ⑩ 多主险保全基座）。 */
+    private PolicyProduct mainProduct(String lineId, int lineNo, String productId, String sumInsured) {
+        return mainProduct(lineId, lineNo, productId, sumInsured, "plan-v8");
+    }
+
+    private PolicyProduct mainProduct(String lineId, int lineNo, String productId, String sumInsured,
+                                      String pricingPlanVersion) {
+        Money amount = Money.of(new BigDecimal(sumInsured), "CNY");
+        return new PolicyProduct(lineId, lineNo, ProductCategory.MAIN, null, productId, "P00" + lineNo,
+                "测试主险", "product-v3", pricingPlanVersion, null, amount, amount, null, null, null, null,
+                List.of(), List.of(), List.of());
     }
 
     private InsuredPartyList parties(String mobile) {

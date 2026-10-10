@@ -107,7 +107,7 @@ public class PolicyIssuanceOrchestrator {
                 insurance.getUnderwritingResult() != null ? insurance.getUnderwritingResult().underwritingId() : null,
                 insurance.getBizNo(), insurance.getMarketPackageId(), decision.policyForm(), mainProductId(insurance), null,
                 insurance.getInsuredPartyList(), policyProducts, mainSumInsured(insurance), standardPremium, totalPremium,
-                PolicyPeriod.of(decision.insurancePeriodStart(), decision.insurancePeriodEnd(), 0, 0), null,
+                PolicyPeriod.of(decision.insurancePeriodStart(), decision.insurancePeriodEnd()), null,
                 CollectionInfo.initial(insurance.getCollectionMode(), totalPremium, LocalDateTime.now()),
                 insurance.getChannelInfo(), insurance.getInsuranceType(), insurance.getTenantId());
         commandGateway.sendAndWait(command);

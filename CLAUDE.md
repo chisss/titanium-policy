@@ -124,11 +124,11 @@ titanium-policy/
 
 ```
 InsuranceCreatedEvent  --@StartSaga--> 记忆建单数据（投保人/保费/保障期间/形态）
-        ...（核保提交、核保结果回流为跨服务同步调用，暂未纳入 Saga 异步编排）
+        ...（核保提交；核保结论经「同步拉取 + Kafka 异步回流」双轨抵达，均触发下一条）
 InsuranceIssuedEvent   --@EndSaga----> commandGateway.sendAndWait(CreatePolicyCommand) 创建正式保单
 ```
 
-注意：Saga 用 `@Autowired transient` 注入 `CommandGateway`/`PolicyNoGenerator`（Saga 不可序列化字段必须 transient）。核保结果跨 `titanium-underwriting` 的 Kafka 异步回流尚未落地，落地后可在此追加 `UnderwritingResultReceivedEvent` 的 `@SagaEventHandler` 实现核保→承保全自动流转。
+注意：Saga 用 `@Autowired transient` 注入 `CommandGateway`/`PolicyNoGenerator`（Saga 不可序列化字段必须 transient）。**核保结论双轨回流（2026-09-27 g02-05 订正）**：跨 `titanium-underwriting` 的 Kafka 异步回流**已落地**——`UnderwritingDecidedEventListener`（`infrastructure/messaging`，`@KafkaListener` 订阅 `underwriting-decided`，防腐 record `UnderwritingDecidedMessage`）解析后经 `InsuranceApplicationService.receiveUnderwritingResult` 回写聚合；第 3 步 `UnderwritingResultReceivedEvent` 的 `@SagaEventHandler`（`IssuanceSaga:266`）**两轨共用**，无需另加处理器。🔴 **两轨并非按场景分界**：核保域 `UnderwritingKafkaEventPublisher` 对每个 `UnderwritingDecidedEvent` **无条件**发布，自动决策件同步轨即时返回的同时也已进入异步轨 ⇒ 同一决策两轨都会到；去重由聚合 `Insurance.isRedeliveredResult`（同核保单号 + 同结论 ⇒ 静默幂等、不发事件）承担，两轨收敛到同一 `ReceiveUnderwritingResultCommand`。守卫测试：`InsuranceUnderwritingResultIdempotencyTest`（含跨轨形态 2 例）+ `UnderwritingDecidedEventListenerTest`（7 例）。
 
 ---
 
@@ -221,9 +221,9 @@ mvn -pl titanium-policy-domain test
 4. ✅ **孤儿事件已清理（m0-705，2026-09-11）**：`PolicyDataUpdatedEvent`、`PolicyRenewedEvent`（无产生者无消费者）与 `LineUnderwritingResultUpdatedEvent` + `UpdateLineUnderwritingResultCommand`（核保域 `UnderwritingDecidedEvent` 载荷不含分段结论字段，上游不存在）已删除；注释中「待核保域支持分段核保」的能力缺口已在 `Insurance.on(UnderwritingResultReceivedEvent)` 保留说明。同期删除被 `PolicyProduct`/`InsuredSubject` 取代的 5 个旧实体：`entity/Subject`、`entity/Coverage`、`entity/InsuranceProduct`、`entity/PolicyItem`、`entity/insurance/InsuranceProduct`（互引孤岛、零外部引用）。
 5. ✅ **ProposalConvertedEvent 写侧已补齐**：新增 `ConvertProposalCommand` + `Proposal.handle(ConvertProposalCommand)`（仅 SUBMITTED 可转，发布 `ProposalConvertedEvent`）。读模型 `ProposalProjectionEventHandler` 投影已就绪，转换命令触发后自动生效。纯对象方法 `convertToApplication` 保留供非事件溯源构建。
 6. ✅ **表现层不再依赖领域命令**：`PolicyController` 等三个 Controller 的命令构造已下沉至 `*ApplicationService`（表现层只传 Request/api-DTO，不持有 domain command），并以 ArchUnit `webShouldNotDependOnDomainCommandsOrAggregates` 固化。
-7. ⚠️ **核保回流未异步化**：Saga 注释说明核保结果跨服务回流依赖消息总线基础设施，尚未落地，当前为同步调用。
+7. ✅ **核保回流已异步化（2026-09-27 g02-05 订正）**：`UnderwritingDecidedEventListener`（`infrastructure/messaging`，`@KafkaListener` 订阅 `underwriting-decided`）**已落地并注册**（见第 9 条），核保结论经「同步拉取 + Kafka 异步回流」双轨抵达本域。🔴 **原记「尚未落地，当前为同步调用」属文档陈旧**，且「两轨以是否需人工介入为天然分界」的表述亦不成立——核保域 `UnderwritingKafkaEventPublisher` 对每个 `UnderwritingDecidedEvent` **无条件**发布，自动决策件两轨都会到。两轨收敛到同一 `ReceiveUnderwritingResultCommand`、共用 `IssuanceSaga` 第 3 步处理器（`:266`），**去重由聚合承担**（`Insurance.isRedeliveredResult`：同核保单号 + 同结论 ⇒ 静默幂等、不发事件）；守卫测试 `InsuranceUnderwritingResultIdempotencyTest`（含跨轨形态 2 例）+ `UnderwritingDecidedEventListenerTest`（7 例）。
 8. ✅ **事件存储与投影脏数据已修**：原 `AxonConfig` 无条件 `InMemoryEventStorageEngine`（事件溯源重启丢事件）已删除，交还 Axon Starter 依 `application.yml` 的 `axon.eventstore.jpa` 装配；原 `PolicyProjection` 向 `t_policy` 写空实体脏数据的投影类已删除（读模型投影统一在 query 层）。
-9. ✅ **Kafka 入站监听已修复（2026-09-02，dev-014 验收）**：Spring Boot 4.0 不再自动注册 `@KafkaListener` 注解后处理器，`KafkaConfig` 已补显式 `@EnableKafka`（同 maintenance/customer 先例），四个入站监听器（身故给付/全残给付/保全回写/核保决定/失效力）容器注册正常，`policy-group` 消费组恢复消费。
+9. ✅ **Kafka 入站监听已修复（2026-09-02，dev-014 验收）**：Spring Boot 4.0 不再自动注册 `@KafkaListener` 注解后处理器，`KafkaConfig` 已补显式 `@EnableKafka`（同 maintenance/customer 先例），`policy-group` 消费组恢复消费。**入站监听器共 7 个**（2026-09-27 复核订正：原记「四个」却列 5 项，两头均与代码不符）——`underwriting-decided`（核保决定）/ `maintenance-executed`（保全回写）/ `billing-lapse-notification`（失效力）/ `claim-death-benefit-settled`（身故给付）/ `claim-disability-benefit-settled`（全残给付）/ `payment-order-paid`（支付成功）/ `payment-order-failed`（支付失败），与 `KafkaConfig.INBOUND_TOPICS`（7 项）逐一对应，由 `PolicyKafkaDeadLetterConfigTest` 机械守护（主题漂移或漏登记即测试失败）。
 10. ✅ **全残给付保单终止断链已修复（2026-09-02，dev-014d）**：原 `DeathBenefitSettledEventListener` 仅覆盖身故，全残给付（CLAIM-6 同身故须终止保单）在 policy 侧无入站监听器。已新增 `DisabilityBenefitSettledEventListener`（topic `claim-disability-benefit-settled`）+ 防腐入站 record `DisabilityBenefitSettledMessage`，与身故共用 `DeathBenefitTerminationOrchestrator.terminateOnBenefitSettled(policyId, operatorId, tenantId, terminationDescription)`（终止描述文案由监听器常量传入，红线 20 常量化）。
 11. ✅ **存量测试编译问题已闭环（m1-801 实读复核，2026-09-11）**：原记录称 `IssuanceSagaTest`/`IssuanceOrchestratorTest` 引用「已不存在的 `ConfirmedPremiumRequestValidator`」——**该表述与代码不符**：类一直存在（分包改造时移入 `orchestration/issuance/validator/` 子包），错的是两个测试里**少了 `.validator` 一段的过时全限定名**。现均已修正（`IssuanceSagaTest` 改走 import 消除 FQN，符合「禁全限定名」规约），实测 `IssuanceSagaTest` 9 例 + `IssuanceOrchestratorTest` 9 例全绿、`titanium-policy-application` 25 个测试源文件编译通过、全仓门禁 **无需** `-Dmaven.test.skip=true`。教训：**测试源码里的全限定名不受 IDE 重构保护**，分包改造后必须全仓扫过时 FQN。
 12. ✅ **保单现金价值只读查询能力（m0-717，2026-09-11）**：新增对外契约 `PolicyCashValueApi`（`GET /api/v1/policies/{policyId}/cash-value`，`contextId=policyCashValueApi`），调用方（计费域垫缴判定）只需保单号。链路：`PolicyCashValueApiProvider` → `PolicyCashValueQueryAppService`（application/query，读 `PolicyView` 取 productId/totalPremium/startDate，保单年度 = 生效日至估值日年差 + 1）→ `PolicyCashValuePort`（`port/product`）→ `PolicyCashValueAdapter`（infrastructure/adapter/product）→ product 域只读现金价值端点。
@@ -289,6 +289,16 @@ mvn -pl titanium-policy-domain test
     - **异常策略与成功侧一致**：解析失败/字段缺失记 warn 后 return，**不抛出**——该主题由多域共用，本监听器抛出会卡住消费位点、连带阻塞理赔与保全域对失败通知的感知。⚠️ 无 DLQ。
     - **测试 +9**：`PaymentOrderFailedMessageTest` 4 例（锁死字段逐一对齐 / 取消与失败成因可辨 / 对端新增字段前向兼容 / 缺字段容忍）+ `PremiumCollectionFailedListenerTest` 5 例（本域失败、取消、他域、字段缺失、空串与字面量 `null` 报文均不得抛出）。
     - 🔴 **可复用判据（纯日志型组件的可测性）**：当组件**有意不改动任何状态**（无依赖、无命令、无返回值）时，用例应锁两条——① **防腐 record 的字段对齐**（字段名漂移不报错、只静默丢字段，最易无声失效）；② **「任何形态报文都不得抛出」的消费不阻塞契约**。前者单独成类（`inbound` 包内），后者断言 `assertDoesNotThrow`。
+
+22. ✅ **保费试算轨口径单轨化（g03-04，2026-09-27）**：删除 `InsuranceLinePremiumResolver`（承保阶段「缺失段保费兜底试算」编排器，全仓零生产调用方，仅自身与测试引用）及其测试，连同被其**独占**的 `PremiumCalculationGateway`（`domain/port/billing`）+ `PremiumCalculationAdapter`（`infrastructure/adapter/billing`）一并删除——m10-1303 判据①「接口+实现均零引用 = 被取代的冗余死壳」（删 resolver 后 Port/Adapter 即落入死壳，保留会误导后来者误信该试算轨仍可用）。
+    - 🔴 **出单取价唯一权威是 product CONFIRM**：承保阶段保费由 `InsuranceLinePremiumConfirmationService` 逐段调 `ConfirmedPremiumPricingPort`（经 `ConfirmedPremiumPricingAdapter` 走 product CONFIRM）冻结，「Policy 只冻结和汇总返回结果，不再解释费率、舍入或核保调整规则。任一段失败即阻断出单，禁止回退请求中的报价或旧 exactPremium」（该类 javadoc 原文）。**不得**为「补齐缺失段保费」新开或恢复任何 billing 试算旁轨——段保费缺失属上游报价/核保问题，应在 CONFIRM 前修正数据，而非出单时二次试算。
+    - 🔴 **billing 标准保费试算仍是 billing 域对外能力（登记，勿删）**：billing `PremiumCalculationApi`（`/api/v1/premium-calculations`）为活契约，当前跨域消费方 = maintenance `ProductRetroactivePeriodRecalculationAdapter`（追补期间保费重算）与 billing 自身 provider。policy 域不再持有其 Port；未来若需接回，须以新用例评估，**不得复活旧 resolver**。
+
+23. 🔶 **NCD 反算取证六列（G11/g11-03，2026-10-10）：契约已交付、R-3 前恒 NULL（契约/模型阶段）**
+    - **已交付**：`t_policy_subject` 六列（`ncd_coefficient`/`ncd_claim_count`/`ncd_period_from`/`ncd_period_to`/`ncd_rule_code`/`ncd_rule_version`，Liquibase `policy_subject_ncd_snapshot_202610101600_weisun_ddl.sql`，**可空无默认**）+ 属性包键契约 `PolicyConstants.SubjectAttributeKey` 六键 + 投影 `PolicyLineProjectionEventHandler.applyNcdEvidence` + 读侧 `PolicySubjectQueryResult` 六字段（随出单落库可见，满足 AC-04 的落库段）。
+    - 🔴 **R-3 前六列恒 NULL 属刻意状态**（NCD 规则口径与版本待业务确认）：出单链路**尚未接入** product 域反算（规则表为零种子，接入即 fail-closed 拒绝出单），属性包不带取证键 ⇒ 投影**一律回写 NULL**，**绝不代填 1.0/0**——「未反算」必须与「确无赔款」（`ncd_claim_count = 0`）在库中可区分（AC-03 禁止事项）。
+    - 🔴 **重投影语义**：缺失键**回写 null 而非保留旧值**——本方法在标的重投影（批改/换单）时同样会跑，沿用旧行会把上一版取证值留在列上（比留空更坏：列上的数字看起来是本次反算的）。守卫测试 `PolicySubjectNcdSnapshotProjectionTest`（5 例，含此场景）。
+    - **接入与规则值登记**：索引文档 §五 第 10 条 `@Reserved` 清单条目 2/3（随 R-3 裁示同批）；供给侧契约/编排在设计上归 product 域（`NcdResolutionOrchestrator` + `ProductNcdApi`），policy 侧只消费。
 
 ---
 

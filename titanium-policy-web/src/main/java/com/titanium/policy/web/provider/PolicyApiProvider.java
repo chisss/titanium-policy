@@ -15,7 +15,9 @@ import com.titanium.policy.api.PolicyApi;
 import com.titanium.policy.api.request.issuance.CreatePolicyRequest;
 import com.titanium.policy.api.request.maintenance.AccountValueWriteBackRequest;
 import com.titanium.policy.api.request.maintenance.ApplyPolicyMaintenanceRequest;
+import com.titanium.policy.api.request.maintenance.PolicyMaintenanceAmountRequest;
 import com.titanium.policy.api.request.maintenance.PolicyMaintenanceRetroactiveEvidenceRequest;
+import com.titanium.policy.api.request.maintenance.PolicyServiceRestrictionRequest;
 import com.titanium.policy.api.request.maintenance.RecordPremiumCollectionRequest;
 import com.titanium.policy.api.response.maintenance.PolicyEndorsementResponse;
 import com.titanium.policy.api.response.maintenance.PolicyMaintenanceApplicationResponse;
@@ -36,9 +38,11 @@ import com.titanium.policy.command.CreatePolicyDirectlyCommand;
 import com.titanium.policy.command.RecordPremiumCollectionCommand;
 import com.titanium.policy.query.query.FindPolicyByIdQuery;
 import com.titanium.policy.query.result.PolicyEndorsementQueryResult;
+import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceAmountFact;
 import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceApplicationReceipt;
 import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceFieldChange;
 import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceRetroactiveEvidence;
+import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceServiceRestriction;
 import com.titanium.policy.web.mapper.PolicyWebMapper;
 
 import lombok.RequiredArgsConstructor;
@@ -77,6 +81,8 @@ public class PolicyApiProvider implements PolicyApi {
                                 change.itemCode(), change.objectId(), change.fieldCode(),
                                 change.dataType(), change.canonicalValue()))
                         .toList(),
+                toAmountFact(request.amountFact()),
+                toServiceRestriction(request.serviceRestriction()),
                 request.stateAction(), request.stateReason(), request.terminationReason(),
                 toRetroactiveEvidence(request.retroactiveEvidence()),
                 RequestContextHolder.getOperatorId(), RequestContextHolder.requireTenantId());
@@ -204,6 +210,21 @@ public class PolicyApiProvider implements PolicyApi {
                 toRetroactiveEvidenceResponse(receipt.retroactiveEvidence()));
     }
 
+    private PolicyMaintenanceAmountFact toAmountFact(PolicyMaintenanceAmountRequest request) {
+        if (request == null) {
+            return null;
+        }
+        return new PolicyMaintenanceAmountFact(request.itemCode(), request.amount(),
+                request.direction(), request.currency(), request.sourceRef());
+    }
+
+    private PolicyMaintenanceServiceRestriction toServiceRestriction(PolicyServiceRestrictionRequest request) {
+        if (request == null) {
+            return null;
+        }
+        return new PolicyMaintenanceServiceRestriction(request.type(), request.action());
+    }
+
     private PolicyMaintenanceRetroactiveEvidence toRetroactiveEvidence(
             PolicyMaintenanceRetroactiveEvidenceRequest evidence) {
         if (evidence == null) {
@@ -238,6 +259,8 @@ public class PolicyApiProvider implements PolicyApi {
         return new PolicyEndorsementResponse(
                 result.getEndorsementNo(), result.getPolicyId(), result.getUpdateType(), result.getCategory(),
                 result.getPolicyVersion(), result.getEffectiveDate(), result.getChangeSummary(),
+                result.getAmountItemCode(), result.getAmountValue(), result.getAmountDirection(),
+                result.getAmountCurrency(),
                 result.isRequiresPremiumRecalc(), result.getSourceMaintenanceId(), result.getOperatorId(),
                 result.getEndorsedAt(), result.getTenantId());
     }

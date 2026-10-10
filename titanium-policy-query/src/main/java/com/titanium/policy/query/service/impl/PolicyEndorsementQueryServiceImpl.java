@@ -46,6 +46,10 @@ public class PolicyEndorsementQueryServiceImpl implements PolicyEndorsementQuery
         result.setPolicyVersion(view.getPolicyVersion());
         result.setEffectiveDate(view.getEffectiveDate());
         result.setChangeSummary(view.getChangeSummary());
+        result.setAmountItemCode(view.getAmountItemCode());
+        result.setAmountValue(view.getAmountValue());
+        result.setAmountDirection(view.getAmountDirection());
+        result.setAmountCurrency(view.getAmountCurrency());
         result.setRequiresPremiumRecalc(view.isRequiresPremiumRecalc());
         result.setSourceMaintenanceId(view.getSourceMaintenanceId());
         result.setOperatorId(view.getOperatorId());

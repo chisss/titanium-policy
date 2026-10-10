@@ -6,6 +6,7 @@ import com.titanium.metadata.enums.product.ProductEnum.IssuanceMode;
 import com.titanium.policy.valueobject.product.ProductBasicInfo;
 import com.titanium.policy.valueobject.product.ProductClauseRef;
 import com.titanium.policy.valueobject.product.ProductIssueRules;
+import com.titanium.policy.valueobject.product.ProductSumInsuredTiers;
 
 /**
  * 产品服务端口（driven port，与聚合平级）
@@ -69,6 +70,29 @@ public interface ProductServicePort {
      * @return 产品投保规则；产品未配置时返回 null
      */
     ProductIssueRules getIssueRules(String productId);
+
+    /**
+     * 取产品的责任级保额档次配置（G01 产出契约的消费入口，见 G02/AC-09）。
+     * <p>
+     * 与 {@link #getIssueRules(String)} 是<b>两个不同来源</b>：后者取产品投保条件
+     * （{@code insureCondition} 的 min/max 保额），本方法取责任级档次契约
+     * （档位清单 + 区间 + 是否开放自由填）。二者互补，不得相互替代。
+     * </p>
+     * <p>
+     * 🔴 <b>三态语义（取不到 ≠ 未配置 ≠ 不接纳）</b>：产品查询成功但未配置任何责任档次时返回
+     * <b>空清单的载体</b>（非 null、非异常）——「未配置」是产品域的合法中间状态；远程调用失败则抛
+     * {@code RemoteDependencyUnavailableException}，<b>绝不折叠成空清单</b>（那会把「服务不可用」
+     * 静默变成「该产品没配档次」从而绕过校验）。
+     * </p>
+     * <p>
+     * ⚠️ 读自产品域读模型，<b>最终一致</b>：刚写入的档次配置可能短暂不可见（对端契约已标注）。
+     * </p>
+     *
+     * @param productId 产品ID
+     * @return 该产品全部责任的档次配置；未配置时 {@code coverages} 为空列表
+     * @throws com.titanium.policy.exception.RemoteDependencyUnavailableException 远程调用失败或下游返回失败码
+     */
+    ProductSumInsuredTiers getCoverageSumInsuredConfigs(String productId);
 
     /**
      * 取产品绑定的条款关联（条款ID + 版本 + 是否主条款）。

@@ -6,9 +6,13 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
 
@@ -25,7 +29,9 @@ import com.titanium.metadata.enums.BaseEnum;
 import com.titanium.metadata.enums.insurance.InsuranceCategory;
 import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.policy.PolicyEnum;
+import com.titanium.metadata.enums.policy.PolicyServiceRestrictionType;
 import com.titanium.metadata.enums.product.ProductEnum.PaymentFrequency;
+import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.query.repository.InsuranceViewRepository;
 import com.titanium.policy.query.repository.PolicyBeneficiaryViewRepository;
 import com.titanium.policy.query.repository.PolicyInsuredViewRepository;
@@ -84,12 +90,16 @@ public class PolicyQueryServiceImpl implements PolicyQueryService {
         if (policy == null) {
             return null;
         }
-        PolicyProductView mainProduct = requireMainProduct(policyId, tenantId);
+        List<PolicyProductView> mainSegments = requireMainSegments(policyId, tenantId);
         String customerId = requireSnapshotText(policy.getPolicyHolderId(), "Policy缺少投保人客户标识");
-        String productId = requireSnapshotText(mainProduct.getProductId(), "Policy主险缺少产品标识");
-        String productVersion = requireSnapshotText(mainProduct.getProductVersion(), "Policy主险缺少产品版本");
-        String planVersion = requireSnapshotText(
-                mainProduct.getPricingPlanVersion(), "Policy主险缺少确认定价计划版本");
+        // 🔴 合同级要素 = 多主险段逐段值以逗号连接（G11/g11-04 D3）：单主险时即该段原值（逐字不变），
+        //    多主险时全部主险段都在值内（不用「取首段」，D1 纪律）；口径与写侧指纹及下方发布字段同源。
+        String productId = PolicyMaintenanceHashing.joinMainProductField(
+                mainSegments.stream().map(PolicyProductView::getProductId).toList());
+        String productVersion = PolicyMaintenanceHashing.joinMainProductField(
+                mainSegments.stream().map(PolicyProductView::getProductVersion).toList());
+        String planVersion = PolicyMaintenanceHashing.joinMainProductField(
+                mainSegments.stream().map(PolicyProductView::getPricingPlanVersion).toList());
         if (policy.getCurrentVersion() == null || policy.getCurrentVersion() < 0) {
             throw snapshotFailure("Policy缺少有效业务基准版本", "POLICY_MAINTENANCE_SNAPSHOT_VERSION_MISSING");
         }
@@ -100,21 +110,63 @@ public class PolicyQueryServiceImpl implements PolicyQueryService {
         long policyVersion = policy.getCurrentVersion().longValue();
         OffsetDateTime capturedAt = OffsetDateTime.now(BUSINESS_OFFSET);
         OffsetDateTime businessEffectiveAt = policy.getStartDate().atOffset(BUSINESS_OFFSET);
-        OffsetDateTime nextBillingDateAt = nextBillingDate(policy, mainProduct, capturedAt.toLocalDateTime());
+        OffsetDateTime nextBillingDateAt = nextBillingDate(policy, mainSegments, capturedAt.toLocalDateTime());
         OffsetDateTime nextPolicyAnniversaryAt = nextPolicyAnniversary(policy, capturedAt.toLocalDateTime());
         List<PolicyBeneficiaryView> beneficiaries = policyBeneficiaryViewRepository
                 .findByPolicyIdAndTenantId(policyId, tenantId);
         List<PolicyInsuredView> insureds = policyInsuredViewRepository
                 .findByPolicyIdAndTenantId(policyId, tenantId);
         Map<String, PolicySnapshotFieldValueQueryResult> fieldValues =
-                buildSnapshotFields(policy, mainProduct, insureds, beneficiaries);
+                buildSnapshotFields(policy, mainSegments, insureds, beneficiaries);
         String storageKey = "axon-event://policy/" + tenantId + "/" + policyId + "?version=" + policyVersion;
-        String contentHash = snapshotHash(policy, mainProduct, policyVersion, fieldValues);
+        String contentHash = snapshotHash(
+                policy, mainSegments, productId, productVersion, planVersion, policyVersion, fieldValues);
         return new PolicyMaintenanceSnapshotQueryResult(
                 tenantId, policyId, requireSnapshotText(policy.getPolicyNo(), "Policy缺少保单号"), customerId,
-                productId, productVersion, planVersion, policy.getPolicyStatus(), policyVersion,
+                productId, productVersion, planVersion, policy.getPolicyStatus(),
+                activeRestrictionTypes(policy),
+                policyVersion,
                 businessEffectiveAt, nextBillingDateAt, nextPolicyAnniversaryAt,
                 storageKey, contentHash, capturedAt, fieldValues);
+    }
+
+    /**
+     * 解析读模型的服务受限列为受限种类清单。
+     * <p>
+     * 列值是逗号连接的种类码（{@code t_policy_view.service_restriction_types}），空/空白即无受限。
+     * 存量行该列为 {@code null}，与「无受限」同解——这正是列语义（空即无受限），无需回填。
+     * </p>
+     */
+    private List<PolicyServiceRestrictionType> activeRestrictionTypes(PolicyView policy) {
+        String raw = policy.getServiceRestrictionTypes();
+        if (raw == null || raw.isBlank()) {
+            return List.of();
+        }
+        return Arrays.stream(raw.split(","))
+                .map(String::trim)
+                .filter(code -> !code.isEmpty())
+                .map(PolicyServiceRestrictionType::fromCode)
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
+    /**
+     * 保单级「下一缴费日」= 各主险段候选中的最早非空者（G11/g11-04 D3）。
+     * <p>
+     * 交强与商业各自持有缴费计划（年缴/月缴…），保单层面的「下一缴费日」取最早到期者——确定性派生，
+     * 不随段顺序变化。单主险时即该段原值（逐字不变）；各段均无可用缴费日时为 {@code null}，
+     * 维护域据此拒绝依赖该字段的生效方式（NEXT_BILLING_DATE 建案时按「未提供可用的下一缴费日」拒绝）。
+     * </p>
+     */
+    private OffsetDateTime nextBillingDate(
+            PolicyView policy,
+            List<PolicyProductView> mainSegments,
+            LocalDateTime now) {
+        return mainSegments.stream()
+                .map(mainSegment -> nextBillingDate(policy, mainSegment, now))
+                .filter(Objects::nonNull)
+                .min(Comparator.naturalOrder())
+                .orElse(null);
     }
 
     private OffsetDateTime nextBillingDate(
@@ -164,27 +216,52 @@ public class PolicyQueryServiceImpl implements PolicyQueryService {
         return candidate.atOffset(BUSINESS_OFFSET);
     }
 
-    private PolicyProductView requireMainProduct(String policyId, String tenantId) {
+    /**
+     * 校验并返回本保单的<b>全部主险段</b>（G11/g11-04 缺口①：与写侧
+     * {@code Policy.requireMainProductsForMaintenance} 同判据）。
+     * <p>
+     * 原判据「{@code size() != 1} 即拒」会让交强 + 商业同单（两个主险段）保单的<b>任何保全</b>
+     * 在建案取快照时被拒（{@code POLICY_MAINTENANCE_SNAPSHOT_CONTRACT_INVALID}）。按 D3 下沉后：
+     * 无主险段 ⇒ 拒；<b>任一</b>主险段缺 productId / productVersion / pricingPlanVersion ⇒ 拒。
+     * 单主险时与旧行为<b>完全等价</b>（旧判据 = size==1 且该段三要素齐备），无「取首段」语义。
+     * </p>
+     */
+    private List<PolicyProductView> requireMainSegments(String policyId, String tenantId) {
         List<PolicyProductView> mainProducts = policyProductViewRepository
                 .findByPolicyIdAndTenantIdOrderByLineNoAsc(policyId, tenantId).stream()
                 .filter(product -> "MAIN".equals(product.getProductCategory()))
                 .toList();
-        if (mainProducts.size() != 1) {
-            throw snapshotFailure("Policy必须且只能存在一个主险段", "POLICY_MAINTENANCE_SNAPSHOT_CONTRACT_INVALID");
+        if (mainProducts.isEmpty()) {
+            throw snapshotFailure("Policy须含至少一个主险段", "POLICY_MAINTENANCE_SNAPSHOT_CONTRACT_INVALID");
         }
-        return mainProducts.getFirst();
+        for (PolicyProductView mainProduct : mainProducts) {
+            requireSnapshotText(mainProduct.getProductId(), "Policy主险缺少产品标识");
+            requireSnapshotText(mainProduct.getProductVersion(), "Policy主险缺少产品版本");
+            requireSnapshotText(mainProduct.getPricingPlanVersion(), "Policy主险缺少确认定价计划版本");
+        }
+        return mainProducts;
     }
 
     private Map<String, PolicySnapshotFieldValueQueryResult> buildSnapshotFields(
             PolicyView policy,
-            PolicyProductView product,
+            List<PolicyProductView> mainSegments,
             List<PolicyInsuredView> insureds,
             List<PolicyBeneficiaryView> beneficiaries) {
         TreeMap<String, PolicySnapshotFieldValueQueryResult> fields = new TreeMap<>();
         fields.put("policy.collection.mode", enumField(policy.getCollectionMode()));
-        fields.put("policy.coverage.sumInsured",
-                decimalField(product.getSumInsured(), product.getPolicyProductId()));
-        fields.put("policy.currency", enumField(product.getCurrency()));
+        // 🔴 保额逐主险段对象化发布（G11/g11-04 缺口②）：字段目录声明本字段为集合字段
+        //    （object_identity_field=policyProductId、requires_object_id=1），与受益人/被保人集合字段同构。
+        //    单主险时仅多一个段前缀（维护域 Key 规范化后对外形态逐字不变）；多主险时各段各自成键，
+        //    不再互相覆盖（原单键写法下后段保额会静默覆盖前段）。
+        //    ⚠️ 合同快照指纹不含段级键：snapshotHash 折叠回裸码合计（与写侧同口径），见该处注释。
+        for (PolicyProductView mainSegment : mainSegments) {
+            String objectId = mainSegment.getPolicyProductId();
+            fields.put(collectionKey(objectId, "policy.coverage.sumInsured"),
+                    decimalField(mainSegment.getSumInsured(), objectId));
+        }
+        String mainCurrencies = PolicyMaintenanceHashing.distinctCurrencies(
+                mainSegments.stream().map(PolicyProductView::getCurrency).toList());
+        fields.put("policy.currency", enumField(mainCurrencies.isEmpty() ? null : mainCurrencies));
         fields.put("policy.holder.birthDate", dateField(policy.getPolicyHolderBirthDate()));
         fields.put("policy.holder.documentNumber", textField(policy.getPolicyHolderIdNo()));
         fields.put("policy.holder.documentType", enumField(policy.getPolicyHolderIdType()));
@@ -196,9 +273,12 @@ public class PolicyQueryServiceImpl implements PolicyQueryService {
         fields.put("policy.period.end", dateTimeField(policy.getEndDate()));
         fields.put("policy.period.start", dateTimeField(policy.getStartDate()));
         fields.put("policy.premium.total", decimalField(policy.getTotalPremium()));
-        fields.put("policy.product.id", textField(product.getProductId()));
-        fields.put("policy.product.planVersion", textField(product.getPricingPlanVersion()));
-        fields.put("policy.product.version", textField(product.getProductVersion()));
+        fields.put("policy.product.id", textField(PolicyMaintenanceHashing.joinMainProductField(
+                mainSegments.stream().map(PolicyProductView::getProductId).toList())));
+        fields.put("policy.product.planVersion", textField(PolicyMaintenanceHashing.joinMainProductField(
+                mainSegments.stream().map(PolicyProductView::getPricingPlanVersion).toList())));
+        fields.put("policy.product.version", textField(PolicyMaintenanceHashing.joinMainProductField(
+                mainSegments.stream().map(PolicyProductView::getProductVersion).toList())));
         fields.put("policy.status", enumField(policy.getPolicyStatus().getCode()));
         beneficiaries.forEach(beneficiary -> {
             String objectId = beneficiary.getId();
@@ -260,19 +340,54 @@ public class PolicyQueryServiceImpl implements PolicyQueryService {
         return new PolicySnapshotFieldValueQueryResult("DATE", value == null ? null : value.toString());
     }
 
+    /**
+     * 合同快照内容指纹（与写侧 {@code Policy.maintenanceSnapshotHash} 同算法、同口径）。
+     * <p>
+     * 🔴 发布形态 ≠ 指纹形态：{@code policy.coverage.sumInsured} 对外逐主险段对象化发布（键含段前缀），
+     * 但写侧指纹用<b>保单级合计裸码</b>（单主险时两者数值相同）。故此处把段级保额键从指纹中排除、
+     * 折叠回裸码合计——否则同一快照在读（受理采集）与写（生效回写）两侧产出不同指纹，且存量单主险
+     * 在途案件的冲突比对会被误判（部署前受理、部署后生效前再采集）。
+     * 其余字段的发布形态与指纹形态本就同构（含受益人/被保人集合键，两侧同为
+     * {@code {objectId}:{fieldCode}}）。
+     * </p>
+     */
     private String snapshotHash(
             PolicyView policy,
-            PolicyProductView product,
+            List<PolicyProductView> mainSegments,
+            String productId,
+            String productVersion,
+            String planVersion,
             long policyVersion,
             Map<String, PolicySnapshotFieldValueQueryResult> fields) {
-        Map<String, PolicyMaintenanceSnapshotFieldValue> domainFields = fields.entrySet().stream()
-                .collect(Collectors.toMap(
-                        Map.Entry::getKey,
-                        entry -> new PolicyMaintenanceSnapshotFieldValue(
-                                entry.getValue().dataType(), entry.getValue().canonicalValue())));
+        Set<String> segmentCoverageKeys = mainSegments.stream()
+                .map(mainSegment -> collectionKey(
+                        mainSegment.getPolicyProductId(), "policy.coverage.sumInsured"))
+                .collect(Collectors.toSet());
+        TreeMap<String, PolicyMaintenanceSnapshotFieldValue> domainFields = new TreeMap<>();
+        fields.forEach((key, value) -> {
+            if (!segmentCoverageKeys.contains(key)) {
+                domainFields.put(key, new PolicyMaintenanceSnapshotFieldValue(
+                        value.dataType(), value.canonicalValue()));
+            }
+        });
+        domainFields.put("policy.coverage.sumInsured", new PolicyMaintenanceSnapshotFieldValue(
+                "DECIMAL", PolicyMaintenanceHashing.totalMainSumInsuredCanonical(
+                        mainSegments.stream().map(this::mainSumInsuredMoney).toList())));
         return PolicyMaintenanceHashing.snapshotHash(
                 policy.getTenantId(), policy.getPolicyId(), policyVersion,
-                product.getProductId(), product.getProductVersion(), product.getPricingPlanVersion(), domainFields);
+                productId, productVersion, planVersion, domainFields);
+    }
+
+    /**
+     * 主险段保额（金额态），段保额为 null 时返回 null（合计时跳过）。
+     * <p>
+     * 经 {@link Money} 构造与求和：币种缺失/非法、多段币种不一致时在此抛异常（fail-closed，
+     * 与写侧 {@code Money.add} 同判据）——受理采集即拒，避免「受理放行、生效必败」。
+     * </p>
+     */
+    private Money mainSumInsuredMoney(PolicyProductView mainSegment) {
+        return mainSegment.getSumInsured() == null ? null
+                : Money.of(mainSegment.getSumInsured(), mainSegment.getCurrency());
     }
 
     private String requireSnapshotText(String value, String message) {
@@ -483,8 +598,6 @@ public class PolicyQueryServiceImpl implements PolicyQueryService {
         result.setProductId(view.getProductId());
         result.setTotalPremium(view.getTotalPremium());
         result.setLineCount(view.getLineCount());
-        result.setWaitingPeriodEndDate(view.getWaitingPeriodEndDate());
-        result.setHesitationPeriodEndDate(view.getHesitationPeriodEndDate());
         result.setCollectionMode(view.getCollectionMode());
         result.setPaymentMethod(view.getPaymentMethod());
         result.setCollectionStatus(view.getCollectionStatus());

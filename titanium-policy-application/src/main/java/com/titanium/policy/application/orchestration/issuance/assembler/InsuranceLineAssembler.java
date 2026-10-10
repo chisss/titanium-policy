@@ -143,6 +143,11 @@ public class InsuranceLineAssembler {
 
     /**
      * 标的意图 → 标的实体。
+     * <p>
+     * 标的保额可空：null 时取段保额（单标的段的「共享段保额」语义）。🔴 该 null 口径与
+     * {@code PolicyCompositionDomainServiceImpl.validateSubjectSumInsuredConservation} 的校验口径
+     * <b>逐字一致</b>（G11/g11-05）——多标的段必须显式声明各标的保额，任一为空即不守恒被拒。
+     * </p>
      */
     private InsuredSubject toSubject(IssuancePlanLine.SubjectIntent intent, Money lineSumInsured) {
         Money sumInsured = intent.subjectSumInsured() != null ? intent.subjectSumInsured() : lineSumInsured;
@@ -157,6 +162,13 @@ public class InsuranceLineAssembler {
 
     /**
      * 从参与方清单的被保险人兜底生成人身类标的（寿险/医疗险常见场景）。
+     * <p>
+     * 🔴 <b>「每被保险人复制段保额」的显式定性（G11/g11-05 第③项）</b>：本兜底<b>仅对单标的段合法</b>
+     * （与 {@link #toSubject} 的「可空 = 取段保额」同效）；<b>多被保险人（团险等）时该行为非法</b>——
+     * 各标的保额同为段保额，Σ = N×段保额 ≠ 段保额，会被 {@code PolicyCompositionDomainService}
+     * 的分项保额守恒不变量（{@code COMPOSITION_SUBJECT_SUM_INSURED_NOT_CONSERVED}）拒绝出单。
+     * 多标的段必须由调用方经 {@link IssuancePlanLine.SubjectIntent#subjectSumInsured} 显式声明各标的保额。
+     * </p>
      */
     private List<InsuredSubject> subjectsFromInsuredParties(IssuanceRequest request, IssuancePlanLine planLine) {
         InsuredPartyList partyList = request.insuredPartyList();

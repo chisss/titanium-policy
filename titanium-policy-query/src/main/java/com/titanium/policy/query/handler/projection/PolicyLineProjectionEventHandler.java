@@ -1,7 +1,9 @@
 package com.titanium.policy.query.handler.projection;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 
 import org.axonframework.config.ProcessingGroup;
@@ -15,6 +17,7 @@ import com.alibaba.fastjson2.JSON;
 import com.titanium.common.jpa.BasePersistable;
 import com.titanium.metadata.enums.BaseEnum;
 import com.titanium.metadata.valueobject.Money;
+import com.titanium.policy.common.constant.PolicyConstants;
 import com.titanium.policy.entity.policy.InsuredSubject;
 import com.titanium.policy.entity.policy.PolicyProduct;
 import com.titanium.policy.event.PolicyCreatedEvent;
@@ -99,6 +102,7 @@ public class PolicyLineProjectionEventHandler {
         view.setProductVersion(line.productVersion());
         view.setPricingPlanVersion(line.pricingPlanVersion());
         view.setInsuranceType(code(line.insuranceType()));
+        view.setInsuranceMandateType(code(line.insuranceMandateType()));
         view.setSumInsured(amount(line.sumInsured()));
         view.setPremium(amount(line.premium()));
         view.setCurrency(currency(line.premium() != null ? line.premium() : line.sumInsured()));
@@ -163,10 +167,70 @@ public class PolicyLineProjectionEventHandler {
             view.setAttributesJson(subject.attributes() != null && !subject.attributes().isEmpty()
                     ? JSON.toJSONString(subject.attributes())
                     : null);
+            applyNcdEvidence(view, subject);
             view.setTenantId(tenantId);
             stampAuditTime(view);
             policySubjectViewRepository.save(view);
         }
+    }
+
+    /**
+     * 标的属性包中的 NCD 取证键 → 读模型六列（G11/g11-03 AC-04）。
+     * <p>
+     * 键契约见 {@link PolicyConstants.SubjectAttributeKey}：系数（存量键 {@code ncd}）+ 赔案条数 +
+     * 区间起止 + 规则集编码/版本。属性包缺失取证键时六列**一律回写为 null**——不是「保留上次的值」：
+     * 本方法在标的重投影（批改/换单）时同样会跑，若沿用加载出来的旧行，改单后会把上一版取证值留在列上，
+     * 那比留空更坏（列上的数字看起来是本次反算的，实则不是）。
+     * </p>
+     * <p>
+     * 🔴 <b>缺失即为 null，绝不以默认系数 1.0 或默认区间代填</b>——它会把「未反算 / 取不到历史」
+     * 与「确无赔款」抹成同一形态，正是 AC-03 禁止的那件事。区间止点语义为**不含**（半开，
+     * 与产品域 {@code NcdLookbackWindow} 一致）。
+     * </p>
+     */
+    private void applyNcdEvidence(PolicySubjectView view, InsuredSubject subject) {
+        view.setNcdCoefficient(subject.attributeAsDecimal(PolicyConstants.SubjectAttributeKey.NCD));
+        view.setNcdClaimCount(subject.attributeAsInt(PolicyConstants.SubjectAttributeKey.NCD_CLAIM_COUNT));
+        view.setNcdPeriodFrom(readNcdInstant(subject, PolicyConstants.SubjectAttributeKey.NCD_PERIOD_FROM));
+        view.setNcdPeriodTo(readNcdInstant(subject, PolicyConstants.SubjectAttributeKey.NCD_PERIOD_TO));
+        view.setNcdRuleCode(subject.attributeAsString(PolicyConstants.SubjectAttributeKey.NCD_RULE_CODE));
+        view.setNcdRuleVersion(subject.attributeAsString(PolicyConstants.SubjectAttributeKey.NCD_RULE_VERSION));
+    }
+
+    /**
+     * 读取 NCD 取证时间点（属性包跨序列化往返，形态不唯一，逐一容忍）。
+     * <p>
+     * 事件经 Axon Jackson 序列化落事件流、投影时反序列化为 {@code Map}，时间值的实际类型取决于写入侧
+     * 的构造形态：可能是 {@link LocalDateTime}/{@link LocalDate}，也可能是 ISO-8601 字符串。
+     * 只认一种形态会让另一形态**静默落空为 null**（列上看不出区别），故统一收敛于此。
+     * </p>
+     *
+     * @param subject 标的
+     * @param key     属性键
+     * @return 时间点；缺失或不可解析返回 {@code null}（不可解析即视为未反算，不做猜测）
+     */
+    private LocalDateTime readNcdInstant(InsuredSubject subject, String key) {
+        Object value = subject.attributes() != null ? subject.attributes().get(key) : null;
+        if (value instanceof LocalDateTime dateTime) {
+            return dateTime;
+        }
+        if (value instanceof LocalDate date) {
+            return date.atStartOfDay();
+        }
+        if (value instanceof String text && !text.isBlank()) {
+            String trimmed = text.trim();
+            try {
+                return LocalDateTime.parse(trimmed);
+            } catch (DateTimeParseException ignored) {
+                try {
+                    return LocalDate.parse(trimmed).atStartOfDay();
+                } catch (DateTimeParseException notADate) {
+                    log.warn("[险种段投影] NCD 取证时间不可解析，列置空: key={}, value={}", key, trimmed);
+                    return null;
+                }
+            }
+        }
+        return null;
     }
 
     /**
@@ -207,7 +271,11 @@ public class PolicyLineProjectionEventHandler {
     }
 
     /**
-     * 段级保障期间 → 读模型三列（起期/止期/期间类型）。
+     * 段级保障期间 → 读模型七列（起期/止期/期间类型 + 段级宽限期四列）。
+     * <p>
+     * 🔴 等待期/犹豫期自 G11/g11-04（D2 裁决）由<b>段</b>承载（保单级不再持有）：交强 + 商业同单时
+     * 两主险段宽限期取值本不相同，逐段落列才能按段读回（AC-11 的 D2 项按段断言）。
+     * </p>
      */
     private void applyPeriod(PolicyProductView view, LineCoveragePeriod period) {
         if (period == null) {
@@ -216,6 +284,10 @@ public class PolicyLineProjectionEventHandler {
         view.setPeriodStart(period.periodStart());
         view.setPeriodEnd(period.periodEnd());
         view.setPeriodType(code(period.periodType()));
+        view.setWaitingPeriodDays(period.waitingPeriodDays());
+        view.setWaitingPeriodEndDate(period.waitingPeriodEndDate());
+        view.setHesitationPeriodDays(period.hesitationPeriodDays());
+        view.setHesitationPeriodEndDate(period.hesitationPeriodEndDate());
     }
 
     /**

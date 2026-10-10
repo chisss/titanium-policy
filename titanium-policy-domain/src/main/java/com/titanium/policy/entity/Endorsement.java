@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 
 import com.titanium.policy.common.enums.EndorsementCategory;
 import com.titanium.policy.common.enums.PolicyDataUpdateType;
+import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceAmountFact;
 
 /**
  * 批单实体（聚合内不可变记录）
@@ -20,6 +21,7 @@ import com.titanium.policy.common.enums.PolicyDataUpdateType;
  * @param endorsementEffectiveDate 批单生效日
  * @param changeSummary 变更摘要
  * @param originalSnapshot 批改前原值快照（文本承载，后续可结构化）
+ * @param amountFact 金额型保全的收付差额事实（字段型/状态型批单为 null）
  * @param requiresPremiumRecalc 是否触发保费重算
  * @param sourceMaintenanceId 来源保全案件ID
  * @param endorsedAt 批改落地时间
@@ -33,6 +35,7 @@ public record Endorsement(
         LocalDateTime endorsementEffectiveDate,
         String changeSummary,
         String originalSnapshot,
+        PolicyMaintenanceAmountFact amountFact,
         boolean requiresPremiumRecalc,
         String sourceMaintenanceId,
         LocalDateTime endorsedAt,

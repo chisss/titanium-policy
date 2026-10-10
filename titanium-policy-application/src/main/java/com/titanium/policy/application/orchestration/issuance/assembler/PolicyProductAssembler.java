@@ -21,9 +21,11 @@ import com.titanium.policy.port.product.ProductServicePort;
 import com.titanium.policy.valueobject.issuance.IssuanceRequest;
 import com.titanium.policy.valueobject.policy.ClauseSnapshot;
 import com.titanium.policy.valueobject.policy.CoverageSnapshot;
+import com.titanium.policy.valueobject.policy.LineCoveragePeriod;
 import com.titanium.policy.valueobject.pricing.PremiumCalculationReference;
 import com.titanium.policy.valueobject.product.ProductBasicInfo;
 import com.titanium.policy.valueobject.product.ProductClauseRef;
+import com.titanium.policy.valueobject.product.ProductIssueRules;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -96,6 +98,7 @@ public class PolicyProductAssembler {
             return List.of();
         }
         Map<String, String> policyProductIdByLineId = new HashMap<>();
+        Map<String, ProductIssueRules> issueRulesByProductId = new HashMap<>();
         Map<String, PremiumCalculationReference> referenceByLineId = referencesByLineId(calculationReferences);
         boolean requireCalculationReference = calculationReferences != null && !calculationReferences.isEmpty();
         for (InsuranceLine insuranceLine : insuranceLines) {
@@ -112,7 +115,7 @@ public class PolicyProductAssembler {
                 throw new IllegalArgumentException("险种段缺少匹配的确认计算版本引用: " + insuranceLine.lineId());
             }
             lines.add(assembleLine(insuranceLine, tenantId, policyProductIdByLineId.get(insuranceLine.lineId()),
-                    parentPolicyProductId, calculationReference));
+                    parentPolicyProductId, calculationReference, issueRulesByProductId));
         }
         log.info("保单险种段装配完成: 段数={}, 责任数合计={}", lines.size(),
                 lines.stream().mapToInt(line -> line.coverageSnapshots().size()).sum());
@@ -121,10 +124,23 @@ public class PolicyProductAssembler {
 
     /**
      * 装配单个保单段：取产品条款 → 取条款责任 → 决定挂载 → 组装段。
+     * <p>
+     * 🔴 <b>段级等待期/犹豫期在此注入</b>（G11/g11-04 D2 裁决：二者随 {@link LineCoveragePeriod}
+     * 按段承载，保单级不再持有）：取本段产品投保条件的宽限期配置，经
+     * {@link LineCoveragePeriod#withGracePeriods} 写入本段保障期间——一步/两步/三步出单的保单段
+     * 装配全部收敛于本方法，是段级宽限期的<b>唯一</b>生产点。
+     * </p>
+     * <p>
+     * 🔴 <b>取数失败不吞异常</b>（m21-02 语义自 {@code IssuanceSaga} 平移至此）：{@code getIssueRules}
+     * 抛错必须向上传播，由出单编排 / Saga 错误处理器使该次出单挂起并告警——犹豫期是长期人身险客户
+     * 的法定解约权，等待期归零则等待期内出险也会赔付。产品未配置规则（返回 {@code null}）不是错误，
+     * 按无宽限期处理。
+     * </p>
      */
     private PolicyProduct assembleLine(InsuranceLine insuranceLine, String tenantId, String policyProductId,
                                        String parentPolicyProductId,
-                                       PremiumCalculationReference calculationReference) {
+                                       PremiumCalculationReference calculationReference,
+                                       Map<String, ProductIssueRules> issueRulesCache) {
         List<ClauseSnapshot> clauseSnapshots = new ArrayList<>();
         List<CoverageSnapshot> coverageSnapshots = new ArrayList<>();
         ProductBasicInfo product = productServicePort.getProductBasicInfo(insuranceLine.productId());
@@ -148,15 +164,41 @@ public class PolicyProductAssembler {
         String productVersion = insuranceLine.productVersion() != null
                 ? insuranceLine.productVersion() : product != null ? product.productVersion() : null;
 
+        LineCoveragePeriod coveragePeriod = insuranceLine.coveragePeriod();
+        ProductIssueRules issueRules = issueRulesOf(insuranceLine.productId(), issueRulesCache);
+        if (coveragePeriod != null) {
+            coveragePeriod = coveragePeriod.withGracePeriods(
+                    issueRules != null ? issueRules.waitingPeriodDays() : null,
+                    issueRules != null ? issueRules.hesitationPeriodDays() : null);
+        }
+
         return new PolicyProduct(policyProductId, insuranceLine.lineNo(), insuranceLine.productCategory(),
                 parentPolicyProductId, insuranceLine.productId(), insuranceLine.productCode(),
                 productName, productVersion,
                 calculationReference != null ? calculationReference.pricingPlanVersion() : null,
                 insuranceLine.insuranceType(), insuranceLine.sumInsured(),
-                insuranceLine.payablePremium(), insuranceLine.coveragePeriod(), insuranceLine.paymentTerms(),
+                insuranceLine.payablePremium(), coveragePeriod, insuranceLine.paymentTerms(),
                 insuranceLine.underwritingConclusion(), resolveLineStatus(insuranceLine), List.copyOf(clauseSnapshots),
                 insuranceLine.insuredSubjects() != null ? insuranceLine.insuredSubjects() : List.of(),
-                List.copyOf(coverageSnapshots));
+                List.copyOf(coverageSnapshots),
+                product != null ? product.insuranceMandateType() : null);
+    }
+
+    /**
+     * 取产品出单规则（同一次装配内按产品ID记忆化，多主险同产品不重复远程取数）。
+     * <p>
+     * 🔴 与 {@link #assembleLine} 同一口径：<b>不吞取数异常</b>；产品无规则配置时返回 {@code null}
+     * （记忆化亦缓存 {@code null}，避免无规则产品被反复查询）。
+     * </p>
+     */
+    private ProductIssueRules issueRulesOf(String productId, Map<String, ProductIssueRules> cache) {
+        if (productId == null) {
+            return null;
+        }
+        if (!cache.containsKey(productId)) {
+            cache.put(productId, productServicePort.getIssueRules(productId));
+        }
+        return cache.get(productId);
     }
 
     private Map<String, PremiumCalculationReference> referencesByLineId(

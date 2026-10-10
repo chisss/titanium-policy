@@ -48,6 +48,7 @@ public interface InsuranceWebMapper {
     @Mapping(target = "sumInsured", ignore = true)
     @Mapping(target = "paymentMode", ignore = true)
     @Mapping(target = "premiumPaymentYears", ignore = true)
+    @Mapping(target = "sumInsuredTiers", ignore = true)
     ConvertProposalToInsuranceCommand toCommand(ConvertToInsuranceDTO request, String tenantId);
 
     /**
@@ -68,6 +69,7 @@ public interface InsuranceWebMapper {
     @Mapping(target = "sumInsured", ignore = true)
     @Mapping(target = "paymentMode", ignore = true)
     @Mapping(target = "premiumPaymentYears", ignore = true)
+    @Mapping(target = "sumInsuredTiers", ignore = true)
     ConvertProposalToInsuranceCommand toCommand(ConvertToInsuranceRequest dto, String tenantId);
 
     /**

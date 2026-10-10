@@ -5,6 +5,7 @@ import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
+import com.titanium.metadata.enums.insurance.InsuranceMandateType;
 import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.policy.CoverageAttachLevel;
 import com.titanium.metadata.enums.policy.PolicyLineStatus;
@@ -34,7 +35,8 @@ import com.titanium.policy.valueobject.policy.LinePaymentTerms;
  * </ol>
  * <p>
  * 主险与附加险的关系以 {@link #productCategory} 与 {@link #parentPolicyProductId} 表达：
- * 一张保单有且仅有一个 MAIN 段，RIDER 段的 parent 必须指向该主险段。单险种保单即段列表长度为 1。
+ * 一张保单<b>至少一个</b> MAIN 段（G11/g11-04 方案 B：交强 + 商业同单即两个主险段，主险段间
+ * {@code productId} 唯一），RIDER 段的 parent 必须指向<b>任一</b>主险段。单险种保单即段列表长度为 1。
  * </p>
  * <p>
  * 取代原 {@code entity/InsuranceProduct} 与 {@code entity/insurance/InsuranceProduct}
@@ -60,6 +62,9 @@ import com.titanium.policy.valueobject.policy.LinePaymentTerms;
  * @param clauseSnapshots        本险种绑定的条款快照（L2.5）
  * @param insuredSubjects        本险种承保的标的（L3）
  * @param coverageSnapshots      本险种的保险责任快照（L4，含挂载层级）
+ * @param insuranceMandateType   险别（法定强制 / 自愿投保，G11/g11-04；与险种正交，随产品快照冻结，
+ *                               {@code null} = 产品未声明险别——存量事件与全部非车险产品的正常取值，
+ *                               消费方按「非强制」处理，<b>不得</b>推断为自愿）
  */
 public record PolicyProduct(String policyProductId, int lineNo, ProductCategory productCategory,
                             String parentPolicyProductId, String productId, String productCode, String productName,
@@ -67,9 +72,9 @@ public record PolicyProduct(String policyProductId, int lineNo, ProductCategory 
                             Money sumInsured, Money premium, LineCoveragePeriod coveragePeriod, LinePaymentTerms paymentTerms,
                             ConclusionType underwritingConclusion, PolicyLineStatus lineStatus,
                             List<ClauseSnapshot> clauseSnapshots, List<InsuredSubject> insuredSubjects,
-                            List<CoverageSnapshot> coverageSnapshots) {
+                            List<CoverageSnapshot> coverageSnapshots, InsuranceMandateType insuranceMandateType) {
 
-    /** 兼容计划版本尚未冻结的历史事件与旧调用方。 */
+    /** 兼容计划版本尚未冻结的历史事件与旧调用方（险别同缺省为未声明）。 */
     public PolicyProduct(String policyProductId, int lineNo, ProductCategory productCategory,
                          String parentPolicyProductId, String productId, String productCode, String productName,
                          String productVersion, InsuranceProductType insuranceType, Money sumInsured, Money premium,
@@ -79,7 +84,35 @@ public record PolicyProduct(String policyProductId, int lineNo, ProductCategory 
                          List<CoverageSnapshot> coverageSnapshots) {
         this(policyProductId, lineNo, productCategory, parentPolicyProductId, productId, productCode, productName,
                 productVersion, null, insuranceType, sumInsured, premium, coveragePeriod, paymentTerms,
-                underwritingConclusion, lineStatus, clauseSnapshots, insuredSubjects, coverageSnapshots);
+                underwritingConclusion, lineStatus, clauseSnapshots, insuredSubjects, coverageSnapshots, null);
+    }
+
+    /** 兼容险别尚未冻结的历史事件与旧调用方（计划版本已在位）。 */
+    public PolicyProduct(String policyProductId, int lineNo, ProductCategory productCategory,
+                         String parentPolicyProductId, String productId, String productCode, String productName,
+                         String productVersion, String pricingPlanVersion, InsuranceProductType insuranceType,
+                         Money sumInsured, Money premium, LineCoveragePeriod coveragePeriod,
+                         LinePaymentTerms paymentTerms, ConclusionType underwritingConclusion,
+                         PolicyLineStatus lineStatus, List<ClauseSnapshot> clauseSnapshots,
+                         List<InsuredSubject> insuredSubjects, List<CoverageSnapshot> coverageSnapshots) {
+        this(policyProductId, lineNo, productCategory, parentPolicyProductId, productId, productCode, productName,
+                productVersion, pricingPlanVersion, insuranceType, sumInsured, premium, coveragePeriod, paymentTerms,
+                underwritingConclusion, lineStatus, clauseSnapshots, insuredSubjects, coverageSnapshots, null);
+    }
+
+    /**
+     * 是否法定强制险种段（如交强险）。
+     * <p>
+     * 🔴 <b>空值语义</b>：{@code null}（产品未声明险别）按<b>非强制</b>返回 {@code false}——
+     * 存量事件与全部非车险产品均未声明，若把 null 当强制会让它们全被误判。
+     * 消费方（G11/g11-04 ⑧「交强不得单独解绑」守卫）以本谓词为唯一判据。
+     * </p>
+     *
+     * @return 法定强制返回 {@code true}
+     */
+    @JsonIgnore
+    public boolean isCompulsory() {
+        return insuranceMandateType == InsuranceMandateType.COMPULSORY;
     }
 
     /**
@@ -171,7 +204,7 @@ public record PolicyProduct(String policyProductId, int lineNo, ProductCategory 
         return new PolicyProduct(policyProductId, lineNo, productCategory, parentPolicyProductId, productId,
                 productCode, productName, productVersion, pricingPlanVersion, insuranceType, newSumInsured, premium,
                 coveragePeriod, paymentTerms, underwritingConclusion, lineStatus, clauseSnapshots, insuredSubjects,
-                coverageSnapshots);
+                coverageSnapshots, insuranceMandateType);
     }
 
     /**
@@ -265,6 +298,7 @@ public record PolicyProduct(String policyProductId, int lineNo, ProductCategory 
     private PolicyProduct withConclusionAndStatus(ConclusionType conclusion, PolicyLineStatus status) {
         return new PolicyProduct(policyProductId, lineNo, productCategory, parentPolicyProductId, productId,
                 productCode, productName, productVersion, pricingPlanVersion, insuranceType, sumInsured, premium,
-                coveragePeriod, paymentTerms, conclusion, status, clauseSnapshots, insuredSubjects, coverageSnapshots);
+                coveragePeriod, paymentTerms, conclusion, status, clauseSnapshots, insuredSubjects, coverageSnapshots,
+                insuranceMandateType);
     }
 }

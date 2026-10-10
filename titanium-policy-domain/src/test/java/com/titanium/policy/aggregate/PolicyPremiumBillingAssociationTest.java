@@ -90,7 +90,7 @@ class PolicyPremiumBillingAssociationTest {
         Money premium = Money.of(new BigDecimal("1000.00"), "CNY");
         return new PolicyCreatedEvent(POLICY_ID, new PolicyNo("P202608120001"), PolicyForm.INDIVIDUAL,
                 "PRODUCT_001", null, null, null, "BIZ_001", null,
-                PolicyPeriod.of(now.minusMinutes(1), now.plusYears(1), 0, 0), premium, null, List.of(), null,
+                PolicyPeriod.of(now.minusMinutes(1), now.plusYears(1)), premium, null, List.of(), null,
                 CollectionInfo.initial(PremiumCollectionMode.ONLINE, premium, now), null,
                 new PolicyStatus(PolicyStatusCode.NOT_EFFECTIVE, now, "创建", "SYSTEM"), null, null,
                 TENANT_ID);

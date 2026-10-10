@@ -44,7 +44,7 @@ class PolicyEndorsementTest {
     private PolicyCreatedEvent createdEvent() {
         LocalDateTime now = LocalDateTime.now();
         return new PolicyCreatedEvent(POLICY_ID, new PolicyNo("POL-2024-0001"), PolicyForm.INDIVIDUAL, null, null, null, null, null,
-                PolicyPeriod.of(now.minusDays(1), now.plusYears(1), 0, 0), null, null, java.util.List.of(), null, null, null, new PolicyStatus(PolicyStatusCode.NOT_EFFECTIVE, now, "创建", "system"),
+                PolicyPeriod.of(now.minusDays(1), now.plusYears(1)), null, null, java.util.List.of(), null, null, null, new PolicyStatus(PolicyStatusCode.NOT_EFFECTIVE, now, "创建", "system"),
                 null, null, TENANT_ID);
     }
 

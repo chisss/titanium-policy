@@ -40,14 +40,13 @@ class PremiumScheduleOrchestratorTest {
 
     @ParameterizedTest
     @CsvSource({
-        "LUMP_SUM,1,1000.00",
-        "ANNUAL,20,50.00",
-        "SEMI_ANNUAL,40,25.00",
-        "QUARTERLY,80,12.50",
-        "MONTHLY,240,4.17"
+        "LUMP_SUM,1",
+        "ANNUAL,20",
+        "SEMI_ANNUAL,40",
+        "QUARTERLY,80",
+        "MONTHLY,240"
     })
-    void calculatesAllSupportedPaymentFrequencies(String paymentMode, int expectedPeriods,
-                                                   BigDecimal expectedInstallment) {
+    void convertsAllSupportedPaymentFrequenciesAndPassesTotalPremium(String paymentMode, int expectedPeriods) {
         orchestrator.generate(POLICY_ID, BILL_ID, ACCOUNT_ID, paymentMode, 20,
                 Money.of(new BigDecimal("1000.00"), "CNY"), FIRST_DUE_DATE, TENANT_ID);
 
@@ -56,7 +55,8 @@ class PremiumScheduleOrchestratorTest {
         PremiumScheduleRequest request = captor.getValue();
         assertEquals(ACCOUNT_ID, request.billingAccountId());
         assertEquals(expectedPeriods, request.totalPeriods());
-        assertEquals(expectedInstallment, request.installmentAmount());
+        // 编排器只做期数换算，不再自行整除：分期舍入与尾差承接由计费域统一负责
+        assertEquals(new BigDecimal("1000.00"), request.totalPremium());
         assertEquals(FIRST_DUE_DATE, request.firstDueDate());
     }
 

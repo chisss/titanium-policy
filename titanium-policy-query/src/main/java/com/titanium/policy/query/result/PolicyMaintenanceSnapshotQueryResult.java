@@ -1,9 +1,11 @@
 package com.titanium.policy.query.result;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Map;
 
 import com.titanium.metadata.enums.policy.PolicyEnum.PolicyStatus;
+import com.titanium.metadata.enums.policy.PolicyServiceRestrictionType;
 
 /** 保全建案使用的 Policy 权威只读快照。 */
 public record PolicyMaintenanceSnapshotQueryResult(
@@ -15,6 +17,7 @@ public record PolicyMaintenanceSnapshotQueryResult(
         String productVersion,
         String planVersion,
         PolicyStatus policyStatus,
+        List<PolicyServiceRestrictionType> serviceRestrictionTypes,
         long policyVersion,
         OffsetDateTime businessEffectiveAt,
         OffsetDateTime nextBillingDateAt,
@@ -23,6 +26,11 @@ public record PolicyMaintenanceSnapshotQueryResult(
         String snapshotContentHash,
         OffsetDateTime capturedAt,
         Map<String, PolicySnapshotFieldValueQueryResult> fieldValues) {
+
+    public PolicyMaintenanceSnapshotQueryResult {
+        serviceRestrictionTypes = serviceRestrictionTypes == null
+                ? List.of() : List.copyOf(serviceRestrictionTypes);
+    }
 
     /** 兼容 M5-04 之前不含未来计划日期的内部构造。 */
     public PolicyMaintenanceSnapshotQueryResult(
@@ -41,7 +49,7 @@ public record PolicyMaintenanceSnapshotQueryResult(
             OffsetDateTime capturedAt,
             Map<String, PolicySnapshotFieldValueQueryResult> fieldValues) {
         this(tenantId, policyId, policyNumber, customerId, productId, productVersion, planVersion,
-                policyStatus, policyVersion, businessEffectiveAt, null, null, snapshotStorageKey,
+                policyStatus, List.of(), policyVersion, businessEffectiveAt, null, null, snapshotStorageKey,
                 snapshotContentHash, capturedAt, fieldValues);
     }
 

@@ -18,6 +18,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility;
 
+import com.titanium.common.context.RequestContextHolder;
 import com.titanium.metadata.enums.billing.PremiumCollectionMode;
 import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.policy.PolicyForm;
@@ -43,7 +44,6 @@ import com.titanium.policy.event.insurance.InsuranceSubmittedForUnderwritingEven
 import com.titanium.policy.event.insurance.UnderwritingResultReceivedEvent;
 import com.titanium.policy.generator.PolicyNoGenerator;
 import com.titanium.policy.port.investment.InvestmentAccountPort;
-import com.titanium.policy.port.product.ProductServicePort;
 import com.titanium.policy.port.underwriting.UnderwritingDecisionGateway;
 import com.titanium.policy.service.PolicyIssuanceDomainService;
 import com.titanium.policy.valueobject.insurance.UnderwritingDecisionRequest;
@@ -52,7 +52,6 @@ import com.titanium.policy.valueobject.policy.ChannelInfo;
 import com.titanium.policy.valueobject.policy.CollectionInfo;
 import com.titanium.policy.valueobject.policy.CollectionResult;
 import com.titanium.policy.valueobject.policy.PolicyPeriod;
-import com.titanium.policy.valueobject.product.ProductIssueRules;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -72,8 +71,21 @@ import lombok.extern.slf4j.Slf4j;
  *         创建正式保单并结束 Saga。</li>
  * </ol>
  * <p>
- * <b>核保通信</b>：当前经 {@link UnderwritingDecisionGateway} 同步实现对接核保域（注册中心/消息总线就绪前的过渡方案）。
- * 后续可替换为异步消息实现，本 Saga 的编排骨架（事件 → 命令的状态机推进）无需改动。
+ * <b>核保通信（双轨回流，两轨均已落地）</b>：核保结论经两条独立通道抵达本 Saga，二者<b>不分场景</b>、
+ * 同一决策可能两轨都到——核保域 {@code UnderwritingKafkaEventPublisher} 对每个
+ * {@code UnderwritingDecidedEvent} <b>无条件</b>发布，自动决策件在同步轨即时返回的同时也已进入异步轨：
+ * </p>
+ * <ul>
+ *     <li><b>同步轨</b>：本 Saga 第 2 步经 {@link UnderwritingDecisionGateway} 即时拉取结论，以
+ *         {@link ReceiveUnderwritingResultCommand} 回写（见 {@code on(InsuranceSubmittedForUnderwritingEvent)}）；</li>
+ *     <li><b>异步轨</b>：核保域发布到 {@code underwriting-decided}，由 policy 域
+ *         {@code UnderwritingDecidedEventListener}（infrastructure/messaging）消费后回写同一命令。</li>
+ * </ul>
+ * <p>
+ * 两轨收敛到<b>同一个命令</b>，故第 3 步（{@link UnderwritingResultReceivedEvent} → 承保）对来源无感；
+ * 重复投递的去重由聚合根承担（{@code Insurance.isRedeliveredResult}：同核保单号 + 同结论 ⇒ 静默幂等、
+ * 不发事件），守卫测试见 {@code InsuranceUnderwritingResultIdempotencyTest} 与
+ * {@code UnderwritingDecidedEventListenerTest}。
  * </p>
  */
 @Slf4j
@@ -119,9 +131,6 @@ public class IssuanceSaga {
     @Autowired
     private transient PremiumScheduleOrchestrator premiumScheduleOrchestrator;
 
-    @Autowired
-    private transient ProductServicePort productServicePort;
-
     /** 保单形态 */
     private PolicyForm    policyForm;
     /** 投保人ID */
@@ -162,10 +171,6 @@ public class IssuanceSaga {
     private PremiumCollectionMode collectionMode;
     /** 渠道信息（透传保单，此前保单查不到来源渠道） */
     private ChannelInfo channelInfo;
-    /** 等待期天数（取产品投保条件配置） */
-    private int waitingPeriodDays;
-    /** 犹豫期天数（取产品投保条件配置） */
-    private int hesitationPeriodDays;
 
     /**
      * 【投保】投保单创建 → 启动 Saga，记忆后续创建保单所需数据
@@ -173,6 +178,11 @@ public class IssuanceSaga {
     @StartSaga
     @SagaEventHandler(associationProperty = "insuranceId")
     public void on(InsuranceCreatedEvent event) {
+        inTenantScope(event.tenantId(), event.insuranceId(), () -> rememberCreation(event));
+    }
+
+    /** 【投保】记忆后续创建保单所需数据。 */
+    private void rememberCreation(InsuranceCreatedEvent event) {
         log.info("[IssuanceSaga] 启动: insuranceId={}, tenantId={}", event.insuranceId(), event.tenantId());
         this.policyForm = event.policyForm();
         this.holderId = event.holderId();
@@ -197,36 +207,6 @@ public class IssuanceSaga {
         this.bizNo = event.bizNo();
         this.collectionMode = event.collectionMode();
         this.channelInfo = event.channelInfo();
-        // 取产品投保条件的等待期/犹豫期配置（此前 policy 域完全未消费该配置）
-        rememberPolicyPeriodDays(event.insuranceLines());
-    }
-
-    /**
-     * 记忆主险产品配置的等待期与犹豫期天数（出单时构造保单期间用）。
-     * <p>
-     * 远程取数失败不阻断出单，按无等待期/无犹豫期兜底并告警——二者影响理赔与退保判定，
-     * 缺失需人工补正。
-     * </p>
-     */
-    private void rememberPolicyPeriodDays(List<InsuranceLine> lines) {
-        if (lines == null || lines.isEmpty()) {
-            return;
-        }
-        InsuranceLine main = lines.stream().filter(InsuranceLine::isMain).findFirst().orElse(lines.get(0));
-        if (main.productId() == null) {
-            return;
-        }
-        // 🔴 m21-02（审查报告 RPC-01）：此处原为 catch-all，把「取产品规则失败」转成
-        // 「按无等待期兜底（需人工补正）」——而那句「人工补正」全仓并不存在对应流程，
-        // 结果是等待期与犹豫期静默归零继续出单：犹豫期是长期人身险客户的法定解约权，
-        // 等待期归零则等待期内出险也会赔付（直接赔付损失）。现改为**不吞异常**，
-        // 由 Saga 的错误处理器（PolicySagaErrorHandlingConfiguration 的传播型处理器）
-        // 使该次出单挂起并告警，等待人工处置。
-        ProductIssueRules rules = productServicePort.getIssueRules(main.productId());
-        if (rules != null) {
-            this.waitingPeriodDays = rules.waitingPeriodDays() != null ? rules.waitingPeriodDays() : 0;
-            this.hesitationPeriodDays = rules.hesitationPeriodDays() != null ? rules.hesitationPeriodDays() : 0;
-        }
     }
 
     /**
@@ -234,11 +214,18 @@ public class IssuanceSaga {
      */
     @SagaEventHandler(associationProperty = "insuranceId")
     public void on(InsuranceSubmittedForUnderwritingEvent event) {
+        inTenantScope(event.tenantId(), event.insuranceId(), () -> requestUnderwritingDecision(event));
+    }
+
+    /** 【核保】请求核保域出具结论并回写投保单聚合。 */
+    private void requestUnderwritingDecision(InsuranceSubmittedForUnderwritingEvent event) {
         log.info("[IssuanceSaga] 提交核保，请求核保结论: insuranceId={}", event.insuranceId());
 
         // UW-2：从记忆的参与方清单提取首要被保人核保要素（年龄/性别），构建富核保请求。
-        // 清单缺失时各要素为 null，核保域按保守标准体兜底。
+        // G02/AC-01：年龄/性别现已经跨域契约全量透传；职业类别/BMI 在承保前置链路无数据源，
+        // 缺失一律留痕（见 warnMissingRiskFactors），核保域对 null 要素按其可得要素评分。
         InsuredInfo primaryInsured = extractPrimaryInsured();
+        warnMissingRiskFactors(primaryInsured, event.insuranceId());
         UnderwritingDecisionRequest request = new UnderwritingDecisionRequest(event.insuranceId(), event.holderId(),
                 event.insuredCount(), this.sumInsured, event.exactPremium(), event.currency(), event.productCodes(),
                 event.tenantId(), primaryInsured != null ? primaryInsured.age() : null,
@@ -263,6 +250,11 @@ public class IssuanceSaga {
      */
     @SagaEventHandler(associationProperty = "insuranceId")
     public void on(UnderwritingResultReceivedEvent event) {
+        inTenantScope(event.tenantId(), event.insuranceId(), () -> applyUnderwritingResult(event));
+    }
+
+    /** 【承保】按核保结论路由：通过则推进出单，否则结束 Saga。 */
+    private void applyUnderwritingResult(UnderwritingResultReceivedEvent event) {
         // UW-3：记忆核保加费率，出单时并入保费
         this.extraPremiumRatio = event.extraPremiumRatio();
         // 记忆核保单ID，出单时透传保单（承保依据溯源，此前保单查不到核保单）
@@ -296,6 +288,11 @@ public class IssuanceSaga {
     @EndSaga
     @SagaEventHandler(associationProperty = "insuranceId")
     public void on(InsuranceIssuedEvent event) {
+        inTenantScope(event.tenantId(), event.insuranceId(), () -> issuePolicy(event));
+    }
+
+    /** 【出单】创建正式保单，并完成出单后收费/期缴/投资账户编排。 */
+    private void issuePolicy(InsuranceIssuedEvent event) {
         String policyId = UUID.randomUUID().toString();
         String policyNo = policyNoGenerator.generatePolicyNo(tenantId);
 
@@ -324,7 +321,7 @@ public class IssuanceSaga {
                 sumInsured != null ? Money.of(sumInsured, payablePremium.currency()) : null,
                 standardPremium,
                 payablePremium,
-                PolicyPeriod.of(insurancePeriodStart, insurancePeriodEnd, waitingPeriodDays, hesitationPeriodDays),
+                PolicyPeriod.of(insurancePeriodStart, insurancePeriodEnd),
                 null,
                 CollectionInfo.initial(collectionMode, payablePremium, LocalDateTime.now()),
                 channelInfo,
@@ -418,6 +415,66 @@ public class IssuanceSaga {
             return null;
         }
         return insuredPartyList.insuredList().get(0);
+    }
+
+    /**
+     * 核保要素缺失留痕（G02/AC-01）
+     * <p>
+     * 🔴 缺失<b>不阻断</b>出单——核保域对未提供的要素按 {@code null} 处理、以其余可得要素评分
+     * （{@code InsuredRiskFactors} 四分量均可空）。但缺失必须<b>可检索</b>：静默降级会让
+     * 「某险种长期在零要素下自动核保」无从发现，而这正是改造前「职业+BMI 从未真正到达核保域」
+     * 潜伏至今的原因——链路两端各自都「正常」，中间丢要素无声无息。
+     * </p>
+     * <p>
+     * 两类缺失成因不同，分列告警以便反查：① 被保人参与方清单缺失（异常路径，年龄/性别一并丢失）；
+     * ② 职业类别/BMI 结构性不可得（{@code InsuredPartyList.InsuredInfo} 无对应字段，属柜面/APP
+     * 完整录入才有的人力要素，承保前置链路本就不具备该数据源）。
+     * </p>
+     *
+     * @param primaryInsured 首要被保人（可能为 null）
+     * @param insuranceId    投保单ID（缺失留痕的检索键）
+     */
+    private void warnMissingRiskFactors(InsuredInfo primaryInsured, String insuranceId) {
+        if (primaryInsured == null) {
+            log.warn("[IssuanceSaga] 被保人参与方清单缺失，年龄/性别无法透传核保域: insuranceId={}", insuranceId);
+        }
+        log.warn("[IssuanceSaga] 职业类别/BMI 在承保前置链路不可得（参与方清单无对应字段），本次核保不含该两项要素:"
+                + " insuranceId={}", insuranceId);
+    }
+
+    /**
+     * 在租户请求上下文作用域内执行 Saga 步骤。
+     * <p>
+     * 🔴 <b>为何 Saga 必须自建作用域</b>：{@code RequestContextHolder} 基于 {@code ThreadLocal}，
+     * 而 Saga 的事件处理器运行在 Axon 的 tracking processor 线程上——它与创建 Saga 的 Web 请求线程
+     * 不是同一个线程，线程上下文不跨线程传播。本类的出站调用（核保 Feign、产品试算 Feign、billing
+     * Feign）与命令派发都<b>依赖线程上下文提供租户</b>：出站 Feign 拦截器是「上下文有才注入」策略，
+     * 上下文为空时静默不加 {@code X-Tenant-Id} 头，对端契约入口随即 400（{@code TENANT_HEADER_MISSING}）。
+     * </p>
+     * <p>
+     * 2026-09-27 g02-06 真机实测：第 4 步出单调用产品试算即因该 400 失败，Saga 处理器进入退避重试、
+     * 阻塞整个 tracking segment。根因不是某处漏传租户（各调用点的 {@code tenantId} 一直在显式传参），
+     * 而是 <b>Saga 线程根本没有上下文</b>——参数传得再全，也到不了出站请求头。
+     * </p>
+     * <p>
+     * 故此处以 Saga <b>自身持久化的租户</b>（取自事件载荷、随 Saga 状态一同序列化）建立作用域，
+     * 不依赖任何跨线程上下文搬运机制；这是 {@code RequestContextHolder.runAsTenant} 的既定用法
+     * （「非 Web 线程的唯一推荐用法」）。作用域在步骤结束后自动还原，不污染线程池复用线程。
+     * </p>
+     *
+     * @param tenantId    本步骤所属租户
+     * @param insuranceId 投保单ID（缺失租户时的告警检索键）
+     * @param step        该步骤的处理逻辑
+     */
+    private void inTenantScope(String tenantId, String insuranceId, Runnable step) {
+        if (tenantId == null || tenantId.isBlank()) {
+            // 保持改造前行为（不建立作用域），但留下可检索告警——静默降级会让「出站缺租户头」无从反查
+            log.warn("[IssuanceSaga] 事件未携带租户，跳过身份作用域建立（本步骤出站调用将缺少租户头）: insuranceId={}",
+                    insuranceId);
+            step.run();
+            return;
+        }
+        RequestContextHolder.runAsTenant(tenantId, step);
     }
 
 }

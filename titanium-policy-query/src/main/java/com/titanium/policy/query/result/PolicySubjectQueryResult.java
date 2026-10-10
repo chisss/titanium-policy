@@ -1,6 +1,7 @@
 package com.titanium.policy.query.result;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 import lombok.Data;
 
@@ -41,4 +42,27 @@ public class PolicySubjectQueryResult {
 
     /** 类型化属性包 JSON（结构由产品 Schema 定义） */
     private String     attributesJson;
+
+    /**
+     * NCD 系数反算结果（G11/g11-03 AC-04）
+     * <p>
+     * 🔴 {@code null} = **未反算**，与「确无赔款」不可混同：后者由 {@link #ncdClaimCount} = 0 表达。
+     * </p>
+     */
+    private BigDecimal    ncdCoefficient;
+
+    /** 反算取证：统计区间内计入的历史赔案条数（{@code null}=未反算；0=确无赔款） */
+    private Integer       ncdClaimCount;
+
+    /** 反算取证：统计区间起点（含） */
+    private LocalDateTime ncdPeriodFrom;
+
+    /** 反算取证：统计区间止点（**不含**，半开口径） */
+    private LocalDateTime ncdPeriodTo;
+
+    /** 反算取证：所用规则集编码 */
+    private String        ncdRuleCode;
+
+    /** 反算取证：所用规则集版本（签发即冻结） */
+    private String        ncdRuleVersion;
 }

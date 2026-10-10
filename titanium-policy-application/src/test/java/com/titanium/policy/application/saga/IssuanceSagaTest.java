@@ -22,6 +22,7 @@ import org.axonframework.test.saga.SagaTestFixture;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import com.titanium.common.context.RequestContextHolder;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.enums.product.ProductEnum.PaymentFrequency;
 import com.titanium.metadata.enums.underwriting.UnderwritingEnum.ConclusionType;
@@ -50,6 +51,7 @@ import com.titanium.policy.service.impl.PolicyIssuanceDomainServiceImpl;
 import com.titanium.policy.valueobject.billing.BillingResult;
 import com.titanium.policy.valueobject.billing.PremiumBillRequest;
 import com.titanium.policy.valueobject.billing.PremiumScheduleRequest;
+import com.titanium.policy.valueobject.billing.UnpaidBill;
 import com.titanium.policy.valueobject.insurance.UnderwritingDecisionRequest;
 import com.titanium.policy.valueobject.insurance.UnderwritingResult;
 import com.titanium.policy.valueobject.policy.CollectionResult;
@@ -60,6 +62,7 @@ import com.titanium.policy.valueobject.pricing.ConfirmedPremiumResult;
 import com.titanium.policy.valueobject.product.ProductBasicInfo;
 import com.titanium.policy.valueobject.product.ProductClauseRef;
 import com.titanium.policy.valueobject.product.ProductIssueRules;
+import com.titanium.policy.valueobject.product.ProductSumInsuredTiers;
 
 /**
  * 投保出单 Saga 全链路编排测试
@@ -146,6 +149,31 @@ public class IssuanceSagaTest {
     }
 
     /**
+     * 🔴 回归守卫（2026-09-27 g02-06 真机缺陷）：Saga 步骤必须在**事件携带的租户作用域**内执行
+     * <p>
+     * Saga 处理器运行在 Axon tracking 线程上，该线程没有请求上下文（{@code ThreadLocal} 不跨线程传播）；
+     * 而出站 Feign 拦截器是「上下文有租户才注入 {@code X-Tenant-Id}」策略 ⇒ 缺头时对端契约入口返回
+     * 400 {@code TENANT_HEADER_MISSING} ⇒ Saga 进退避重试并**阻塞整个 tracking segment**（真机表现为
+     * 「出单第 4 步调产品试算失败、后续新单完全不推进」）。故断言两点：网关被调用时上下文中已有事件
+     * 租户；步骤结束后上下文还原，不把租户泄漏到线程池复用线程。
+     * </p>
+     */
+    @Test
+    public void testSagaStepRunsWithinEventTenantScope() {
+        underwritingGateway.setResult(approvedResult());
+        String tenantBefore = RequestContextHolder.getTenantId();
+
+        fixture.givenAggregate(INSURANCE_ID).published(insuranceCreatedEvent())
+                .whenAggregate(INSURANCE_ID).publishes(insuranceSubmittedEvent())
+                .expectActiveSagas(1);
+
+        assertEquals(TENANT_ID, underwritingGateway.tenantIdOnCall(),
+                "核保网关被调用时线程上下文必须已建立事件租户作用域，否则出站 Feign 静默缺 X-Tenant-Id 头");
+        assertEquals(tenantBefore, RequestContextHolder.getTenantId(),
+                "Saga 步骤结束后必须还原线程上下文（runAsTenant 的 finally 语义），不得泄漏到复用线程");
+    }
+
+    /**
      * 核保通过 → 触发承保出单命令，Saga 保持活跃
      */
     @Test
@@ -228,7 +256,7 @@ public class IssuanceSagaTest {
     }
 
     /**
-     * 期缴计划金额必须与保单全部承保险种段的应付总保费保持一致。
+     * 期缴计划的总保费必须与保单全部承保险种段的应付总保费保持一致（主险 1000 + 附加险 200）。
      */
     @Test
     public void testPremiumScheduleUsesPolicyPayablePremium() {
@@ -238,7 +266,7 @@ public class IssuanceSagaTest {
 
         PremiumScheduleRequest schedule = billingServicePort.lastSchedule();
         assertEquals(20, schedule.totalPeriods());
-        assertEquals(new BigDecimal("60.00"), schedule.installmentAmount());
+        assertEquals(new BigDecimal("1200.00"), schedule.totalPremium());
         assertEquals(List.of(PRODUCT_ID, "RIDER_ID_001"), confirmedPremiumPricingPort.requestedProductIds());
     }
 
@@ -258,7 +286,7 @@ public class IssuanceSagaTest {
 
         PremiumScheduleRequest attemptedSchedule = billingServicePort.lastSchedule();
         assertEquals(20, attemptedSchedule.totalPeriods());
-        assertEquals(new BigDecimal("50.00"), attemptedSchedule.installmentAmount());
+        assertEquals(new BigDecimal("1000.00"), attemptedSchedule.totalPremium());
     }
 
     // ==================== 测试夹具数据 ====================
@@ -337,6 +365,8 @@ public class IssuanceSagaTest {
     private static class StubUnderwritingDecisionGateway implements UnderwritingDecisionGateway {
         private UnderwritingResult result;
         private UnderwritingDecisionRequest lastRequest;
+        /** 被调用瞬间的线程上下文租户——Saga 是否在租户作用域内发起出站调用的直接证据（g02-06 回归守卫） */
+        private String tenantIdOnCall;
 
         void setResult(UnderwritingResult result) {
             this.result = result;
@@ -345,11 +375,16 @@ public class IssuanceSagaTest {
         @Override
         public UnderwritingResult requestDecision(UnderwritingDecisionRequest request) {
             this.lastRequest = request;
+            this.tenantIdOnCall = RequestContextHolder.getTenantId();
             return result;
         }
 
         UnderwritingDecisionRequest lastRequest() {
             return lastRequest;
+        }
+
+        String tenantIdOnCall() {
+            return tenantIdOnCall;
         }
     }
 
@@ -399,6 +434,12 @@ public class IssuanceSagaTest {
         }
 
         @Override
+        public ProductSumInsuredTiers getCoverageSumInsuredConfigs(String productId) {
+            // 本桩不模拟责任档次配置：空 coverages ⇒ 聚合按「产品未配置档次」放行（档次校验另有专项测试）
+            return new ProductSumInsuredTiers(productId, List.of());
+        }
+
+        @Override
         public List<ProductClauseRef> getClauseRefs(String productId, String tenantId) {
             return List.of();
         }
@@ -440,6 +481,11 @@ public class IssuanceSagaTest {
             if (scheduleFailure != null) {
                 throw scheduleFailure;
             }
+        }
+
+        @Override
+        public List<UnpaidBill> getUnpaidBills(String policyId) {
+            return List.of();
         }
 
         PremiumScheduleRequest lastSchedule() {

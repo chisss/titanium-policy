@@ -19,13 +19,16 @@ import com.titanium.metadata.response.ApiResponse;
 import com.titanium.policy.exception.PolicyBusinessRuleException;
 import com.titanium.policy.exception.RemoteDependencyUnavailableException;
 import com.titanium.policy.port.product.ProductServicePort;
+import com.titanium.policy.valueobject.product.CoverageSumInsuredConfig;
 import com.titanium.policy.valueobject.product.ProductBasicInfo;
 import com.titanium.policy.valueobject.product.ProductClauseRef;
 import com.titanium.policy.valueobject.product.ProductIssueRules;
+import com.titanium.policy.valueobject.product.ProductSumInsuredTiers;
 import com.titanium.product.api.ProductApi;
 import com.titanium.product.api.ProductTemplateApi;
 import com.titanium.product.api.response.clause.ProductClauseResponse;
 import com.titanium.product.api.response.config.CoveragePeriodConfigResponse;
+import com.titanium.product.api.response.config.CoverageSumInsuredConfigResponse;
 import com.titanium.product.api.response.config.InsureConditionResponse;
 import com.titanium.product.api.response.config.IssuanceProcessConfigResponse;
 import com.titanium.product.api.response.config.PaymentConfigResponse;
@@ -73,7 +76,8 @@ public class ProductServiceAdapter implements ProductServicePort {
         }
         return new ProductBasicInfo(product.getProductId(), product.getProductCode(), product.getProductName(),
                 product.getVersion(), product.getInsuranceType(),
-                product.getStatus() != null ? product.getStatus().getCode() : null);
+                product.getStatus() != null ? product.getStatus().getCode() : null,
+                product.getInsuranceMandateType());
     }
 
     @Override
@@ -137,7 +141,10 @@ public class ProductServiceAdapter implements ProductServicePort {
                 underwriting != null ? underwriting.manualReviewAmountThreshold() : null,
                 issuance != null && issuance.underwritingSkippable(),
                 issuance != null && issuance.prepaymentRequired(), subjectType,
-                requiredAttributes(structure != null ? structure.getSubjectFieldsSchema() : null));
+                requiredAttributes(structure != null ? structure.getSubjectFieldsSchema() : null),
+                // G11/g11-06：多标的声明取自产品模板（structure 与前文 subjectType 同源）；
+                // 无模板/无结构时传 null（三态「未声明 = 不限制」，见 ProductIssueRules.allowsMultipleSubjects）
+                structure != null ? structure.isAllowMultipleSubjects() : null);
     }
 
     /** 从模板 JSON Schema 读取 required 数组；非法 Schema 按未配置约束处理并记录日志。 */
@@ -174,6 +181,28 @@ public class ProductServiceAdapter implements ProductServicePort {
             case MARINE_CARGO -> SubjectType.CARGO;
             default -> SubjectType.PERSON;
         };
+    }
+
+    @Override
+    public ProductSumInsuredTiers getCoverageSumInsuredConfigs(String productId) {
+        ApiResponse<List<CoverageSumInsuredConfigResponse>> response =
+                productApi.getCoverageSumInsuredConfigs(productId);
+        if (response == null) {
+            throw new RemoteDependencyUnavailableException(SystemErrorCode.DEPENDENCY_SERVICE_ERROR,
+                    "查询产品责任保额档次配置无响应: productId=" + productId);
+        }
+        if (!response.isSuccess()) {
+            // 🔴 失败不折叠成空清单：折叠会把「服务不可用」静默变成「该产品没配档次」，
+            // 使段级保额档次校验被整体绕过（G02/AC-09）。
+            throw new RemoteDependencyUnavailableException(SystemErrorCode.DEPENDENCY_SERVICE_ERROR,
+                    "获取产品责任保额档次配置失败: productId=" + productId + ", downstreamCode=" + response.getCode()
+                            + ", message=" + response.getMessage());
+        }
+        // 查询成功但 data 为空 ⇒ 该产品未配置档次（对端契约：未配置返回空列表，非 404）
+        List<CoverageSumInsuredConfigResponse> coverages =
+                response.getData() != null ? response.getData() : List.of();
+        return new ProductSumInsuredTiers(productId,
+                coverages.stream().map(this::toCoverageSumInsuredConfig).toList());
     }
 
     @Override
@@ -233,6 +262,25 @@ public class ProductServiceAdapter implements ProductServicePort {
      * 决定保单侧 {@code PolicyForm}。联合保单在保单域暂按个单处理（无独立形态语义）。
      * </p>
      */
+    /**
+     * 产品域责任档次 Response → 保单域防腐镜像。
+     * <p>
+     * 仅做结构翻译，不重复对端的不变量校验（档位单调、区间自洽等由产品域写入时守护）。
+     * {@code allowCustomAmount} 用 {@code Boolean.TRUE.equals} 承接——对端为包装类型，
+     * 缺失按「不开放自由填」处理（失败关闭）。
+     * </p>
+     */
+    private CoverageSumInsuredConfig toCoverageSumInsuredConfig(CoverageSumInsuredConfigResponse response) {
+        List<CoverageSumInsuredConfig.SumInsuredTier> tiers = response.tiers() == null ? List.of()
+                : response.tiers().stream()
+                        .map(tier -> new CoverageSumInsuredConfig.SumInsuredTier(tier.tierCode(), tier.sumInsured(),
+                                tier.allowedTerms(), tier.sortNo()))
+                        .toList();
+        return new CoverageSumInsuredConfig(response.coverageCode(), tiers, response.minSumInsured(),
+                response.maxSumInsured(), Boolean.TRUE.equals(response.allowCustomAmount()),
+                response.defaultTierCode());
+    }
+
     private PolicyForm toPolicyForm(PolicyFormConfigResponse formConfig) {
         if (formConfig == null || formConfig.policyFormType() == null) {
             return null;

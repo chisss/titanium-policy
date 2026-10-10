@@ -1,6 +1,7 @@
 package com.titanium.policy.query.handler.projection;
 
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -78,14 +79,18 @@ public class PolicyProjectionEventHandler {
         policyViewMapper.applyCreated(view, event);
         if (event.policyProducts() != null) {
             view.setLineCount(event.policyProducts().size());
-            List<PolicyProduct> mainProducts = event.policyProducts().stream()
+            // 🔴 G11/g11-04 D1：保单级产品编码**保非空**——多主险（交强 + 商业同单）下按 lineNo 升序
+            // 取**首个有编码的主险段**填入；旧守卫 mainProducts.size() == 1 在方案 B 下退化为「永不填」，
+            // 会让既有列表/筛选列整体变空。
+            // 🔴 该列服务于列表展示与筛选，多主险时语义是「**首主险段**产品编码，非合同唯一产品」，
+            // 合同构成以险种段列表（t_policy_product）为准；D1 是四处派生取值中**唯一**允许「取首段」
+            // 的一项（D2/D3/D4 一律下沉段级，禁止照抄本写法）。
+            event.policyProducts().stream()
                     .filter(Objects::nonNull)
                     .filter(PolicyProduct::isMain)
-                    .toList();
-            if (mainProducts.size() == 1 && mainProducts.get(0).productCode() != null
-                    && !mainProducts.get(0).productCode().isBlank()) {
-                view.setProductCode(mainProducts.get(0).productCode());
-            }
+                    .filter(product -> product.productCode() != null && !product.productCode().isBlank())
+                    .min(Comparator.comparingInt(PolicyProduct::lineNo))
+                    .ifPresent(product -> view.setProductCode(product.productCode()));
         } else if (view.getLineCount() == null && event.productId() != null && !event.productId().isBlank()) {
             // 历史事件没有段列表；仅能由主险产品ID确认至少一段，不能把“未知”错误投影为 0 段
             view.setLineCount(1);

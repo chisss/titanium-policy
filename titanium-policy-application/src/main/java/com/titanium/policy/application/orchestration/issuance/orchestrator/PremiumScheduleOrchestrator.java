@@ -1,7 +1,5 @@
 package com.titanium.policy.application.orchestration.issuance.orchestrator;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.Map;
 
@@ -63,13 +61,13 @@ public class PremiumScheduleOrchestrator {
         }
         try {
             int totalPeriods = periodsPerYear == 0 ? 1 : Math.multiplyExact(premiumPaymentYears, periodsPerYear);
-            BigDecimal installmentAmount = payablePremium.value().divide(BigDecimal.valueOf(totalPeriods), 2,
-                    RoundingMode.HALF_UP);
             LocalDate dueDate = firstDueDate != null ? firstDueDate : LocalDate.now();
+            // 只做期数换算，不做整除：分期舍入（FLOOR 分摊）与末期尾差承接是计费域 PremiumSchedule 的统一职责，
+            // 上游自行 HALF_UP 整除会把尾差提前磨平、与计费域分账口径脱钩。
             billingServicePort.generatePremiumSchedule(new PremiumScheduleRequest(policyId, billingAccountId,
-                    paymentMode, totalPeriods, installmentAmount, payablePremium.currency(), dueDate, tenantId));
-            log.info("期缴计划生成完成: policyId={}, billId={}, mode={}, periods={}, installment={}", policyId,
-                    billId, paymentMode, totalPeriods, installmentAmount);
+                    paymentMode, totalPeriods, payablePremium.value(), payablePremium.currency(), dueDate, tenantId));
+            log.info("期缴计划生成完成: policyId={}, billId={}, mode={}, periods={}, totalPremium={}", policyId,
+                    billId, paymentMode, totalPeriods, payablePremium.value());
         } catch (RuntimeException exception) {
             log.error("期缴计划生成失败（保单和账单保留，待补偿）: policyId={}, billId={}", policyId, billId,
                     exception);

@@ -180,14 +180,6 @@ public class PolicyView extends BaseView {
     @Column(name = "line_count")
     private Integer       lineCount;
 
-    /** 等待期届满日（此前疾病类责任不赔） */
-    @Column(name = "waiting_period_end_date")
-    private LocalDateTime waitingPeriodEndDate;
-
-    /** 犹豫期届满日（此前可无条件退保） */
-    @Column(name = "hesitation_period_end_date")
-    private LocalDateTime hesitationPeriodEndDate;
-
     /** 收费方式码（OFFLINE/ONLINE/FREE/PAY_AFTER_USE/WITHHOLD） */
     @Column(name = "collection_mode", length = 32)
     private String        collectionMode;
@@ -210,6 +202,21 @@ public class PolicyView extends BaseView {
     /** 收讫状态码（UNCOLLECTED/PARTIALLY_COLLECTED/COLLECTED/DEFERRED/OVERDUE） */
     @Column(name = "collection_status", length = 32)
     private String        collectionStatus;
+
+    /**
+     * 生效中的服务受限种类码，多值以英文逗号连接（如 {@code LOSS_REPORT}），无受限时为 {@code null}。
+     * <p>
+     * 取自 {@code PolicyMaintenanceAppliedEvent.serviceRestrictionsAfter} 的生效条目：
+     * 挂失等受限类保全施加时写入、解除时移除，与 {@code policyStatus} 是<b>正交</b>的一条维度
+     * （挂失保单仍是 EFFECTIVE）。
+     * </p>
+     * <p>
+     * 🔴 本列是<b>读侧可见性</b>用途（列表/详情展示、保全建案前置准入），不是准入的权威判据——
+     * 读模型最终一致，权威拒绝在写侧聚合（见 {@code Policy.serviceRestricted()}）。
+     * </p>
+     */
+    @Column(name = "service_restriction_types", length = 255)
+    private String        serviceRestrictionTypes;
 
     /** 已收保费金额 */
     @Column(name = "collected_amount", precision = 18, scale = 2)

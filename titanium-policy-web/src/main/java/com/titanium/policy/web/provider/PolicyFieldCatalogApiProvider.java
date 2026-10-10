@@ -11,8 +11,8 @@ import com.titanium.metadata.response.ApiResponse;
 import com.titanium.policy.api.PolicyFieldCatalogApi;
 import com.titanium.policy.api.response.fieldcatalog.PolicyFieldCatalogResponse;
 import com.titanium.policy.application.query.PolicyFieldCatalogApplicationService;
-import com.titanium.policy.fieldcatalog.PolicyFieldCatalog;
 import com.titanium.policy.fieldcatalog.PolicyFieldCatalogCriteria;
+import com.titanium.policy.fieldcatalog.PolicyFieldCatalogSnapshot;
 import com.titanium.policy.web.mapper.PolicyFieldCatalogWebMapper;
 
 import lombok.RequiredArgsConstructor;
@@ -31,7 +31,7 @@ public class PolicyFieldCatalogApiProvider implements PolicyFieldCatalogApi {
     public ApiResponse<PolicyFieldCatalogResponse> getCurrentCatalog(String productType, String policyType, LocalDate businessDate) {
         PolicyFieldCatalogCriteria criteria =
                 new PolicyFieldCatalogCriteria(RequestContextHolder.requireTenantId(), productType, policyType, businessDate);
-        PolicyFieldCatalog catalog = applicationService.getCurrentCatalog(criteria);
-        return ApiResponse.success(mapper.toResponse(criteria, catalog));
+        PolicyFieldCatalogSnapshot snapshot = applicationService.getCatalogAt(criteria);
+        return ApiResponse.success(mapper.toResponse(criteria, snapshot));
     }
 }

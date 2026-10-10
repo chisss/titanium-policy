@@ -313,13 +313,12 @@ public interface PolicyWebMapper {
     /**
      * 起止期 → 保单期间值对象（空安全）
      * <p>
-     * 裸建单端点不承载等待期/犹豫期（二者由产品 {@code InsureCondition} 配置决定，
-     * 经出单编排器装配），此处传 0 表示无。走 {@code PolicyIssuanceApi} 的正规出单链路
-     * 会填入产品配置的真实天数。
+     * 保单期间仅承载保障起止期；等待期/犹豫期自 G11/g11-04（D2 裁决）<b>下沉段级</b>，随各险种段
+     * {@code LineCoveragePeriod} 按段装配（产品 {@code InsureCondition} 配置经出单编排器写入段上）。
      * </p>
      */
     default PolicyPeriod toPolicyPeriod(LocalDateTime start, LocalDateTime end) {
-        return start == null && end == null ? null : PolicyPeriod.of(start, end, 0, 0);
+        return start == null && end == null ? null : PolicyPeriod.of(start, end);
     }
 
     /**

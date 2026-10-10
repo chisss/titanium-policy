@@ -1,6 +1,7 @@
 package com.titanium.policy.application.orchestration.issuance.assembler;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -38,18 +39,28 @@ public class CreateProposalCommandAssembler {
     public CreateProposalCommand assemble(IssuanceRequest request, String proposalId, String proposalNo,
                                           List<ProposalLine> proposalLines, PolicyForm policyForm) {
         IssuancePlanLine mainPlan = request.mainLine();
-        ProposalLine mainProposalLine = proposalLines.stream().filter(ProposalLine::isMain).findFirst().orElse(null);
+        // 🔴 G11/g11-04：expectedProductCode 是**面向展示的派生列**（意向单列表按险种编码筛选，见
+        // ProposalQueryServiceImpl.buildSpec），多主险（交强 + 商业同单）下保非空——按 lineNo 升序取
+        // **首个有编码的主险段**；语义为「首主险段编码，非单据唯一险种」，单据构成以 proposalLines 为准。
+        // 🔴 本处与 D1（保单读模型 productCode）同属「展示派生列 → 保非空取首段」判据；
+        // D2/D3/D4 是段级要素（等待期/合同要素/缴费条款），**禁止**照抄此写法。
+        ProposalLine firstCodedMainLine = proposalLines.stream()
+                .filter(ProposalLine::isMain)
+                .filter(line -> line.productCode() != null && !line.productCode().isBlank())
+                .min(Comparator.comparingInt(ProposalLine::lineNo))
+                .orElse(null);
         return CreateProposalCommand.builder().proposalId(proposalId).proposalNo(proposalNo)
                 .policyForm(policyForm).channel(request.salesChannel())
                 .customerId(request.holderCustomerId()).intendedSumInsured(request.mainSumInsured())
                 .intendedPremium(request.quotedPremium()).insurancePeriodStart(request.periodStart())
                 .insurancePeriodEnd(request.periodEnd())
-                .expectedProductCode(mainProposalLine != null ? mainProposalLine.productCode() : null)
+                .expectedProductCode(firstCodedMainLine != null ? firstCodedMainLine.productCode() : null)
                 .proposalLines(proposalLines).proposalSubjects(buildProposalSubjects(request))
                 .insuranceType(ProposalLine.resolveInsuranceType(request.insuranceType(), proposalLines))
                 .bizNo(request.bizNo()).marketPackageId(request.marketPackageId()).tenantId(request.tenantId())
                 .insuredPartyList(request.insuredPartyList()).collectionMode(request.collectionMode())
                 .channelInfo(buildChannelInfo(request))
+                // 单据级缴费摘要（=首主险段值，仅供回退/展示）；段级完整缴费条件随 ProposalLine 传递（D4）
                 .paymentMode(mainPlan != null && mainPlan.paymentFrequency() != null
                         ? mainPlan.paymentFrequency().getCode() : null)
                 .premiumPaymentYears(mainPlan != null && mainPlan.premiumPaymentYears() != null

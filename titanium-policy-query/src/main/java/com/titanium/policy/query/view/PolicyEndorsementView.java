@@ -1,5 +1,6 @@
 package com.titanium.policy.query.view;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 import com.titanium.common.jpa.BaseView;
@@ -58,6 +59,28 @@ public class PolicyEndorsementView extends BaseView {
     /** 变更摘要 */
     @Column(name = "change_summary", length = 512)
     private String        changeSummary;
+
+    /**
+     * 金额型保全项编码（非金额型批单为空）。
+     * <p>
+     * 「这笔钱因哪项保全而发生」的唯一线索：金额本身不含语义，批改类型（加额/减额缴费…）也由它推导，
+     * 故与金额并列落库，供对账按保全项取数。
+     * </p>
+     */
+    @Column(name = "amount_item_code", length = 64)
+    private String        amountItemCode;
+
+    /** 收付金额（正数绝对值，非金额型批单为空） */
+    @Column(name = "amount_value", precision = 18, scale = 2)
+    private BigDecimal    amountValue;
+
+    /** 收付方向（DEBIT/CREDIT，非金额型批单为空） */
+    @Column(name = "amount_direction", length = 10)
+    private String        amountDirection;
+
+    /** 币种（三字母代码，非金额型批单为空） */
+    @Column(name = "amount_currency", length = 3)
+    private String        amountCurrency;
 
     /** 是否触发保费重算 */
     @Column(name = "requires_premium_recalc", nullable = false)

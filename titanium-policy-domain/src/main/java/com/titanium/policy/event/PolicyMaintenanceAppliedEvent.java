@@ -5,8 +5,10 @@ import java.util.List;
 
 import com.titanium.policy.common.enums.EndorsementCategory;
 import com.titanium.policy.common.enums.PolicyDataUpdateType;
+import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceAmountFact;
 import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceAppliedField;
 import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceExecutionState;
+import com.titanium.policy.valueobject.policy.PolicyServiceRestrictions;
 
 /** Policy 已在单一聚合事件中应用字段、生成批单、版本和实际快照。 */
 public record PolicyMaintenanceAppliedEvent(
@@ -21,6 +23,8 @@ public record PolicyMaintenanceAppliedEvent(
         long actualPolicyVersion,
         LocalDateTime effectiveAt,
         String changeSummary,
+        PolicyMaintenanceAmountFact amountFact,
+        PolicyServiceRestrictions serviceRestrictionsAfter,
         String proposedSnapshotHash,
         String originalSnapshotHash,
         String appliedSnapshotStorageKey,

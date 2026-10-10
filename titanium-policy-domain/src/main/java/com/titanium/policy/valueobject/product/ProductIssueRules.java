@@ -42,10 +42,31 @@ import com.titanium.metadata.enums.product.ProductEnum.UnderwritingMode;
  * @param allowedPaymentTerms         允许的缴费期限（年数选项）
  * @param coveragePeriodUnit          保障期间单位
  * @param fixedTermOptions            固定期限选项（年数）
- * @param underwritingMode            核保模式
+ * @param underwritingMode            核保模式（🔴 <b>预留</b>：当前仅由
+ *                                    {@code ProductServiceAdapter} 写入，全仓无读取点。接入前需先定义
+ *                                    「谁按此模式改变出单/核保流程」的消费方，否则只是声明）
  * @param manualReviewAmountThreshold 转人工核保的保额阈值
- * @param underwritingSkippable       是否可跳过核保
- * @param prepaymentRequired          是否必须先收费再出单
+ *                                    <p>
+ *                                    消费点见 {@link #requiresManualUnderwriting(BigDecimal)}。
+ *                                    🔴 <b>权威口径提示</b>：该值在 policy 域仅承载产品配置快照，
+ *                                    出单主链路的「转人工」判定权威侧是 <b>核保域</b>——由
+ *                                    {@code UnderwriteCommand.manualReviewAmountThreshold} 承接，
+ *                                    且核保域判据为 <b>严格大于</b>（{@code sumInsured > threshold}），
+ *                                    与本类 {@code requiresManualUnderwriting} 的 <b>大于等于</b> 口径
+ *                                    <b>不一致</b>。二者不可同时启用，否则同一保额在两域得到相反结论。
+ *                                    </p>
+ * @param underwritingSkippable       是否可跳过核保（🔴 <b>预留</b>：同 {@code underwritingMode}，
+ *                                    仅写入无读取点）
+ * @param prepaymentRequired          是否必须先收费再出单（🔴 <b>预留</b>：同 {@code underwritingMode}，
+ *                                    仅写入无读取点；先收费语义当前由出单编排的收费步骤直接承担）
+ * @param subjectType                 标的类型（由产品模板 {@code policyStructure.subjectType} 取；
+ *                                    无模板时为推断值或 null）
+ * @param requiredSubjectAttributes   标的必填属性清单（由产品模板标的 JSON Schema 的 required 取）
+ * @param allowMultipleSubjects       是否允许多标的（G11/g11-06：由产品模板
+ *                                    {@code policyStructure.allowMultipleSubjects} 取）。
+ *                                    🔴 <b>三态</b>：{@code null} = 无模板/未声明 = <b>不限制</b>，
+ *                                    仅 {@code Boolean.FALSE} 才拒绝多标的段。消费点见
+ *                                    {@link #allowsMultipleSubjects()}
  */
 public record ProductIssueRules(Integer minAge, Integer maxAge, BigDecimal minSumInsured, BigDecimal maxSumInsured,
                                 Integer maxInsuredCount, Integer minGroupSize, List<String> forbiddenOccupations,
@@ -55,7 +76,27 @@ public record ProductIssueRules(Integer minAge, Integer maxAge, BigDecimal minSu
                                 PeriodUnit coveragePeriodUnit, List<Integer> fixedTermOptions,
                                 UnderwritingMode underwritingMode, BigDecimal manualReviewAmountThreshold,
                                 boolean underwritingSkippable, boolean prepaymentRequired,
-                                SubjectType subjectType, List<String> requiredSubjectAttributes) {
+                                SubjectType subjectType, List<String> requiredSubjectAttributes,
+                                Boolean allowMultipleSubjects) {
+
+    /**
+     * 兼容旧版调用方的构造器（22 组件形态）。未提供多标的声明时保持原有「无数量约束」语义。
+     */
+    public ProductIssueRules(Integer minAge, Integer maxAge, BigDecimal minSumInsured, BigDecimal maxSumInsured,
+                             Integer maxInsuredCount, Integer minGroupSize, List<String> forbiddenOccupations,
+                             List<String> allowedRegions, List<String> forbiddenRegions, Integer waitingPeriodDays,
+                             Integer hesitationPeriodDays, PolicyForm policyForm, boolean beneficiaryRequired,
+                             List<PaymentFrequency> allowedFrequencies, List<Integer> allowedPaymentTerms,
+                             PeriodUnit coveragePeriodUnit, List<Integer> fixedTermOptions,
+                             UnderwritingMode underwritingMode, BigDecimal manualReviewAmountThreshold,
+                             boolean underwritingSkippable, boolean prepaymentRequired,
+                             SubjectType subjectType, List<String> requiredSubjectAttributes) {
+        this(minAge, maxAge, minSumInsured, maxSumInsured, maxInsuredCount, minGroupSize, forbiddenOccupations,
+                allowedRegions, forbiddenRegions, waitingPeriodDays, hesitationPeriodDays, policyForm,
+                beneficiaryRequired, allowedFrequencies, allowedPaymentTerms, coveragePeriodUnit, fixedTermOptions,
+                underwritingMode, manualReviewAmountThreshold, underwritingSkippable, prepaymentRequired, subjectType,
+                requiredSubjectAttributes, null);
+    }
 
     /**
      * 兼容旧版调用方的构造器。未提供标的 Schema 时保持原有“无段级属性约束”语义。
@@ -73,6 +114,21 @@ public record ProductIssueRules(Integer minAge, Integer maxAge, BigDecimal minSu
                 beneficiaryRequired, allowedFrequencies, allowedPaymentTerms, coveragePeriodUnit, fixedTermOptions,
                 underwritingMode, manualReviewAmountThreshold, underwritingSkippable, prepaymentRequired, null,
                 List.of());
+    }
+
+    /**
+     * 产品是否允许多标的段（G11/g11-06）。
+     * <p>
+     * 🔴 <b>三态语义</b>：{@code null}（无模板/未声明）视为<b>不限制</b>——与
+     * {@link #allowsFrequency} 等的「未配置不限制」同范式，防对无声明产品误拒。
+     * 消费点：{@code IssuanceEligibilityDomainServiceImpl#validateMultipleSubjects}
+     * （多标的段 + 显式 false 才拒）。
+     * </p>
+     *
+     * @return 允许多标段返回 {@code true}
+     */
+    public boolean allowsMultipleSubjects() {
+        return allowMultipleSubjects == null || allowMultipleSubjects;
     }
 
     public boolean requiresSubjectAttribute(String attribute) {
@@ -202,6 +258,17 @@ public record ProductIssueRules(Integer minAge, Integer maxAge, BigDecimal minSu
 
     /**
      * 该保额是否需转人工核保。
+     * <p>
+     * 🔴 <b>预留（当前未接入出单主链路）</b>：出单链路的「转人工」判定权威侧在 <b>核保域</b>
+     * （g02-02：核保域 {@code Underwriting} 聚合按 {@code ProductUnderwritingConfigPort} 取到的
+     * 产品阈值判定）。本方法<b>不接入</b>，以免形成第二权威——两个阈值判定并存时，同一保额可能
+     * 在保单域与核保域得到相反结论。
+     * </p>
+     * <p>
+     * 🔴 <b>口径差异（接入前必须先统一）</b>：本方法为 <b>大于等于</b>（{@code >= threshold}，
+     * 由 {@code !isBelow(...)} 表达）；核保域为 <b>严格大于</b>（{@code > threshold}）。
+     * 恰好等于阈值的保额在两域结论不同。
+     * </p>
      *
      * @param sumInsured 投保保额
      * @return 达到阈值返回 {@code true}

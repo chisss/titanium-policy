@@ -15,8 +15,11 @@ import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.event.AnnuityPayoutStartedEvent;
 import com.titanium.policy.event.PolicyCreatedEvent;
 import com.titanium.policy.event.PolicyEndorsedEvent;
+import com.titanium.policy.event.PolicyLoanDisbursedEvent;
+import com.titanium.policy.event.PolicyLoanRepaidEvent;
 import com.titanium.policy.query.view.AnnuityPayoutPlanView;
 import com.titanium.policy.query.view.PolicyEndorsementView;
+import com.titanium.policy.query.view.PolicyLoanView;
 import com.titanium.policy.query.view.PolicyView;
 import com.titanium.policy.valueobject.policy.PolicyNo;
 
@@ -51,8 +54,6 @@ public interface PolicyViewMapper {
     @Mapping(target = "currency", source = "premium", qualifiedByName = "moneyCurrencyEnum")
     @Mapping(target = "startDate", source = "policyPeriod.insurancePeriodStart")
     @Mapping(target = "endDate", source = "policyPeriod.insurancePeriodEnd")
-    @Mapping(target = "waitingPeriodEndDate", source = "policyPeriod.waitingPeriodEndDate")
-    @Mapping(target = "hesitationPeriodEndDate", source = "policyPeriod.hesitationPeriodEndDate")
     @Mapping(target = "sumInsured", source = "sumInsured", qualifiedByName = "moneyValue")
     @Mapping(target = "totalPremium", source = "premium", qualifiedByName = "moneyValue")
     @Mapping(target = "collectionMode", source = "collectionInfo.collectionMode", qualifiedByName = "enumCode")
@@ -100,6 +101,40 @@ public interface PolicyViewMapper {
     @Mapping(target = "createTime", ignore = true)
     @Mapping(target = "updateTime", ignore = true)
     void applyPayoutStarted(@MappingTarget AnnuityPayoutPlanView view, AnnuityPayoutStartedEvent event);
+
+    /**
+     * 贷款放款事件 → 贷款明细读模型（就地 upsert）。
+     * <p>
+     * 主键 id 取贷款明细业务号 loanId。🔴 {@code repaid}/{@code outstandingPrincipal}/
+     * {@code unpaidInterest} 的<b>创建期初值不在此赋值</b>——它们属「仅新建行时写入」的语义，由投影
+     * 处理器在 {@code orElseGet} 中设置：映射器常量赋值会在 DLQ 重试重放放款事件时把已还款行的
+     * 余额与结清标记<b>重置</b>回初始值。审计时间戳同理由处理器控制。
+     * </p>
+     */
+    @Mapping(target = "id", source = "loanId")
+    @Mapping(target = "createTime", ignore = true)
+    @Mapping(target = "updateTime", ignore = true)
+    void applyLoanDisbursed(@MappingTarget PolicyLoanView view, PolicyLoanDisbursedEvent event);
+
+    /**
+     * 贷款还款事件 → 贷款明细读模型（就地更新未偿余额与结清标记，g04-04）。
+     * <p>
+     * 余额取事件的还款后快照（outstandingPrincipalAfter / outstandingInterestAfter），
+     * 结清标记由 {@code settledFlag} 转 0/1。审计时间戳由处理器控制。
+     * </p>
+     */
+    @Mapping(target = "outstandingPrincipal", source = "outstandingPrincipalAfter")
+    @Mapping(target = "unpaidInterest", source = "outstandingInterestAfter")
+    @Mapping(target = "repaid", source = "settled", qualifiedByName = "settledFlag")
+    @Mapping(target = "createTime", ignore = true)
+    @Mapping(target = "updateTime", ignore = true)
+    void applyLoanRepaid(@MappingTarget PolicyLoanView view, PolicyLoanRepaidEvent event);
+
+    /** 结清标记布尔 → 读模型 0/1 标志 */
+    @Named("settledFlag")
+    default Integer settledFlag(boolean settled) {
+        return settled ? 1 : 0;
+    }
 
     /** 保单号值对象 → 保单号字符串（空安全） */
     @Named("policyNoValue")

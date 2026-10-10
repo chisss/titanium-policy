@@ -48,6 +48,7 @@ import com.titanium.policy.application.orchestration.issuance.assembler.PolicyPr
 import com.titanium.policy.application.orchestration.issuance.assembler.ProposalLineAssembler;
 import com.titanium.policy.application.orchestration.issuance.executor.RiskAssessmentExecutor;
 import com.titanium.policy.application.orchestration.issuance.service.InsuranceLinePremiumConfirmationService;
+import com.titanium.policy.application.orchestration.issuance.service.ProductSumInsuredTiersLoader;
 import com.titanium.policy.application.orchestration.issuance.validator.ConfirmedPremiumRequestValidator;
 import com.titanium.policy.application.support.TestPolicyNoGenerator;
 import com.titanium.policy.command.CreateInsuranceDirectlyCommand;
@@ -66,9 +67,11 @@ import com.titanium.policy.valueobject.issuance.IssuanceProcessConfig;
 import com.titanium.policy.valueobject.issuance.IssuanceRequest;
 import com.titanium.policy.valueobject.issuance.IssuanceResult;
 import com.titanium.policy.valueobject.policy.CollectionResult;
+import com.titanium.policy.valueobject.policy.LineCoveragePeriod;
 import com.titanium.policy.valueobject.pricing.ConfirmedPremiumResult;
 import com.titanium.policy.valueobject.product.ProductBasicInfo;
 import com.titanium.policy.valueobject.product.ProductIssueRules;
+import com.titanium.policy.valueobject.product.ProductSumInsuredTiers;
 
 /**
  * 验证统一出单起点命令的顺序与关键字段透传。
@@ -105,6 +108,7 @@ class IssuanceOrchestratorTest {
                 new CreateInsuranceDirectlyCommandAssembler(),
                 new InsuranceLinePremiumConfirmationService(confirmedPremiumPricingPort,
                         new ConfirmedPremiumRequestValidator(), new ConfirmedPremiumRequestAssembler()),
+                new ProductSumInsuredTiersLoader(productServicePort),
                 premiumCollectionOrchestrator,
                 new PremiumScheduleOrchestrator(billingServicePort));
         when(riskAssessmentExecutor.execute(any(), any())).thenReturn(true);
@@ -119,6 +123,9 @@ class IssuanceOrchestratorTest {
 
     @Test
     void twoStepCreatesInsuranceThenImmediatelySubmitsUnderwriting() {
+        when(productServicePort.getCoverageSumInsuredConfigs(PRODUCT_ID))
+                .thenReturn(new ProductSumInsuredTiers(PRODUCT_ID, List.of()));
+
         IssuanceResult result = orchestrator.orchestrate(IssuanceProcessConfig.twoStep(PRODUCT_ID), request());
 
         ArgumentCaptor<Object> commands = ArgumentCaptor.forClass(Object.class);
@@ -135,6 +142,9 @@ class IssuanceOrchestratorTest {
         assertEquals(20, create.premiumPaymentYears());
         assertEquals(create.insuranceId(), submit.insuranceId());
         assertEquals(TENANT_ID, submit.tenantId());
+        // G02/AC-09：档次配置经编排器取回并作为命令分量交给聚合（聚合不得依赖 Port）
+        assertEquals(1, create.sumInsuredTiers().size());
+        assertEquals(PRODUCT_ID, create.sumInsuredTiers().get(0).productId());
         assertEquals(IssuanceMode.TWO_STEP, result.issuanceMode());
         verifyNoMoreInteractions(commandGateway);
     }
@@ -240,8 +250,14 @@ class IssuanceOrchestratorTest {
         assertEquals(IssuanceStage.PENDING_COLLECTION, result.currentStage());
         ArgumentCaptor<CreatePolicyDirectlyCommand> command = ArgumentCaptor.forClass(CreatePolicyDirectlyCommand.class);
         verify(commandGateway).sendAndWait(command.capture());
-        assertEquals(0, command.getValue().policyPeriod().waitingPeriodDays());
-        assertEquals(0, command.getValue().policyPeriod().hesitationPeriodDays());
+        // 🔴 G11/g11-04（D2）：等待期/犹豫期已下沉段级（保单级 PolicyPeriod 不再持有）——
+        // 产品未配置（null）时段上按无宽限期（0，届满日 null）承载。
+        LineCoveragePeriod coveragePeriod = command.getValue().policyProducts().get(0).coveragePeriod();
+        assertNotNull(coveragePeriod);
+        assertEquals(0, coveragePeriod.waitingPeriodDays());
+        assertNull(coveragePeriod.waitingPeriodEndDate());
+        assertEquals(0, coveragePeriod.hesitationPeriodDays());
+        assertNull(coveragePeriod.hesitationPeriodEndDate());
     }
 
     @Test
@@ -264,7 +280,7 @@ class IssuanceOrchestratorTest {
         assertEquals("ACCOUNT_001", schedule.billingAccountId());
         assertEquals("ANNUAL", schedule.paymentMode());
         assertEquals(20, schedule.totalPeriods());
-        assertEquals(new BigDecimal("50.00"), schedule.installmentAmount());
+        assertEquals(new BigDecimal("1000.00"), schedule.totalPremium());
         assertEquals(request().periodStart().toLocalDate(), schedule.firstDueDate());
         assertEquals(TENANT_ID, schedule.tenantId());
     }

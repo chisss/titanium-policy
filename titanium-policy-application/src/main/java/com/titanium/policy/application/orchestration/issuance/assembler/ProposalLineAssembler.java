@@ -58,7 +58,10 @@ public class ProposalLineAssembler {
                     product != null ? product.productCode() : null,
                     product != null ? product.productVersion() : null,
                     product != null ? product.insuranceType() : request.insuranceType(), planLine.sumInsured(),
-                    planLine.isMain() ? request.quotedPremium() : null));
+                    planLine.isMain() ? request.quotedPremium() : null,
+                    // 🔴 G11/g11-04 D4：段级缴费条件随段透传（「交强年缴 + 商业分期」须各自保留）；
+                    // 此处仅搬运，缺省回退与逐段解析口径在 ProposalIssuanceSaga.refineToInsuranceLines
+                    planLine.paymentFrequency(), planLine.premiumPaymentYears()));
         }
         log.info("意向险种段装配完成: bizNo={}, 段数={}", request.bizNo(), lines.size());
         return List.copyOf(lines);

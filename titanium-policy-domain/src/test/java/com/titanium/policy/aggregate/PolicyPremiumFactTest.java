@@ -69,6 +69,6 @@ class PolicyPremiumFactTest {
 
     private PolicyPeriod period() {
         LocalDateTime now = LocalDateTime.now();
-        return PolicyPeriod.of(now, now.plusYears(1), 0, 0);
+        return PolicyPeriod.of(now, now.plusYears(1));
     }
 }

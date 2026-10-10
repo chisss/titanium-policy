@@ -164,12 +164,6 @@ public class PolicyQueryResult {
     /** 险种段数量（单险种为 1，一单多险 > 1） */
     private Integer                     lineCount;
 
-    /** 等待期届满日（此前疾病类责任不赔） */
-    private LocalDateTime               waitingPeriodEndDate;
-
-    /** 犹豫期届满日（此前可无条件退保） */
-    private LocalDateTime               hesitationPeriodEndDate;
-
     /** 收费方式码（OFFLINE/ONLINE/FREE/PAY_AFTER_USE/WITHHOLD） */
     private String                      collectionMode;
 

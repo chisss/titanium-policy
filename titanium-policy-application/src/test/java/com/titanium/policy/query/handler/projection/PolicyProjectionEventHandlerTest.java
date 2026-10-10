@@ -103,8 +103,13 @@ class PolicyProjectionEventHandlerTest {
         assertEquals(3, captor.getValue().getCurrentVersion());
     }
 
+    /**
+     * 🔴 G11/g11-04 D1：多主险（交强 + 商业同单）下保单级产品编码**保非空**——
+     * 按 lineNo 升序取**首个有编码的主险段**；旧行为「主险不唯一即不填」在方案 B 下会让
+     * 列表/筛选列整体变空。
+     */
     @Test
-    void doesNotGuessProductCodeWhenCreatedEventContainsMultipleMainProducts() {
+    void picksFirstCodedMainProductWhenCreatedEventContainsMultipleMainProducts() {
         PolicyViewRepository repository = mock(PolicyViewRepository.class);
         PolicyViewMapper mapper = mock(PolicyViewMapper.class);
         PolicyView existing = new PolicyView();
@@ -121,7 +126,89 @@ class PolicyProjectionEventHandlerTest {
 
         ArgumentCaptor<PolicyView> captor = ArgumentCaptor.forClass(PolicyView.class);
         verify(repository).save(captor.capture());
+        assertEquals("MAIN_CODE_1", captor.getValue().getProductCode());
+    }
+
+    /** 🔴 D1 判据是 lineNo 而非事件列表顺序：列表逆序给出时仍取 lineNo 最小的有编码主险段。 */
+    @Test
+    void picksFirstCodedMainProductRegardlessOfEventListOrder() {
+        PolicyViewRepository repository = mock(PolicyViewRepository.class);
+        PolicyViewMapper mapper = mock(PolicyViewMapper.class);
+        when(repository.findByPolicyIdAndTenantId("POLICY_001", "TENANT_001"))
+                .thenReturn(Optional.of(new PolicyView()));
+        PolicyCreatedEvent event = new PolicyCreatedEvent("POLICY_001", null, null, null, null, null, null,
+                "BIZ_001", null, null, null, null, null,
+                List.of(policyProduct("LINE_002", 2, ProductCategory.MAIN, "MAIN_CODE_2"),
+                        policyProduct("LINE_001", 1, ProductCategory.MAIN, "MAIN_CODE_1")),
+                null, null, null, null, null, null, "TENANT_001");
+
+        new PolicyProjectionEventHandler(repository, mapper).on(event);
+
+        ArgumentCaptor<PolicyView> captor = ArgumentCaptor.forClass(PolicyView.class);
+        verify(repository).save(captor.capture());
+        assertEquals("MAIN_CODE_1", captor.getValue().getProductCode());
+    }
+
+    /** 🔴 D1「保非空」：首个主险段（按 lineNo）无编码时顺延取下一个有编码的主险段，不得因首段为空整体不填。 */
+    @Test
+    void skipsUncodedMainLineWhenDerivingProductCode() {
+        PolicyViewRepository repository = mock(PolicyViewRepository.class);
+        PolicyViewMapper mapper = mock(PolicyViewMapper.class);
+        when(repository.findByPolicyIdAndTenantId("POLICY_001", "TENANT_001"))
+                .thenReturn(Optional.of(new PolicyView()));
+        PolicyCreatedEvent event = new PolicyCreatedEvent("POLICY_001", null, null, null, null, null, null,
+                "BIZ_001", null, null, null, null, null,
+                List.of(policyProduct("LINE_001", 1, ProductCategory.MAIN, null),
+                        policyProduct("LINE_002", 2, ProductCategory.MAIN, "MAIN_CODE_2")),
+                null, null, null, null, null, null, "TENANT_001");
+
+        new PolicyProjectionEventHandler(repository, mapper).on(event);
+
+        ArgumentCaptor<PolicyView> captor = ArgumentCaptor.forClass(PolicyView.class);
+        verify(repository).save(captor.capture());
+        assertEquals("MAIN_CODE_2", captor.getValue().getProductCode());
+    }
+
+    /** 主险段全部无编码时保留既有值——派生列只做填充，不得把已有值清空。 */
+    @Test
+    void preservesExistingCodeWhenNoMainLineCarriesCode() {
+        PolicyViewRepository repository = mock(PolicyViewRepository.class);
+        PolicyViewMapper mapper = mock(PolicyViewMapper.class);
+        PolicyView existing = new PolicyView();
+        existing.setProductCode("EXISTING_CODE");
+        when(repository.findByPolicyIdAndTenantId("POLICY_001", "TENANT_001"))
+                .thenReturn(Optional.of(existing));
+        PolicyCreatedEvent event = new PolicyCreatedEvent("POLICY_001", null, null, null, null, null, null,
+                "BIZ_001", null, null, null, null, null,
+                List.of(policyProduct("LINE_001", 1, ProductCategory.MAIN, null),
+                        policyProduct("LINE_002", 2, ProductCategory.MAIN, null)),
+                null, null, null, null, null, null, "TENANT_001");
+
+        new PolicyProjectionEventHandler(repository, mapper).on(event);
+
+        ArgumentCaptor<PolicyView> captor = ArgumentCaptor.forClass(PolicyView.class);
+        verify(repository).save(captor.capture());
         assertEquals("EXISTING_CODE", captor.getValue().getProductCode());
+    }
+
+    /** 附加险段编码不参与派生——派生列的语义是「首主险段编码」，不得被附加险误填。 */
+    @Test
+    void doesNotDeriveProductCodeFromRiderLine() {
+        PolicyViewRepository repository = mock(PolicyViewRepository.class);
+        PolicyViewMapper mapper = mock(PolicyViewMapper.class);
+        when(repository.findByPolicyIdAndTenantId("POLICY_001", "TENANT_001"))
+                .thenReturn(Optional.of(new PolicyView()));
+        PolicyCreatedEvent event = new PolicyCreatedEvent("POLICY_001", null, null, null, null, null, null,
+                "BIZ_001", null, null, null, null, null,
+                List.of(policyProduct("LINE_001", 1, ProductCategory.MAIN, "MAIN_CODE"),
+                        policyProduct("LINE_002", 2, ProductCategory.RIDER, "RIDER_CODE")),
+                null, null, null, null, null, null, "TENANT_001");
+
+        new PolicyProjectionEventHandler(repository, mapper).on(event);
+
+        ArgumentCaptor<PolicyView> captor = ArgumentCaptor.forClass(PolicyView.class);
+        verify(repository).save(captor.capture());
+        assertEquals("MAIN_CODE", captor.getValue().getProductCode());
     }
 
     @Test
