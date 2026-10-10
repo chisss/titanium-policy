@@ -3,17 +3,20 @@ package com.titanium.policy.api;
 import java.util.List;
 
 import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import com.titanium.metadata.response.ApiResponse;
 import com.titanium.policy.api.request.issuance.CreatePolicyRequest;
 import com.titanium.policy.api.request.maintenance.AccountValueWriteBackRequest;
 import com.titanium.policy.api.request.maintenance.ApplyPolicyMaintenanceRequest;
 import com.titanium.policy.api.request.maintenance.RecordPremiumCollectionRequest;
+import com.titanium.policy.api.request.member.AddInsuredMemberRequest;
 import com.titanium.policy.api.response.maintenance.PolicyEndorsementResponse;
 import com.titanium.policy.api.response.maintenance.PolicyMaintenanceApplicationResponse;
 import com.titanium.policy.api.response.maintenance.PolicyMaintenanceSnapshotResponse;
@@ -143,4 +146,31 @@ public interface PolicyApi {
      */
     @GetMapping("/{policyId}/beneficiaries")
     ApiResponse<List<PolicyBeneficiaryResponse>> getBeneficiaries(@PathVariable String policyId);
+
+    /**
+     * 新增被保险人（团单加保 / 家庭险增员，G12/g12-06）
+     * <p>
+     * 仅团单/家庭险的生效保单可增减成员（形态+状态守卫在聚合根）；家庭险须提供家庭成员关系码。
+     * 读侧可见性经 {@code InsuredMemberAddedEvent} 投影补齐（最终一致）。
+     * </p>
+     *
+     * @param policyId 保单ID
+     * @param request 新增被保险人请求
+     * @return 空响应
+     */
+    @PostMapping("/{policyId}/insured-members")
+    ApiResponse<Void> addInsuredMember(@PathVariable String policyId,
+                                       @Valid @RequestBody AddInsuredMemberRequest request);
+
+    /**
+     * 移除被保险人（团单减保 / 家庭险减员，G12/g12-06）
+     *
+     * @param policyId 保单ID
+     * @param insuredId 被移除的被保险人ID（取被保险人列表返回的 insuredId）
+     * @param reason 移除原因（可空，业务描述文案由调用方按枚举/常量提供）
+     * @return 空响应
+     */
+    @DeleteMapping("/{policyId}/insured-members/{insuredId}")
+    ApiResponse<Void> removeInsuredMember(@PathVariable String policyId, @PathVariable String insuredId,
+                                          @RequestParam(required = false) String reason);
 }

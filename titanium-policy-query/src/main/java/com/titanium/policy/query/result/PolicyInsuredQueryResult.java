@@ -14,6 +14,16 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class PolicyInsuredQueryResult {
 
+    /**
+     * 被保险人ID（= 读模型行标识 {@code PolicyInsuredView.id}，即保全集合字段的对象标识）。
+     * <p>
+     * 🔴 成员增减入口（web/api 的 DELETE /insured-members/{insuredId}）以本字段为定位键：
+     * 合规成员标识（1-32 位 [A-Za-z0-9._-]）下与聚合内 {@code InsuredInfo.insuredId} 同值，
+     * 否则为「保单+顺序」派生值（存量长标识场景，写侧按聚合内标识匹配、届时将移除失败）。
+     * </p>
+     */
+    private String insuredId;
+
     /** 被保险人客户ID */
     private String customerId;
 

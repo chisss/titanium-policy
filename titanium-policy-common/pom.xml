@@ -37,6 +37,13 @@
             <groupId>com.titanium</groupId>
             <artifactId>titanium-common</artifactId>
         </dependency>
+
+        <!-- Test：本模块枚举的机械判据（如 PolicyDataUpdateType 映射/标志位）随类存放 -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>

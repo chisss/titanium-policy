@@ -100,11 +100,16 @@ public interface PolicyLineQueryMapper {
 
     /**
      * 被保险人读模型 → 查询结果。
+     * <p>
+     * {@code insuredId ← id}：读模型行标识即保全集合字段的对象标识，成员增减入口以它为定位键
+     * （与受益人 {@code beneficiaryId ← id} 同法）。
+     * </p>
      *
      * @param view 被保险人读模型
      * @return 被保险人查询结果
      */
     @Mapping(target = "relationToHolder", source = "relation")
+    @Mapping(target = "insuredId", source = "id")
     PolicyInsuredQueryResult toInsuredResult(PolicyInsuredView view);
 
     /**

@@ -67,6 +67,11 @@ import com.titanium.metadata.enums.product.ProductEnum.UnderwritingMode;
  *                                    🔴 <b>三态</b>：{@code null} = 无模板/未声明 = <b>不限制</b>，
  *                                    仅 {@code Boolean.FALSE} 才拒绝多标的段。消费点见
  *                                    {@link #allowsMultipleSubjects()}
+ * @param healthDeclarationItems      自定义告知项清单（G12/g12-02：由产品投保条件
+ *                                    {@code InsureCondition.healthDeclarationItems} 取）。
+ *                                    🔴 <b>三态</b>：{@code null}/空 = 产品未配置 = <b>不校验任何自定义告知项</b>
+ *                                    （防老产品被误拦），消费点见
+ *                                    {@code IssuanceEligibilityDomainServiceImpl#validateHealthDeclaration}
  */
 public record ProductIssueRules(Integer minAge, Integer maxAge, BigDecimal minSumInsured, BigDecimal maxSumInsured,
                                 Integer maxInsuredCount, Integer minGroupSize, List<String> forbiddenOccupations,
@@ -77,10 +82,31 @@ public record ProductIssueRules(Integer minAge, Integer maxAge, BigDecimal minSu
                                 UnderwritingMode underwritingMode, BigDecimal manualReviewAmountThreshold,
                                 boolean underwritingSkippable, boolean prepaymentRequired,
                                 SubjectType subjectType, List<String> requiredSubjectAttributes,
-                                Boolean allowMultipleSubjects) {
+                                Boolean allowMultipleSubjects, List<HealthDeclarationItem> healthDeclarationItems) {
 
     /**
-     * 兼容旧版调用方的构造器（22 组件形态）。未提供多标的声明时保持原有「无数量约束」语义。
+     * 兼容旧版调用方的构造器（24 组件形态）。未提供告知项清单时保持原有「不校验自定义告知项」语义。
+     */
+    public ProductIssueRules(Integer minAge, Integer maxAge, BigDecimal minSumInsured, BigDecimal maxSumInsured,
+                             Integer maxInsuredCount, Integer minGroupSize, List<String> forbiddenOccupations,
+                             List<String> allowedRegions, List<String> forbiddenRegions, Integer waitingPeriodDays,
+                             Integer hesitationPeriodDays, PolicyForm policyForm, boolean beneficiaryRequired,
+                             List<PaymentFrequency> allowedFrequencies, List<Integer> allowedPaymentTerms,
+                             PeriodUnit coveragePeriodUnit, List<Integer> fixedTermOptions,
+                             UnderwritingMode underwritingMode, BigDecimal manualReviewAmountThreshold,
+                             boolean underwritingSkippable, boolean prepaymentRequired,
+                             SubjectType subjectType, List<String> requiredSubjectAttributes,
+                             Boolean allowMultipleSubjects) {
+        this(minAge, maxAge, minSumInsured, maxSumInsured, maxInsuredCount, minGroupSize, forbiddenOccupations,
+                allowedRegions, forbiddenRegions, waitingPeriodDays, hesitationPeriodDays, policyForm,
+                beneficiaryRequired, allowedFrequencies, allowedPaymentTerms, coveragePeriodUnit, fixedTermOptions,
+                underwritingMode, manualReviewAmountThreshold, underwritingSkippable, prepaymentRequired, subjectType,
+                requiredSubjectAttributes, allowMultipleSubjects, null);
+    }
+
+    /**
+     * 兼容旧版调用方的构造器（23 组件形态，标的 Schema 齐全但未声明多标的与告知项清单）。
+     * 多标的按三态「未声明 = 不限制」、告知项按「未配置 = 不校验」处理。
      */
     public ProductIssueRules(Integer minAge, Integer maxAge, BigDecimal minSumInsured, BigDecimal maxSumInsured,
                              Integer maxInsuredCount, Integer minGroupSize, List<String> forbiddenOccupations,
@@ -99,7 +125,7 @@ public record ProductIssueRules(Integer minAge, Integer maxAge, BigDecimal minSu
     }
 
     /**
-     * 兼容旧版调用方的构造器。未提供标的 Schema 时保持原有“无段级属性约束”语义。
+     * 兼容旧版调用方的构造器。未提供标的 Schema、多标的声明与告知项清单时保持原有「无段级属性约束」语义。
      */
     public ProductIssueRules(Integer minAge, Integer maxAge, BigDecimal minSumInsured, BigDecimal maxSumInsured,
                              Integer maxInsuredCount, Integer minGroupSize, List<String> forbiddenOccupations,

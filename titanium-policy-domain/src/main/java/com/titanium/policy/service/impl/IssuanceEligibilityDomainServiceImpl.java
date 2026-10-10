@@ -5,6 +5,8 @@ import static com.titanium.metadata.errorcode.PolicyErrorCode.ELIGIBILITY_AGE_EX
 import static com.titanium.metadata.errorcode.PolicyErrorCode.ELIGIBILITY_BENEFICIARY_RATIO_INVALID;
 import static com.titanium.metadata.errorcode.PolicyErrorCode.ELIGIBILITY_BENEFICIARY_REQUIRED;
 import static com.titanium.metadata.errorcode.PolicyErrorCode.ELIGIBILITY_COVERAGE_PERIOD_NOT_ALLOWED;
+import static com.titanium.metadata.errorcode.PolicyErrorCode.ELIGIBILITY_HEALTH_DECLARATION_REJECTED;
+import static com.titanium.metadata.errorcode.PolicyErrorCode.ELIGIBILITY_HEALTH_DECLARATION_REQUIRED;
 import static com.titanium.metadata.errorcode.PolicyErrorCode.ELIGIBILITY_HOLDER_REQUIRED;
 import static com.titanium.metadata.errorcode.PolicyErrorCode.ELIGIBILITY_INSURED_COUNT_BELOW_MIN;
 import static com.titanium.metadata.errorcode.PolicyErrorCode.ELIGIBILITY_INSURED_COUNT_EXCEEDS_MAX;
@@ -27,12 +29,14 @@ import java.util.Map;
 import org.springframework.stereotype.Service;
 
 import com.titanium.metadata.valueobject.Money;
+import com.titanium.policy.common.constant.PolicyConstants;
 import com.titanium.policy.entity.insurance.InsuredPartyList;
 import com.titanium.policy.service.IssuanceEligibilityDomainService;
 import com.titanium.policy.service.VinValidator;
 import com.titanium.policy.valueobject.RuleDecision;
 import com.titanium.policy.valueobject.issuance.IssuancePlanLine;
 import com.titanium.policy.valueobject.issuance.IssuanceRequest;
+import com.titanium.policy.valueobject.product.HealthDeclarationItem;
 import com.titanium.policy.valueobject.product.ProductIssueRules;
 
 /**
@@ -164,7 +168,11 @@ public class IssuanceEligibilityDomainServiceImpl implements IssuanceEligibility
         if (!payment.passed()) {
             return payment;
         }
-        return validateBeneficiaryRequirement(request, line, rules);
+        RuleDecision beneficiary = validateBeneficiaryRequirement(request, line, rules);
+        if (!beneficiary.passed()) {
+            return beneficiary;
+        }
+        return validateHealthDeclaration(line, rules);
     }
 
     /**
@@ -346,6 +354,64 @@ public class IssuanceEligibilityDomainServiceImpl implements IssuanceEligibility
         return hasBeneficiary
                 ? RuleDecision.accepted()
                 : RuleDecision.rejectedAtLine(ELIGIBILITY_BENEFICIARY_REQUIRED, line.lineNo());
+    }
+
+    /**
+     * 自定义告知项校验（G12/g12-02 AC-02，段级第 13 条）。
+     * <p>
+     * 按产品投保条件配置的告知项清单（{@link ProductIssueRules#healthDeclarationItems()}）逐项核对
+     * 段内答案（{@code extendData.healthDeclaration.answers}，键为告知问题编码的元数据常量名）：
+     * 必答项未作答拒 {@code ELIGIBILITY_HEALTH_DECLARATION_REQUIRED}（补答即可重试）；
+     * 答案肯定且处置为 {@code REJECT} 拒 {@code ELIGIBILITY_HEALTH_DECLARATION_REJECTED}。
+     * </p>
+     * <p>
+     * 🔴 <b>未配置不校验</b>：清单为 null/空（产品未配自定义告知项）直接放行——不得反向要求
+     * 未配置产品也必须作答，否则全部老产品出单被误拦（AC-02 反向判据）。
+     * </p>
+     * <p>
+     * 🔴 <b>只认配置清单</b>：遍历配置清单而非答案键集，answers 中的未知键（配置变更后的残留答案）
+     * 天然不参与校验；处置仅执行 {@code REJECT}，{@code MANUAL_REVIEW}/{@code RECORD_ONLY}
+     * 及未识别处置（null）当前仅建载体（待 R-6 业务确认后接入）。
+     * </p>
+     */
+    private RuleDecision validateHealthDeclaration(IssuancePlanLine line, ProductIssueRules rules) {
+        List<HealthDeclarationItem> items = rules.healthDeclarationItems();
+        if (items == null || items.isEmpty()) {
+            return RuleDecision.accepted();
+        }
+        Map<?, ?> answers = healthDeclarationAnswers(line);
+        for (HealthDeclarationItem item : items) {
+            Object answer = answers.get(item.question().getCode());
+            if (item.required() && item.isUnanswered(answer)) {
+                return RuleDecision.rejectedAtLine(ELIGIBILITY_HEALTH_DECLARATION_REQUIRED, line.lineNo(),
+                        item.question().getName());
+            }
+            if (item.rejects(answer)) {
+                return RuleDecision.rejectedAtLine(ELIGIBILITY_HEALTH_DECLARATION_REJECTED, line.lineNo(),
+                        item.question().getName());
+            }
+        }
+        return RuleDecision.accepted();
+    }
+
+    /**
+     * 取段内自定义告知项答案映射（{@code extendData.healthDeclaration.answers}），空安全。
+     *
+     * @param line 出单方案行
+     * @return 答案映射（键=告知问题编码常量名）；块缺失或结构异常时返回空 Map（按未作答处理，
+     *         由必答判定决定是否拒绝——<b>不代填默认答案</b>）
+     */
+    private Map<?, ?> healthDeclarationAnswers(IssuancePlanLine line) {
+        Map<String, Object> extendData = line.extendData();
+        if (extendData == null) {
+            return Map.of();
+        }
+        Object block = extendData.get(PolicyConstants.LineExtendDataKey.HEALTH_DECLARATION);
+        if (!(block instanceof Map<?, ?> blockMap)) {
+            return Map.of();
+        }
+        Object answers = blockMap.get(PolicyConstants.LineExtendDataKey.HEALTH_DECLARATION_ANSWERS);
+        return answers instanceof Map<?, ?> answerMap ? answerMap : Map.of();
     }
 
     /**

@@ -13,6 +13,7 @@ import com.titanium.metadata.response.ApiResponse;
 import com.titanium.policy.port.underwriting.UnderwritingDecisionGateway;
 import com.titanium.policy.valueobject.insurance.UnderwritingDecisionRequest;
 import com.titanium.policy.valueobject.insurance.UnderwritingResult;
+import com.titanium.policy.valueobject.issuance.HealthDeclarationInput;
 import com.titanium.underwriting.api.UnderwritingApi;
 import com.titanium.underwriting.api.request.underwriting.AutoDecideUnderwritingRequest;
 import com.titanium.underwriting.api.response.underwriting.UnderwritingResponse;
@@ -44,6 +45,11 @@ import lombok.extern.slf4j.Slf4j;
  * <b>G02/AC-01 四要素透传（保留）</b>：年龄/性别/职业类别/BMI 四项要素仍在同一请求内透传。
  * 🔴 <b>未提供的要素一律不写入</b>——不得用 {@code 0}／空串占位，核保域据此区分
  * 「未提供」与「提供了 0 岁/0 类职业」；写假值会让核保域把「无输入」误判成「低风险输入」。
+ * </p>
+ * <p>
+ * <b>G12/g12-01 AC-01 健康告知透传</b>：{@code healthDeclaration} 由出单 Saga 从投保险种段的段级
+ * {@code extendData} 提取后随本请求抵达，本适配器翻译为核保契约的嵌套对象；未提供（{@code null}）时
+ * 一律不写入——口径与四要素一致，不得以「不吸烟/默认身高体重」代填。
  * </p>
  * <p>
  * <b>UW-3 加费回传（保留）</b>：从决策响应读取结构化加费率 {@code extraPremiumRatio} 填入
@@ -133,7 +139,33 @@ public class SyncUnderwritingDecisionAdapter implements UnderwritingDecisionGate
             autoRequest.setBmi(request.primaryInsuredBmi());
         }
 
+        // 健康告知（G12/g12-01 AC-01）：段级 extendData 提供，未提供时不写入（核保域按无告知处理）
+        if (request.healthDeclaration() != null) {
+            autoRequest.setHealthDeclaration(toAutoDecideHealth(request.healthDeclaration()));
+        }
+
         return autoRequest;
+    }
+
+    /**
+     * 健康告知翻译（保单域值对象 → 核保域契约，防腐层）
+     * <p>
+     * 保单域 {@link HealthDeclarationInput} 与核保契约嵌套对象字段逐项对齐（G12/g12-01 实测形态：
+     * 病史两项为字符串列表、吸烟为布尔、身高体重为十进制）。
+     * 保单域侧已保证「三个必答项齐全」才产出非 null 值，核保域 {@code HealthDeclaration} 紧凑构造器
+     * 仍会对其强校验（身高/体重必须为正，非法即拒收）——两域各自守住自己的边界。
+     * </p>
+     */
+    private AutoDecideUnderwritingRequest.HealthDeclarationInput toAutoDecideHealth(
+            HealthDeclarationInput declaration) {
+        AutoDecideUnderwritingRequest.HealthDeclarationInput input =
+                new AutoDecideUnderwritingRequest.HealthDeclarationInput();
+        input.setMedicalHistory(declaration.medicalHistory());
+        input.setFamilyHistory(declaration.familyHistory());
+        input.setSmoking(declaration.smoking());
+        input.setHeightCm(declaration.heightCm());
+        input.setWeightKg(declaration.weightKg());
+        return input;
     }
 
     /**

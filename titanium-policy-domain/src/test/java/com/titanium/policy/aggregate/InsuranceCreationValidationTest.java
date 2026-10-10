@@ -105,7 +105,7 @@ class InsuranceCreationValidationTest {
                                                 String parentLineId, String productId, String productCode) {
         return new InsuranceLine(lineId, lineNo, category, parentLineId, productId, productCode, "产品" + lineId,
                 null, null, Money.of(new BigDecimal("500000"), "CNY"), Money.of(new BigDecimal("1000"), "CNY"),
-                null, null, List.of(), null, null, PolicyLineStatus.UNDERWRITING);
+                null, null, List.of(), null, null, PolicyLineStatus.UNDERWRITING, null);
     }
 
     private ConvertProposalToInsuranceCommand command(List<InsuranceLine> lines) {

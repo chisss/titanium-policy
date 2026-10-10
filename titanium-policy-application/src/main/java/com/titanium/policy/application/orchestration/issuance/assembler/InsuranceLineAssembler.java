@@ -92,7 +92,8 @@ public class InsuranceLineAssembler {
                 product != null ? product.productName() : null, product != null ? product.productVersion() : null,
                 product != null ? product.insuranceType() : request.insuranceType(), planLine.sumInsured(), null,
                 assemblePeriod(request, planLine), assemblePaymentTerms(planLine),
-                assembleSubjects(request, planLine), null, null, PolicyLineStatus.UNDERWRITING);
+                assembleSubjects(request, planLine), null, null, PolicyLineStatus.UNDERWRITING,
+                planLine.extendData());
     }
 
     /**

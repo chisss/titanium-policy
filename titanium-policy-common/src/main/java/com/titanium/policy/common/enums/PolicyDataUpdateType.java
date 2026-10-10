@@ -59,7 +59,25 @@ public enum PolicyDataUpdateType implements BaseEnum {
             EndorsementEffectiveType.SPECIFIED_DATE),
     /** 保障责任变更 */
     COVERAGE_CHANGE(14, "COVERAGE_CHANGE", "保障责任变更", EndorsementCategory.COVERAGE, true, true,
-            EndorsementEffectiveType.SPECIFIED_DATE);
+            EndorsementEffectiveType.SPECIFIED_DATE),
+    /**
+     * 团险增员（团单加保 / 家庭险新增成员，G12/g12-06）
+     * <p>
+     * 🔴 标志位为 R-4 业务确认前的暂定值，镜像加保语义（同 {@code SUBJECT_CHANGE}）：增员是否需重新核保、
+     * 是否触发保费重算、生效日与等待期如何衔接均待业务确认；确认前本项只作入口，不做规则。
+     * </p>
+     */
+    INSURED_MEMBER_ADD(15, "INSURED_MEMBER_ADD", "增员", EndorsementCategory.SUBJECT, true, true,
+            EndorsementEffectiveType.SPECIFIED_DATE),
+    /**
+     * 团险减员（团单减保 / 家庭险移除成员，G12/g12-06）
+     * <p>
+     * 🔴 标志位为 R-4 业务确认前的暂定值，镜像减保语义：减员是否退还保费（退费金额归 G03/G04）、
+     * 名单人数低于 {@code minGroupSize} 时如何处置待业务确认；确认前本项只作入口，不做规则。
+     * </p>
+     */
+    INSURED_MEMBER_REMOVE(16, "INSURED_MEMBER_REMOVE", "减员", EndorsementCategory.SUBJECT, false, true,
+            EndorsementEffectiveType.IMMEDIATE);
 
     private final Integer                  enumCode;
     private final String                   code;
@@ -154,6 +172,8 @@ public enum PolicyDataUpdateType implements BaseEnum {
             case "SUBJECT_CHANGE" -> SUBJECT_CHANGE;
             case "SMOKING_STATUS_CHANGE" -> SMOKING_STATUS_CHANGE;
             case "COVERAGE_CHANGE" -> COVERAGE_CHANGE;
+            case "INSURED_MEMBER_ADD" -> INSURED_MEMBER_ADD;
+            case "INSURED_MEMBER_REMOVE" -> INSURED_MEMBER_REMOVE;
             // 状态类保全（SUSPENSION/RESUMPTION/TERMINATION/REINSTATEMENT）不属批改
             default -> null;
         };

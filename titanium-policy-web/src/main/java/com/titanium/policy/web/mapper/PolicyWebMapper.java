@@ -12,19 +12,24 @@ import com.titanium.metadata.enums.CurrencyEnum;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.api.model.Amount;
 import com.titanium.policy.api.request.issuance.CreatePolicyRequest;
+import com.titanium.policy.api.request.member.AddInsuredMemberRequest;
 import com.titanium.policy.api.response.fieldcatalog.PolicySnapshotFieldValueResponse;
 import com.titanium.policy.api.response.maintenance.PolicyMaintenanceSnapshotResponse;
 import com.titanium.policy.api.response.policy.PolicyBeneficiaryResponse;
 import com.titanium.policy.api.response.policy.PolicyClauseResponse;
 import com.titanium.policy.api.response.policy.PolicyResponse;
 import com.titanium.policy.api.response.policy.PolicyStatusResponse;
+import com.titanium.policy.command.AddInsuredMemberCommand;
 import com.titanium.policy.command.ApplyPolicyEndorsementCommand;
 import com.titanium.policy.command.CreatePolicyCommand;
 import com.titanium.policy.command.CreatePolicyDirectlyCommand;
 import com.titanium.policy.command.DistributeDividendCommand;
 import com.titanium.policy.command.MaturePolicyCommand;
+import com.titanium.policy.command.RemoveInsuredMemberCommand;
 import com.titanium.policy.command.StartAnnuityPayoutCommand;
 import com.titanium.policy.command.WaivePremiumCommand;
+import com.titanium.policy.common.enums.FamilyRelation;
+import com.titanium.policy.entity.insurance.InsuredPartyList;
 import com.titanium.policy.query.result.PolicyBeneficiaryQueryResult;
 import com.titanium.policy.query.result.PolicyClauseQueryResult;
 import com.titanium.policy.query.result.PolicyMaintenanceSnapshotQueryResult;
@@ -37,6 +42,7 @@ import com.titanium.policy.web.dto.maintenance.DistributeDividendDTO;
 import com.titanium.policy.web.dto.maintenance.MaturePolicyDTO;
 import com.titanium.policy.web.dto.maintenance.StartAnnuityPayoutDTO;
 import com.titanium.policy.web.dto.maintenance.WaivePremiumDTO;
+import com.titanium.policy.web.dto.member.AddInsuredMemberDTO;
 import com.titanium.policy.web.response.policy.PolicyDetailVO;
 
 /**
@@ -302,6 +308,91 @@ public interface PolicyWebMapper {
     @Mapping(target = "tenantId", source = "tenantId")
     ApplyPolicyEndorsementCommand toApplyEndorsementCommand(ApplyEndorsementDTO request, String policyId,
                                                             String operatorId, String tenantId);
+
+    /**
+     * HTTP DTO → 新增被保险人命令（Controller 用，团单加保 / 家庭险增员）
+     * <p>
+     * 家庭成员关系直接用域枚举（同 {@code ApplyEndorsementDTO.updateType} 直映射约定）。
+     * </p>
+     *
+     * @param request 新增被保险人请求
+     * @param policyId 保单ID
+     * @param operatorId 操作人ID
+     * @param tenantId 租户ID
+     * @return 新增被保险人命令
+     */
+    @Mapping(target = "policyId", source = "policyId")
+    @Mapping(target = "member", source = "request")
+    @Mapping(target = "familyRelation", source = "request.familyRelation")
+    @Mapping(target = "operatorId", source = "operatorId")
+    @Mapping(target = "tenantId", source = "tenantId")
+    AddInsuredMemberCommand toAddInsuredMemberCommand(AddInsuredMemberDTO request, String policyId,
+                                                      String operatorId, String tenantId);
+
+    /**
+     * 远程 Request → 新增被保险人命令（Provider 用，团单加保 / 家庭险增员）
+     * <p>
+     * api 层零内部依赖：家庭成员关系以 code 字符串承载，在 web 层映射器翻译为域枚举。
+     * </p>
+     *
+     * @param request 新增被保险人请求（Feign 契约）
+     * @param policyId 保单ID
+     * @param operatorId 操作人ID
+     * @param tenantId 租户ID
+     * @return 新增被保险人命令
+     */
+    @Mapping(target = "policyId", source = "policyId")
+    @Mapping(target = "member", source = "request")
+    @Mapping(target = "familyRelation", expression = "java(toFamilyRelation(request.familyRelation()))")
+    @Mapping(target = "operatorId", source = "operatorId")
+    @Mapping(target = "tenantId", source = "tenantId")
+    AddInsuredMemberCommand toAddInsuredMemberCommand(AddInsuredMemberRequest request, String policyId,
+                                                      String operatorId, String tenantId);
+
+    /**
+     * HTTP DTO → 被保险人快照（新增成员命令的成员段）
+     *
+     * @param request 新增被保险人请求
+     * @return 被保险人快照（聚合内实体）
+     */
+    InsuredPartyList.InsuredInfo toInsuredInfo(AddInsuredMemberDTO request);
+
+    /**
+     * 远程 Request → 被保险人快照（新增成员命令的成员段）
+     *
+     * @param request 新增被保险人请求（Feign 契约）
+     * @return 被保险人快照（聚合内实体）
+     */
+    @Mapping(target = "familyRelation", expression = "java(toFamilyRelation(request.familyRelation()))")
+    InsuredPartyList.InsuredInfo toInsuredInfo(AddInsuredMemberRequest request);
+
+    /**
+     * 移除被保险人命令（Controller/Provider 共用，全标量入参，reason 可空）
+     *
+     * @param policyId 保单ID
+     * @param insuredId 被移除的被保险人ID
+     * @param reason 移除原因
+     * @param operatorId 操作人ID
+     * @param tenantId 租户ID
+     * @return 移除被保险人命令
+     */
+    @Mapping(target = "policyId", source = "policyId")
+    @Mapping(target = "insuredId", source = "insuredId")
+    @Mapping(target = "reason", source = "reason")
+    @Mapping(target = "operatorId", source = "operatorId")
+    @Mapping(target = "tenantId", source = "tenantId")
+    RemoveInsuredMemberCommand toRemoveInsuredMemberCommand(String policyId, String insuredId, String reason,
+                                                            String operatorId, String tenantId);
+
+    /**
+     * 家庭成员关系 code → 域枚举（空安全）
+     * <p>
+     * api 层零内部依赖，家庭关系以 code 字符串承载，翻译点固定在 web 层映射器。
+     * </p>
+     */
+    default FamilyRelation toFamilyRelation(String code) {
+        return code == null || code.isBlank() ? null : FamilyRelation.fromCode(code);
+    }
 
     /**
      * BigDecimal + 币种 → Money 值对象（空安全，缺省币种 CNY）

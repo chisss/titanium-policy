@@ -2,6 +2,7 @@ package com.titanium.policy.entity.insurance;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
@@ -50,13 +51,16 @@ import com.titanium.policy.valueobject.policy.LinePaymentTerms;
  * @param underwritingConclusion 本险种核保结论（未核保为 null）
  * @param extraPremiumRatio      本险种核保加费率（无加费为 null）
  * @param lineStatus             本险种投保段状态
+ * @param extendData             段级扩展数据（G12/g12-01：健康告知等特化要素的透传载体，
+ *                               键契约见 {@code PolicyConstants.LineExtendDataKey}；无则为 null）
  */
 public record InsuranceLine(String lineId, int lineNo, ProductCategory productCategory, String parentLineId,
                             String productId, String productCode, String productName, String productVersion,
                             InsuranceProductType insuranceType, Money sumInsured, Money premium,
                             LineCoveragePeriod coveragePeriod, LinePaymentTerms paymentTerms,
                             List<InsuredSubject> insuredSubjects, ConclusionType underwritingConclusion,
-                            BigDecimal extraPremiumRatio, PolicyLineStatus lineStatus) {
+                            BigDecimal extraPremiumRatio, PolicyLineStatus lineStatus,
+                            Map<String, Object> extendData) {
 
     /**
      * 兼容产品版本字段加入前的历史事件和既有调用方。
@@ -69,7 +73,7 @@ public record InsuranceLine(String lineId, int lineNo, ProductCategory productCa
                          BigDecimal extraPremiumRatio, PolicyLineStatus lineStatus) {
         this(lineId, lineNo, productCategory, parentLineId, productId, productCode, productName, null,
                 insuranceType, sumInsured, premium, coveragePeriod, paymentTerms, insuredSubjects,
-                underwritingConclusion, extraPremiumRatio, lineStatus);
+                underwritingConclusion, extraPremiumRatio, lineStatus, null);
     }
 
     /**
@@ -136,7 +140,7 @@ public record InsuranceLine(String lineId, int lineNo, ProductCategory productCa
         };
         return new InsuranceLine(lineId, lineNo, productCategory, parentLineId, productId, productCode, productName,
                 productVersion, insuranceType, sumInsured, premium, coveragePeriod, paymentTerms, insuredSubjects, conclusion,
-                extraPremiumRatio, newStatus);
+                extraPremiumRatio, newStatus, extendData);
     }
 
     /**
@@ -152,7 +156,7 @@ public record InsuranceLine(String lineId, int lineNo, ProductCategory productCa
     public InsuranceLine withPremium(Money resolvedPremium) {
         return new InsuranceLine(lineId, lineNo, productCategory, parentLineId, productId, productCode, productName,
                 productVersion, insuranceType, sumInsured, resolvedPremium, coveragePeriod, paymentTerms, insuredSubjects,
-                underwritingConclusion, extraPremiumRatio, lineStatus);
+                underwritingConclusion, extraPremiumRatio, lineStatus, extendData);
     }
 
     /**
@@ -168,7 +172,7 @@ public record InsuranceLine(String lineId, int lineNo, ProductCategory productCa
     public InsuranceLine withConfirmedPremium(Money confirmedPremium) {
         return new InsuranceLine(lineId, lineNo, productCategory, parentLineId, productId, productCode, productName,
                 productVersion, insuranceType, sumInsured, confirmedPremium, coveragePeriod, paymentTerms,
-                insuredSubjects, underwritingConclusion, null, lineStatus);
+                insuredSubjects, underwritingConclusion, null, lineStatus, extendData);
     }
 
     /**

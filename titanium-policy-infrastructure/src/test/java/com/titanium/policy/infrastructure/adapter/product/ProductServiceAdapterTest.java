@@ -1,7 +1,9 @@
 package com.titanium.policy.infrastructure.adapter.product;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -17,11 +19,15 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.insurance.SubjectType;
 import com.titanium.metadata.enums.product.ProductEnum.IssuanceMode;
+import com.titanium.metadata.enums.underwriting.HealthDeclarationHandling;
+import com.titanium.metadata.enums.underwriting.HealthDeclarationQuestion;
 import com.titanium.metadata.errorcode.PolicyErrorCode;
 import com.titanium.metadata.response.ApiResponse;
 import com.titanium.policy.exception.PolicyBusinessRuleException;
 import com.titanium.product.api.ProductApi;
 import com.titanium.product.api.ProductTemplateApi;
+import com.titanium.product.api.response.config.HealthDeclarationItemResponse;
+import com.titanium.product.api.response.config.InsureConditionResponse;
 import com.titanium.product.api.response.config.IssuanceProcessConfigResponse;
 import com.titanium.product.api.response.product.ProductResponse;
 import com.titanium.product.api.response.product.ProductTemplateResponse;
@@ -101,6 +107,66 @@ class ProductServiceAdapterTest {
         var rules = adapter.getIssueRules("product-1");
         assertEquals(SubjectType.VEHICLE, rules.subjectType());
         assertEquals(List.of("licensePlate", "vin"), rules.requiredSubjectAttributes());
+    }
+
+    /**
+     * 告知项清单翻译（g12-02）：问题编码经 {@code fromCode} 解析为元数据枚举、处置码解析为处置枚举；
+     * 未知问题编码跳过（对端新增编码的滚动升级窗口，m8-1103 读取路径宽容判据）。
+     */
+    @Test
+    void shouldMapHealthDeclarationItemsIntoIssueRules() {
+        ProductResponse product = product(IssuanceMode.ONE_STEP);
+        product.setInsureCondition(insureCondition(List.of(
+                new HealthDeclarationItemResponse("HOSPITALIZATION_TWO_YEARS", "近两年住院史", true, "REJECT"),
+                new HealthDeclarationItemResponse("SURGERY_HISTORY", "手术史", true, "RECORD_ONLY"),
+                new HealthDeclarationItemResponse("UNKNOWN_QUESTION", "对端新增项", true, "REJECT"))));
+        when(productApi.getProductById("product-1")).thenReturn(ApiResponse.success(product));
+        when(productTemplateApi.getByProductId("product-1")).thenReturn(ApiResponse.success(null));
+
+        ProductServiceAdapter adapter = new ProductServiceAdapter(OBJECT_MAPPER, productApi, productTemplateApi);
+
+        var items = adapter.getIssueRules("product-1").healthDeclarationItems();
+        assertEquals(2, items.size(), "未知问题编码应跳过而非整链失败");
+        assertEquals(HealthDeclarationQuestion.HOSPITALIZATION_TWO_YEARS, items.get(0).question());
+        assertEquals(HealthDeclarationHandling.REJECT, items.get(0).handling());
+        assertTrue(items.get(0).required());
+        assertEquals(HealthDeclarationHandling.RECORD_ONLY, items.get(1).handling());
+    }
+
+    /** 处置码未识别时承接为 null（语义：仅必答校验、不执行处置），不抛出、不丢弃该告知项本身。 */
+    @Test
+    void shouldTolerateUnrecognizedHandlingCode() {
+        ProductResponse product = product(IssuanceMode.ONE_STEP);
+        product.setInsureCondition(insureCondition(List.of(
+                new HealthDeclarationItemResponse("CHRONIC_DISEASE", "慢性病史", false, "ROLLBACK_XYZ"))));
+        when(productApi.getProductById("product-1")).thenReturn(ApiResponse.success(product));
+        when(productTemplateApi.getByProductId("product-1")).thenReturn(ApiResponse.success(null));
+
+        ProductServiceAdapter adapter = new ProductServiceAdapter(OBJECT_MAPPER, productApi, productTemplateApi);
+
+        var items = adapter.getIssueRules("product-1").healthDeclarationItems();
+        assertEquals(1, items.size());
+        assertEquals(HealthDeclarationQuestion.CHRONIC_DISEASE, items.get(0).question());
+        assertNull(items.get(0).handling(), "未识别处置按「仅必答校验」承接为 null");
+    }
+
+    /** 产品未配置告知项时清单为空——消费侧语义「空 = 不校验」，防老产品出单被误拦（AC-02 反向判据）。 */
+    @Test
+    void shouldKeepHealthDeclarationItemsEmptyWhenNotConfigured() {
+        ProductResponse product = product(IssuanceMode.ONE_STEP);
+        when(productApi.getProductById("product-1")).thenReturn(ApiResponse.success(product));
+        when(productTemplateApi.getByProductId("product-1")).thenReturn(ApiResponse.success(null));
+
+        ProductServiceAdapter adapter = new ProductServiceAdapter(OBJECT_MAPPER, productApi, productTemplateApi);
+
+        var items = adapter.getIssueRules("product-1").healthDeclarationItems();
+        assertTrue(items.isEmpty(), "未配置（条件缺失）与配置为空列表两态必须同为空清单");
+    }
+
+    /** 投保条件 Response 工厂：只填告知项清单，其余组件对出单规则校验无影响置空。 */
+    private InsureConditionResponse insureCondition(List<HealthDeclarationItemResponse> items) {
+        return new InsureConditionResponse(null, null, List.of(), List.of(), null, null, null, null, null,
+                List.of(), List.of(), null, null, null, items);
     }
 
     private ProductResponse product(IssuanceMode mode) {

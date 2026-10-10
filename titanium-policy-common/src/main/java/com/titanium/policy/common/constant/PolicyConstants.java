@@ -69,4 +69,53 @@ public class PolicyConstants {
         /** 反算所用规则集版本（取证：规则版本） */
         public static final String NCD_RULE_VERSION = "ncdRuleVersion";
     }
+
+    /**
+     * 险种段特有要素（{@code extendData}）的键契约（G12/g12-01 AC-01）
+     * <p>
+     * {@code IssuancePlanLine.extendData} 是出单请求中<b>段级特化要素</b>的载体：前端经
+     * {@code SubmitIssuanceRequest.PlanLine.extendData} 提交，随 {@code InsuranceLine.extendData}
+     * 落事件流。本类是该载荷的<b>键契约</b>：出单侧按此写入，出单 Saga 提取核保要素时按此解析，
+     * 键名漂移即编译期可见。
+     * </p>
+     * <p>
+     * 🔴 <b>健康告知「全或全无」口径</b>：核保域 {@code HealthDeclaration} 对身高/体重有强校验
+     * （必须为正），且吸烟项是无三态的原始 {@code boolean}——故本侧声明了告知就必须同时提供
+     * {@link #HEALTH_DECLARATION_SMOKING 吸烟}/{@link #HEALTH_DECLARATION_HEIGHT_CM 身高}/
+     * {@link #HEALTH_DECLARATION_WEIGHT_KG 体重} 三个必答项，缺任一即视为<b>未提供</b>
+     * （Saga 留痕告警、不代填），<b>禁止</b>以「不吸烟 / 默认身高体重」代填——
+     * 静默代填会把「没告知」变成「低风险告知」。
+     * </p>
+     */
+    public static class LineExtendDataKey {
+
+        /** 健康告知块（嵌套对象，含既往病史/家族病史/吸烟/身高/体重五键及自定义告知项答案键） */
+        public static final String HEALTH_DECLARATION = "healthDeclaration";
+
+        /** 既往病史（字符串数组，无则空数组） */
+        public static final String HEALTH_DECLARATION_MEDICAL_HISTORY = "medicalHistory";
+
+        /** 家族遗传病史（字符串数组，无则空数组） */
+        public static final String HEALTH_DECLARATION_FAMILY_HISTORY = "familyHistory";
+
+        /** 是否吸烟（必答，布尔） */
+        public static final String HEALTH_DECLARATION_SMOKING = "smoking";
+
+        /** 身高厘米（必答，正数） */
+        public static final String HEALTH_DECLARATION_HEIGHT_CM = "heightCm";
+
+        /** 体重千克（必答，正数） */
+        public static final String HEALTH_DECLARATION_WEIGHT_KG = "weightKg";
+
+        /**
+         * 自定义告知项答案（G12/g12-02）：嵌套对象，键=告知问题编码（metadata
+         * {@code HealthDeclarationQuestion} 常量名，如 {@code HOSPITALIZATION_TWO_YEARS}），值=布尔。
+         * <p>
+         * 仅对产品「告知项清单」（{@code InsureCondition.healthDeclarationItems}）配置的问题作答，
+         * 与上方五个平铺固定项<b>并列共存</b>——固定项是核保域强类型要素（吸烟/身高/体重等），
+         * 本键是产品可配的扩展项（答什么由产品清单决定，本侧按清单核对）。
+         * </p>
+         */
+        public static final String HEALTH_DECLARATION_ANSWERS = "answers";
+    }
 }

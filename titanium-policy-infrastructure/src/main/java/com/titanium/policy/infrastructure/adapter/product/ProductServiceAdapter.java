@@ -13,6 +13,8 @@ import com.titanium.metadata.enums.insurance.SubjectType;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.enums.product.ProductEnum.IssuanceMode;
 import com.titanium.metadata.enums.product.ProductEnum.PolicyFormType;
+import com.titanium.metadata.enums.underwriting.HealthDeclarationHandling;
+import com.titanium.metadata.enums.underwriting.HealthDeclarationQuestion;
 import com.titanium.metadata.errorcode.PolicyErrorCode;
 import com.titanium.metadata.errorcode.SystemErrorCode;
 import com.titanium.metadata.response.ApiResponse;
@@ -20,6 +22,7 @@ import com.titanium.policy.exception.PolicyBusinessRuleException;
 import com.titanium.policy.exception.RemoteDependencyUnavailableException;
 import com.titanium.policy.port.product.ProductServicePort;
 import com.titanium.policy.valueobject.product.CoverageSumInsuredConfig;
+import com.titanium.policy.valueobject.product.HealthDeclarationItem;
 import com.titanium.policy.valueobject.product.ProductBasicInfo;
 import com.titanium.policy.valueobject.product.ProductClauseRef;
 import com.titanium.policy.valueobject.product.ProductIssueRules;
@@ -29,6 +32,7 @@ import com.titanium.product.api.ProductTemplateApi;
 import com.titanium.product.api.response.clause.ProductClauseResponse;
 import com.titanium.product.api.response.config.CoveragePeriodConfigResponse;
 import com.titanium.product.api.response.config.CoverageSumInsuredConfigResponse;
+import com.titanium.product.api.response.config.HealthDeclarationItemResponse;
 import com.titanium.product.api.response.config.InsureConditionResponse;
 import com.titanium.product.api.response.config.IssuanceProcessConfigResponse;
 import com.titanium.product.api.response.config.PaymentConfigResponse;
@@ -144,7 +148,44 @@ public class ProductServiceAdapter implements ProductServicePort {
                 requiredAttributes(structure != null ? structure.getSubjectFieldsSchema() : null),
                 // G11/g11-06：多标的声明取自产品模板（structure 与前文 subjectType 同源）；
                 // 无模板/无结构时传 null（三态「未声明 = 不限制」，见 ProductIssueRules.allowsMultipleSubjects）
-                structure != null ? structure.isAllowMultipleSubjects() : null);
+                structure != null ? structure.isAllowMultipleSubjects() : null,
+                // G12/g12-02：自定义告知项清单取自产品投保条件；未配置（null/空）两态在消费侧同为不校验
+                condition != null ? toHealthDeclarationItems(condition.healthDeclarationItems()) : List.of());
+    }
+
+    /**
+     * 产品告知项配置 → 保单域防腐镜像（G12/g12-02 AC-02）。
+     * <p>
+     * 🔴 <b>解析失败跳过而非整单拒绝</b>：question 编码本域未识别（对端新增编码的滚动升级窗口）时
+     * 跳过该项并留痕——读取路径宽容（m8-1103 判据），不把「不认识」放大成「产品配错」。
+     * 跳过必答项会让出单少校验一项，故必须 warn 留痕。
+     * </p>
+     * <p>
+     * handling 未识别时保留 {@code null}（镜像语义：仅必答校验、不执行处置），同样留痕。
+     * </p>
+     *
+     * @param items 产品侧告知项清单（可为 null=未配置）
+     * @return 保单域防腐镜像清单；未配置或全部不可识别时为空列表（空=不校验，见 ProductIssueRules）
+     */
+    private List<HealthDeclarationItem> toHealthDeclarationItems(List<HealthDeclarationItemResponse> items) {
+        if (items == null || items.isEmpty()) {
+            return List.of();
+        }
+        List<HealthDeclarationItem> mapped = new ArrayList<>();
+        for (HealthDeclarationItemResponse item : items) {
+            HealthDeclarationQuestion question = HealthDeclarationQuestion.fromCode(item.question());
+            if (question == null) {
+                log.warn("产品告知项问题编码无法识别，跳过该项: code={}", item.question());
+                continue;
+            }
+            HealthDeclarationHandling handling = HealthDeclarationHandling.fromCode(item.handling());
+            if (item.handling() != null && handling == null) {
+                log.warn("产品告知项处置编码无法识别，按「仅必答校验」处理: question={}, code={}",
+                        item.question(), item.handling());
+            }
+            mapped.add(new HealthDeclarationItem(question, item.required(), handling));
+        }
+        return List.copyOf(mapped);
     }
 
     /** 从模板 JSON Schema 读取 required 数组；非法 Schema 按未配置约束处理并记录日志。 */

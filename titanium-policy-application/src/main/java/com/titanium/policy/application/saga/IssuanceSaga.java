@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -34,6 +35,7 @@ import com.titanium.policy.command.LinkInvestmentAccountCommand;
 import com.titanium.policy.command.ReceiveUnderwritingResultCommand;
 import com.titanium.policy.command.TriggerIssuanceCommand;
 import com.titanium.policy.common.constant.PolicyConstants;
+import com.titanium.policy.common.constant.PolicyConstants.LineExtendDataKey;
 import com.titanium.policy.entity.insurance.InsuranceLine;
 import com.titanium.policy.entity.insurance.InsuredPartyList;
 import com.titanium.policy.entity.insurance.InsuredPartyList.InsuredInfo;
@@ -48,6 +50,7 @@ import com.titanium.policy.port.underwriting.UnderwritingDecisionGateway;
 import com.titanium.policy.service.PolicyIssuanceDomainService;
 import com.titanium.policy.valueobject.insurance.UnderwritingDecisionRequest;
 import com.titanium.policy.valueobject.insurance.UnderwritingResult;
+import com.titanium.policy.valueobject.issuance.HealthDeclarationInput;
 import com.titanium.policy.valueobject.policy.ChannelInfo;
 import com.titanium.policy.valueobject.policy.CollectionInfo;
 import com.titanium.policy.valueobject.policy.CollectionResult;
@@ -226,11 +229,13 @@ public class IssuanceSaga {
         // 缺失一律留痕（见 warnMissingRiskFactors），核保域对 null 要素按其可得要素评分。
         InsuredInfo primaryInsured = extractPrimaryInsured();
         warnMissingRiskFactors(primaryInsured, event.insuranceId());
+        // G12/g12-01 AC-01：从记忆的险种段 extendData 提取健康告知，随本请求透传核保域（未提供/不完整留痕）
+        HealthDeclarationInput healthDeclaration = extractHealthDeclaration(event.insuranceId());
         UnderwritingDecisionRequest request = new UnderwritingDecisionRequest(event.insuranceId(), event.holderId(),
                 event.insuredCount(), this.sumInsured, event.exactPremium(), event.currency(), event.productCodes(),
                 event.tenantId(), primaryInsured != null ? primaryInsured.age() : null,
                 primaryInsured != null ? primaryInsured.gender() : null,
-                null, null);
+                null, null, healthDeclaration);
         UnderwritingResult result = underwritingDecisionGateway.requestDecision(request);
 
         commandGateway.sendAndWait(new ReceiveUnderwritingResultCommand(event.insuranceId(), result, event.tenantId()), COMMAND_TIMEOUT_SECONDS, TimeUnit.SECONDS);
@@ -415,6 +420,44 @@ public class IssuanceSaga {
             return null;
         }
         return insuredPartyList.insuredList().get(0);
+    }
+
+    /**
+     * 提取健康告知（G12/g12-01 AC-01）
+     * <p>
+     * 健康告知随出单请求的段级 {@code extendData} 提交（键契约
+     * {@link LineExtendDataKey#HEALTH_DECLARATION}），本方法遍历记忆的险种段，取<b>首个携带告知块的段</b>
+     * 解析——首个携带段即权威，其解析结果（含「声明不完整」的 null）即本单结论，不再看后续段
+     * （一单内多处告知属上游数据异常，逐段兜底会让结论不确定）。解析口径（三个必答项齐全且身高体重为正）
+     * 见 {@link HealthDeclarationInput#fromExtendData}。
+     * </p>
+     * <p>
+     * 🔴 <b>缺失与不完整分列告警，且一律不代填</b>：① 全部段均无告知块 → 按「未提供」告警；
+     * ② 有告知块但三个必答项（吸烟/身高/体重）缺任一项或非法 → 按「声明不完整」告警，同样按未提供处理。
+     * 两种成因反查方向不同（前端未采集 vs 采集残缺），故分开留痕；静默或以默认值代填会把
+     * 「没告知」变成「低风险告知」，核保域将据此作出错误决策。
+     * </p>
+     *
+     * @param insuranceId 投保单ID（缺失留痕的检索键）
+     * @return 完整健康告知；未提供或声明不完整时返回 null
+     */
+    private HealthDeclarationInput extractHealthDeclaration(String insuranceId) {
+        if (insuranceLines != null) {
+            for (InsuranceLine line : insuranceLines) {
+                Map<String, Object> extendData = line.extendData();
+                if (extendData == null || !extendData.containsKey(LineExtendDataKey.HEALTH_DECLARATION)) {
+                    continue;
+                }
+                HealthDeclarationInput declaration = HealthDeclarationInput.fromExtendData(extendData);
+                if (declaration == null) {
+                    log.warn("[IssuanceSaga] 健康告知声明不完整（吸烟/身高/体重缺项或非法），按未提供处理:"
+                            + " insuranceId={}, lineNo={}", insuranceId, line.lineNo());
+                }
+                return declaration;
+            }
+        }
+        log.warn("[IssuanceSaga] 出单请求未携带健康告知，本次核保不含健康告知要素: insuranceId={}", insuranceId);
+        return null;
     }
 
     /**

@@ -19,6 +19,7 @@ import com.titanium.policy.api.request.maintenance.PolicyMaintenanceAmountReques
 import com.titanium.policy.api.request.maintenance.PolicyMaintenanceRetroactiveEvidenceRequest;
 import com.titanium.policy.api.request.maintenance.PolicyServiceRestrictionRequest;
 import com.titanium.policy.api.request.maintenance.RecordPremiumCollectionRequest;
+import com.titanium.policy.api.request.member.AddInsuredMemberRequest;
 import com.titanium.policy.api.response.maintenance.PolicyEndorsementResponse;
 import com.titanium.policy.api.response.maintenance.PolicyMaintenanceApplicationResponse;
 import com.titanium.policy.api.response.maintenance.PolicyMaintenanceAppliedFieldResponse;
@@ -32,10 +33,12 @@ import com.titanium.policy.api.response.policy.PolicyStatusResponse;
 import com.titanium.policy.application.command.policy.PolicyApplicationService;
 import com.titanium.policy.application.query.PolicyAppQueryService;
 import com.titanium.policy.application.query.PolicyLineAppQueryService;
+import com.titanium.policy.command.AddInsuredMemberCommand;
 import com.titanium.policy.command.ApplyPolicyMaintenanceCommand;
 import com.titanium.policy.command.CreatePolicyCommand;
 import com.titanium.policy.command.CreatePolicyDirectlyCommand;
 import com.titanium.policy.command.RecordPremiumCollectionCommand;
+import com.titanium.policy.command.RemoveInsuredMemberCommand;
 import com.titanium.policy.query.query.FindPolicyByIdQuery;
 import com.titanium.policy.query.result.PolicyEndorsementQueryResult;
 import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceAmountFact;
@@ -190,6 +193,24 @@ public class PolicyApiProvider implements PolicyApi {
                 .map(policyWebMapper::toBeneficiaryResponse)
                 .toList();
         return ApiResponse.success(beneficiaries);
+    }
+
+    @Override
+    public ApiResponse<Void> addInsuredMember(String policyId, AddInsuredMemberRequest request) {
+        // 协议转换：Feign Request → 领域命令（家庭关系 code 在映射器内翻译），收敛到同一应用层门面
+        AddInsuredMemberCommand command = policyWebMapper.toAddInsuredMemberCommand(
+                request, policyId, RequestContextHolder.getOperatorId(), RequestContextHolder.requireTenantId());
+        policyApplicationService.addInsuredMember(command);
+        return ApiResponse.success();
+    }
+
+    @Override
+    public ApiResponse<Void> removeInsuredMember(String policyId, String insuredId, String reason) {
+        RemoveInsuredMemberCommand command = policyWebMapper.toRemoveInsuredMemberCommand(
+                policyId, insuredId, reason, RequestContextHolder.getOperatorId(),
+                RequestContextHolder.requireTenantId());
+        policyApplicationService.removeInsuredMember(command);
+        return ApiResponse.success();
     }
 
     private PolicyMaintenanceApplicationResponse toResponse(PolicyMaintenanceApplicationReceipt receipt) {

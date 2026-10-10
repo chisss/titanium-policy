@@ -106,7 +106,7 @@ class InsuranceLinePremiumConfirmationServiceTest {
                 propertyLine.productName(), propertyLine.productVersion(), propertyLine.insuranceType(),
                 propertyLine.sumInsured(), propertyLine.premium(), propertyLine.coveragePeriod(),
                 propertyLine.paymentTerms(), List.of(), propertyLine.underwritingConclusion(),
-                propertyLine.extraPremiumRatio(), propertyLine.lineStatus());
+                propertyLine.extraPremiumRatio(), propertyLine.lineStatus(), propertyLine.extendData());
         InsuredPartyList parties = new InsuredPartyList("LIST-1", null,
                 List.of(new InsuredPartyList.InsuredInfo(
                         "CUSTOMER-1", "INSURED-1", "被保险人", IdCardType.CHINA_ID_CARD,
@@ -137,7 +137,7 @@ class InsuranceLinePremiumConfirmationServiceTest {
                 LinePaymentTerms.lumpSum(), List.of(InsuredSubject.ofPerson(
                         "SUBJECT-1", "CUSTOMER-1", "被保险人", Money.of(new BigDecimal("100000"), "CNY"),
                         Map.of("age", 35, "gender", "M"))), ConclusionType.ACCEPT, null,
-                PolicyLineStatus.ACCEPTED);
+                PolicyLineStatus.ACCEPTED, null);
 
         service.confirm(List.of(oneYearLine), null, "INSURANCE-1", "BIZ-1", start, "TENANT-1", false);
 
@@ -153,7 +153,7 @@ class InsuranceLinePremiumConfirmationServiceTest {
                 Money.of(new BigDecimal("100000"), "CNY"), null,
                 LineCoveragePeriod.fixedTerm(BUSINESS_TIME, BUSINESS_TIME.plusYears(20), 20, null),
                 LinePaymentTerms.lumpSum(), List.of(subject), ConclusionType.MODIFY, extraPremiumRatio,
-                PolicyLineStatus.ACCEPTED);
+                PolicyLineStatus.ACCEPTED, null);
     }
 
     private static final class RecordingPort implements ConfirmedPremiumPricingPort {

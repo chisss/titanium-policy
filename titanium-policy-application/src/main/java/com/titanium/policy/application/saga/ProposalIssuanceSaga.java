@@ -196,7 +196,7 @@ public class ProposalIssuanceSaga {
             return List.of(new InsuranceLine(lineId, 1, ProductCategory.MAIN, null, null,
                     expectedProductCode, null, null, insuranceType,
                     sumInsured, null, coveragePeriod, documentPaymentTerms, subjectsForLine(insuranceType, sumInsured),
-                    null, null, PolicyLineStatus.UNDERWRITING));
+                    null, null, PolicyLineStatus.UNDERWRITING, null));
         }
         Map<Integer, String> lineIdByNo = new HashMap<>();
         for (ProposalLine line : proposalLines) {
@@ -209,7 +209,7 @@ public class ProposalIssuanceSaga {
                     line.productCode(), null, line.productVersion(), line.insuranceType(), line.intendedSumInsured(),
                     null, coveragePeriod, line.productCategory() == ProductCategory.MAIN ? resolveLinePaymentTerms(line) : null,
                     subjectsForLine(line.insuranceType(), line.intendedSumInsured()), null, null,
-                    PolicyLineStatus.UNDERWRITING));
+                    PolicyLineStatus.UNDERWRITING, null));
         }
         return List.copyOf(lines);
     }

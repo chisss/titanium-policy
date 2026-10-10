@@ -3,6 +3,8 @@ package com.titanium.policy.query.handler.projection;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 
 import org.axonframework.config.ProcessingGroup;
 import org.axonframework.eventhandling.EventHandler;
@@ -11,6 +13,8 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.titanium.policy.entity.insurance.InsuredPartyList;
+import com.titanium.policy.event.InsuredMemberAddedEvent;
+import com.titanium.policy.event.InsuredMemberRemovedEvent;
 import com.titanium.policy.event.PolicyCreatedEvent;
 import com.titanium.policy.query.repository.PolicyBeneficiaryViewRepository;
 import com.titanium.policy.query.repository.PolicyInsuredViewRepository;
@@ -25,7 +29,9 @@ import lombok.extern.slf4j.Slf4j;
  * 保单参与方读模型投影处理器（CQRS 读侧）
  * <p>
  * 订阅 {@link PolicyCreatedEvent}，将 insuredPartyList 中的被保险人和受益人清单
- * 拆解投影到 {@code t_policy_insured} 和 {@code t_policy_beneficiary}，实现参与方读写分离。
+ * 拆解投影到 {@code t_policy_insured} 和 {@code t_policy_beneficiary}，实现参与方读写分离；
+ * 并订阅成员增减事件（{@link InsuredMemberAddedEvent}/{@link InsuredMemberRemovedEvent}，
+ * G12/g12-06 团单加保/家庭险增减员入口），维护被保险人清单的最终一致。
  * </p>
  * <p>
  * <b>幂等性</b>：先按 policyId+tenantId 删除存量，再批量插入，保证事件重放不累积脏数据。
@@ -71,26 +77,7 @@ public class PolicyPartyProjectionEventHandler {
         List<InsuredPartyList.InsuredInfo> insuredList = partyList.insuredList();
         if (insuredList != null) {
             for (int i = 0; i < insuredList.size(); i++) {
-                InsuredPartyList.InsuredInfo insured = insuredList.get(i);
-                PolicyInsuredView view = new PolicyInsuredView();
-                // 主键即保全集合字段的对象标识：读侧发布的对象标识必须与写侧执行器的解析函数同源，
-                // 否则受理通过的被保险人类保全项在生效环节解析不到目标（详见 PolicyMaintenanceObjectId#insured）
-                view.setId(PolicyMaintenanceObjectId.insured(policyId, insured, i).value());
-                view.setPolicyId(policyId);
-                view.setCustomerId(insured.customerId());
-                view.setInsuredName(insured.name());
-                view.setIdType(insured.certType() != null ? insured.certType().getCode() : null);
-                view.setIdNo(insured.certNo());
-                view.setAge(insured.age());
-                view.setGender(insured.gender() != null ? insured.gender().getCode() : null);
-                view.setPhone(insured.phone());
-                view.setRelation(insured.relationToHolder());
-                view.setFamilyRelation(
-                        insured.familyRelation() != null ? insured.familyRelation().getCode() : null);
-                view.setTenantId(tenantId);
-                view.setCreateTime(now);
-                view.setUpdateTime(now);
-                insuredViewRepository.save(view);
+                insuredViewRepository.save(toInsuredView(policyId, insuredList.get(i), i, tenantId, now));
             }
         }
         log.info("[参与方投影] 被保险人: policyId={}, count={}", policyId,
@@ -123,6 +110,90 @@ public class PolicyPartyProjectionEventHandler {
         }
         log.info("[参与方投影] 受益人: policyId={}, count={}", policyId,
                 beneficiaryList != null ? beneficiaryList.size() : 0);
+    }
+
+    /**
+     * 投影被保险人新增事件（团单加保 / 家庭险增员，G12/g12-06）
+     * <p>
+     * 家庭险场景以事件携带的家庭关系覆盖成员关系，与聚合 {@code Policy#on(InsuredMemberAddedEvent)}
+     * 同法，保证读模型与聚合状态一致。幂等：对象标识由
+     * {@link PolicyMaintenanceObjectId#insured} 派生，合规成员标识下同一事件重放标识相同，已存在即跳过。
+     * </p>
+     */
+    @EventHandler
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void on(InsuredMemberAddedEvent event) {
+        InsuredPartyList.InsuredInfo member = event.member();
+        if (member == null) {
+            // 事件载荷缺成员信息：记警告跳过，不阻断事件流（投影只做最终一致维护）
+            log.warn("[参与方投影] 新增被保险人事件缺少成员信息，跳过: policyId={}", event.policyId());
+            return;
+        }
+        if (event.familyRelation() != null) {
+            member = new InsuredPartyList.InsuredInfo(member.customerId(), member.insuredId(), member.name(),
+                    member.certType(), member.certNo(), member.age(), member.gender(), member.phone(),
+                    member.relationToHolder(), event.familyRelation());
+        }
+        // 追加位置 = 当前投影行数；合规 insuredId 下对象标识与顺序无关（优先复用聚合内标识）
+        int index = insuredViewRepository.findByPolicyIdAndTenantId(event.policyId(), event.tenantId()).size();
+        PolicyInsuredView view = toInsuredView(event.policyId(), member, index, event.tenantId(), LocalDateTime.now());
+        if (insuredViewRepository.findById(view.getId()).isPresent()) {
+            return;
+        }
+        insuredViewRepository.save(view);
+        log.info("[参与方投影] 新增被保险人: policyId={}, insuredId={}", event.policyId(), member.insuredId());
+    }
+
+    /**
+     * 投影被保险人移除事件（团单减保 / 家庭险减员，G12/g12-06）
+     * <p>
+     * 读模型行标识（{@code PolicyInsuredView.id}）在合规成员标识下即聚合内 {@code insuredId}，
+     * 直接命中删除；未命中（成员标识为存量长标识的派生值、投影缺失）时记警告跳过、<b>不抛出</b>——
+     * 投影只做最终一致维护，不得因单行缺失阻断事件流。租户不符同样跳过（防跨租户误删）。
+     * </p>
+     */
+    @EventHandler
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void on(InsuredMemberRemovedEvent event) {
+        Optional<PolicyInsuredView> found = insuredViewRepository.findById(event.insuredId());
+        if (found.isEmpty()) {
+            log.warn("[参与方投影] 移除被保险人未命中读模型行，跳过: policyId={}, insuredId={}",
+                    event.policyId(), event.insuredId());
+            return;
+        }
+        PolicyInsuredView view = found.get();
+        if (!Objects.equals(view.getTenantId(), event.tenantId())) {
+            log.warn("[参与方投影] 移除被保险人租户不匹配，跳过: policyId={}, insuredId={}",
+                    event.policyId(), event.insuredId());
+            return;
+        }
+        insuredViewRepository.delete(view);
+        log.info("[参与方投影] 移除被保险人: policyId={}, insuredId={}", event.policyId(), event.insuredId());
+    }
+
+    /**
+     * 被保险人快照 → 读模型行（创建投影与新增成员投影共用，保证对象标识派生同源）
+     */
+    private PolicyInsuredView toInsuredView(String policyId, InsuredPartyList.InsuredInfo insured, int index,
+                                            String tenantId, LocalDateTime now) {
+        PolicyInsuredView view = new PolicyInsuredView();
+        // 主键即保全集合字段的对象标识：读侧发布的对象标识必须与写侧执行器的解析函数同源，
+        // 否则受理通过的被保险人类保全项在生效环节解析不到目标（详见 PolicyMaintenanceObjectId#insured）
+        view.setId(PolicyMaintenanceObjectId.insured(policyId, insured, index).value());
+        view.setPolicyId(policyId);
+        view.setCustomerId(insured.customerId());
+        view.setInsuredName(insured.name());
+        view.setIdType(insured.certType() != null ? insured.certType().getCode() : null);
+        view.setIdNo(insured.certNo());
+        view.setAge(insured.age());
+        view.setGender(insured.gender() != null ? insured.gender().getCode() : null);
+        view.setPhone(insured.phone());
+        view.setRelation(insured.relationToHolder());
+        view.setFamilyRelation(insured.familyRelation() != null ? insured.familyRelation().getCode() : null);
+        view.setTenantId(tenantId);
+        view.setCreateTime(now);
+        view.setUpdateTime(now);
+        return view;
     }
 
 }

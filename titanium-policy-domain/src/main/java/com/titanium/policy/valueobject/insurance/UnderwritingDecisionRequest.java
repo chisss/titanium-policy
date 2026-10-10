@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 import com.titanium.metadata.enums.customer.CustomerEnum.CustomerGender;
+import com.titanium.policy.valueobject.issuance.HealthDeclarationInput;
 
 /**
  * 核保决策请求值对象
@@ -27,6 +28,12 @@ import com.titanium.metadata.enums.customer.CustomerEnum.CustomerGender;
  * 完整录入才有的人力要素，出单主链路取不到。故后两项在本链路恒为 {@code null}，
  * 由 Saga 显式告警留痕（非静默），需完整要素的险种应走人工核保或补充录入通道。
  * </p>
+ * <p>
+ * <b>G12/g12-01 AC-01 新增健康告知字段</b>：{@code healthDeclaration} 由出单 Saga 从投保险种段的
+ * {@code extendData} 提取（键契约 {@code PolicyConstants.LineExtendDataKey}），随本请求透传核保域。
+ * 未提供（键缺失）或声明不完整时为 {@code null}，由 Saga 显式告警留痕，<b>绝不代填</b>
+ * （「没告知」与「告知为低风险」必须在核保入参层可区分）。
+ * </p>
  *
  * @param insuranceId              投保单ID（核保关联键）
  * @param holderId                 投保人ID
@@ -40,10 +47,11 @@ import com.titanium.metadata.enums.customer.CustomerEnum.CustomerGender;
  * @param primaryInsuredGender     首要被保人性别（可为 null）
  * @param primaryInsuredOccupationCategory 首要被保人职业类别（1-6，可为 null）
  * @param primaryInsuredBmi        首要被保人 BMI（可为 null）
+ * @param healthDeclaration        健康告知（可为 null 表示未提供）
  */
 public record UnderwritingDecisionRequest(String insuranceId, String holderId, int insuredCount,
                                           BigDecimal sumInsured, BigDecimal premium, String currency,
                                           List<String> productCodes, String tenantId, Integer primaryInsuredAge,
                                           CustomerGender primaryInsuredGender, Integer primaryInsuredOccupationCategory,
-                                          BigDecimal primaryInsuredBmi) {
+                                          BigDecimal primaryInsuredBmi, HealthDeclarationInput healthDeclaration) {
 }

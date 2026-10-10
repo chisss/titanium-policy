@@ -33,6 +33,7 @@ import com.titanium.metadata.errorcode.SystemErrorCode;
 import com.titanium.metadata.response.ApiResponse;
 import com.titanium.policy.valueobject.insurance.UnderwritingDecisionRequest;
 import com.titanium.policy.valueobject.insurance.UnderwritingResult;
+import com.titanium.policy.valueobject.issuance.HealthDeclarationInput;
 import com.titanium.underwriting.api.UnderwritingApi;
 import com.titanium.underwriting.api.request.underwriting.AutoDecideUnderwritingRequest;
 import com.titanium.underwriting.api.response.underwriting.UnderwritingResponse;
@@ -155,6 +156,36 @@ class SyncUnderwritingDecisionAdapterTest {
         assertFalse(json.contains("\"occupationCategory\":0"), json);
         JsonNode age = OBJECT_MAPPER.readTree(json).get("age");
         assertTrue(age == null || age.isNull(), json);
+    }
+
+    @Test
+    void transmitsHealthDeclarationOntoAutoDecidePayload() {
+        // G12/g12-01 AC-01：五项逐一映射，任一遗漏（尤其 smoking 的包装语义）都会让核保域
+        // 按「无告知」评分——静默降级正是本次改造禁止的形态
+        adapter.requestDecision(requestWithHealthDeclaration(new HealthDeclarationInput(List.of("高血压"),
+                List.of("糖尿病家族史"), true, new BigDecimal("175"), new BigDecimal("80"))));
+
+        AutoDecideUnderwritingRequest.HealthDeclarationInput payload =
+                captureAutoDecideRequest().getHealthDeclaration();
+        assertEquals(List.of("高血压"), payload.getMedicalHistory());
+        assertEquals(List.of("糖尿病家族史"), payload.getFamilyHistory());
+        assertEquals(Boolean.TRUE, payload.getSmoking());
+        assertEquals(new BigDecimal("175"), payload.getHeightCm());
+        assertEquals(new BigDecimal("80"), payload.getWeightKg());
+    }
+
+    @Test
+    void omitsHealthDeclarationWhenUpstreamDidNotProvideIt() throws Exception {
+        adapter.requestDecision(request(new BigDecimal("1200.00")));
+
+        AutoDecideUnderwritingRequest payload = captureAutoDecideRequest();
+        assertNull(payload.getHealthDeclaration());
+        // 未提供 ≠ 提供了「无病史、不吸烟」的低风险告知：载荷中不得出现告知对象，
+        // 否则核保域无法区分「没告知」与「告知了低风险」，风险方向被反转
+        // （Jackson 对 null 字段输出 "healthDeclaration":null，故判据是「键为 null 或缺席」而非「键不出现」）
+        String json = OBJECT_MAPPER.writeValueAsString(payload);
+        JsonNode health = OBJECT_MAPPER.readTree(json).get("healthDeclaration");
+        assertTrue(health == null || health.isNull(), json);
     }
 
     // ---------------------------------------------------------------- 审计主体
@@ -280,14 +311,20 @@ class SyncUnderwritingDecisionAdapterTest {
 
     private UnderwritingDecisionRequest request(BigDecimal premium) {
         return new UnderwritingDecisionRequest(INSURANCE_ID, HOLDER_ID, 1, SUM_INSURED, premium, "CNY",
-                List.of(PRODUCT_CODE), TENANT_ID, null, null, null, null);
+                List.of(PRODUCT_CODE), TENANT_ID, null, null, null, null, null);
     }
 
     /** 构造携带四要素的核保决策请求（G02/AC-01） */
     private UnderwritingDecisionRequest requestWithRiskFactors(Integer age, CustomerGender gender,
                                                                Integer occupationCategory, BigDecimal bmi) {
         return new UnderwritingDecisionRequest(INSURANCE_ID, HOLDER_ID, 1, SUM_INSURED, new BigDecimal("1200.00"),
-                "CNY", List.of(PRODUCT_CODE), TENANT_ID, age, gender, occupationCategory, bmi);
+                "CNY", List.of(PRODUCT_CODE), TENANT_ID, age, gender, occupationCategory, bmi, null);
+    }
+
+    /** 构造携带健康告知的核保决策请求（G12/g12-01 AC-01） */
+    private UnderwritingDecisionRequest requestWithHealthDeclaration(HealthDeclarationInput healthDeclaration) {
+        return new UnderwritingDecisionRequest(INSURANCE_ID, HOLDER_ID, 1, SUM_INSURED, new BigDecimal("1200.00"),
+                "CNY", List.of(PRODUCT_CODE), TENANT_ID, null, null, null, null, healthDeclaration);
     }
 
     /** 捕获适配器实际发给核保域的一次性载荷 */

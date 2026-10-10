@@ -5,13 +5,12 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.titanium.policy.query.mapper.PolicyLineQueryMapper;
 import com.titanium.policy.query.repository.PolicyBeneficiaryViewRepository;
 import com.titanium.policy.query.repository.PolicyInsuredViewRepository;
 import com.titanium.policy.query.result.PolicyBeneficiaryQueryResult;
 import com.titanium.policy.query.result.PolicyInsuredQueryResult;
 import com.titanium.policy.query.service.PolicyPartyQueryService;
-import com.titanium.policy.query.view.PolicyBeneficiaryView;
-import com.titanium.policy.query.view.PolicyInsuredView;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,13 +29,17 @@ public class PolicyPartyQueryServiceImpl implements PolicyPartyQueryService {
 
     private final PolicyInsuredViewRepository   insuredViewRepository;
     private final PolicyBeneficiaryViewRepository beneficiaryViewRepository;
+    // View → QueryResult 统一走 PolicyLineQueryMapper：与保单全景查询同源。
+    // 🔴 禁止改回手工逐字段 set——同一语义两份实现必然分叉（g12-06 真机探针曾暴露
+    // 手工版漏映射 insuredId，增减员定位键在参与方查询口恒 null）。
+    private final PolicyLineQueryMapper mapper;
 
     @Override
     @Transactional(readOnly = true)
     public List<PolicyInsuredQueryResult> findInsuredByPolicyId(String policyId, String tenantId) {
         return insuredViewRepository.findByPolicyIdAndTenantId(policyId, tenantId)
                 .stream()
-                .map(this::toInsuredResult)
+                .map(mapper::toInsuredResult)
                 .toList();
     }
 
@@ -45,42 +48,7 @@ public class PolicyPartyQueryServiceImpl implements PolicyPartyQueryService {
     public List<PolicyBeneficiaryQueryResult> findBeneficiariesByPolicyId(String policyId, String tenantId) {
         return beneficiaryViewRepository.findByPolicyIdAndTenantId(policyId, tenantId)
                 .stream()
-                .map(this::toBeneficiaryResult)
+                .map(mapper::toBeneficiaryResult)
                 .toList();
-    }
-
-    /** View → 被保险人查询结果 */
-    private PolicyInsuredQueryResult toInsuredResult(PolicyInsuredView view) {
-        PolicyInsuredQueryResult result = new PolicyInsuredQueryResult();
-        result.setPolicyId(view.getPolicyId());
-        result.setCustomerId(view.getCustomerId());
-        result.setInsuredName(view.getInsuredName());
-        result.setIdType(view.getIdType());
-        result.setIdNo(view.getIdNo());
-        result.setAge(view.getAge());
-        result.setGender(view.getGender());
-        result.setPhone(view.getPhone());
-        result.setRelationToHolder(view.getRelation());
-        result.setFamilyRelation(view.getFamilyRelation());
-        result.setTenantId(view.getTenantId());
-        return result;
-    }
-
-    /** View → 受益人查询结果 */
-    private PolicyBeneficiaryQueryResult toBeneficiaryResult(PolicyBeneficiaryView view) {
-        PolicyBeneficiaryQueryResult result = new PolicyBeneficiaryQueryResult();
-        result.setBeneficiaryId(view.getId());
-        result.setPolicyId(view.getPolicyId());
-        result.setCustomerId(view.getCustomerId());
-        result.setBeneficiaryName(view.getBeneficiaryName());
-        result.setIdType(view.getIdType());
-        result.setIdNo(view.getIdNo());
-        result.setGender(view.getGender());
-        result.setPhone(view.getPhone());
-        result.setBeneficiaryType(view.getBeneficiaryType());
-        result.setOrderNo(view.getOrderNo());
-        result.setShareRatio(view.getShareRatio());
-        result.setTenantId(view.getTenantId());
-        return result;
     }
 }

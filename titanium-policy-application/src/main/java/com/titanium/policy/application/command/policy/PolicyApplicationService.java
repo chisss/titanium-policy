@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import com.titanium.metadata.enums.policy.PolicyEnum;
 import com.titanium.policy.application.orchestration.issuance.orchestrator.IssuanceOrchestrator;
 import com.titanium.policy.command.ActivatePolicyCommand;
+import com.titanium.policy.command.AddInsuredMemberCommand;
 import com.titanium.policy.command.ApplyPolicyEndorsementCommand;
 import com.titanium.policy.command.ApplyPolicyMaintenanceCommand;
 import com.titanium.policy.command.CancelPolicyCommand;
@@ -20,6 +21,7 @@ import com.titanium.policy.command.MatureDuePolicyCommand;
 import com.titanium.policy.command.MaturePolicyCommand;
 import com.titanium.policy.command.PayAnnuityBenefitCommand;
 import com.titanium.policy.command.RecordPremiumCollectionCommand;
+import com.titanium.policy.command.RemoveInsuredMemberCommand;
 import com.titanium.policy.command.ResumePolicyCommand;
 import com.titanium.policy.command.StartAnnuityPayoutCommand;
 import com.titanium.policy.command.SuspendPolicyCommand;
@@ -261,5 +263,32 @@ public class PolicyApplicationService {
     public void updateAccountValue(String policyId, String accountId, BigDecimal accountValue, String currency,
                                    String tenantId) {
         commandGateway.sendAndWait(new UpdateAccountValueCommand(policyId, accountId, accountValue, currency, tenantId));
+    }
+
+    /**
+     * 新增被保险人（团单加保 / 家庭险增员，G12/g12-06 生产入口）。
+     * <p>
+     * 单聚合单命令直发：形态（团单/家庭险）与状态（生效）守卫、家庭成员关系约束均由聚合根
+     * {@code Policy#handle(AddInsuredMemberCommand)} 承担，本门面零业务规则。读侧可见性由
+     * {@code PolicyPartyProjectionEventHandler} 订阅 {@code InsuredMemberAddedEvent} 补齐。
+     * </p>
+     *
+     * @param command 新增被保险人命令
+     */
+    public void addInsuredMember(AddInsuredMemberCommand command) {
+        commandGateway.sendAndWait(command);
+    }
+
+    /**
+     * 移除被保险人（团单减保 / 家庭险减员，G12/g12-06 生产入口）。
+     * <p>
+     * 存在性/非空不变量由 {@code InsuredPartyList#removeInsured} 守护、聚合转译为业务异常；
+     * 退费与生效口径待 R-4 业务确认（本批次只做入口，不做规则）。
+     * </p>
+     *
+     * @param command 移除被保险人命令
+     */
+    public void removeInsuredMember(RemoveInsuredMemberCommand command) {
+        commandGateway.sendAndWait(command);
     }
 }

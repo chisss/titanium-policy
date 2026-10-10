@@ -42,7 +42,12 @@ public class RiskAssessmentDomainServiceImpl implements RiskAssessmentDomainServ
         if (step == RiskAssessmentStep.MANUAL_UNDERWRITING) {
             return RiskAssessmentDecision.pass(step);
         }
-        // 规则：黑名单/重复投保/反洗钱/健康告知等本地风控步骤，当前默认通过（规则明确后在此内聚判定逻辑）
+        // 规则：健康告知的判定权在核保域（G12/g12-01：告知要素随核保请求透传，由核保域按其内容评分/拒保），
+        // 本步骤为「委托放行」而非「默认通过」——放行的前提是判定已由下游承担，不是本步无判定
+        if (step == RiskAssessmentStep.HEALTH_DECLARATION_CHECK) {
+            return RiskAssessmentDecision.pass(step);
+        }
+        // 规则：黑名单/重复投保/反洗钱等本地风控步骤，当前默认通过（规则明确后在此内聚判定逻辑）
         return RiskAssessmentDecision.pass(step);
     }
 }

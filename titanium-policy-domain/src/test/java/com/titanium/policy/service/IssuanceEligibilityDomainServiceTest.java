@@ -16,14 +16,18 @@ import com.titanium.metadata.enums.insurance.SubjectType;
 import com.titanium.metadata.enums.policy.BeneficiaryType;
 import com.titanium.metadata.enums.product.ProductEnum.PaymentFrequency;
 import com.titanium.metadata.enums.product.ProductEnum.ProductCategory;
+import com.titanium.metadata.enums.underwriting.HealthDeclarationHandling;
+import com.titanium.metadata.enums.underwriting.HealthDeclarationQuestion;
 import com.titanium.metadata.errorcode.PolicyErrorCode;
 import com.titanium.metadata.valueobject.Money;
+import com.titanium.policy.common.constant.PolicyConstants.LineExtendDataKey;
 import com.titanium.policy.entity.insurance.InsuredPartyList;
 import com.titanium.policy.service.impl.IssuanceEligibilityDomainServiceImpl;
 import com.titanium.policy.service.impl.VinValidatorImpl;
 import com.titanium.policy.valueobject.RuleDecision;
 import com.titanium.policy.valueobject.issuance.IssuancePlanLine;
 import com.titanium.policy.valueobject.issuance.IssuanceRequest;
+import com.titanium.policy.valueobject.product.HealthDeclarationItem;
 import com.titanium.policy.valueobject.product.ProductIssueRules;
 
 /**
@@ -81,6 +85,40 @@ class IssuanceEligibilityDomainServiceTest {
                 List.of(PaymentFrequency.ANNUAL, PaymentFrequency.LUMP_SUM), List.of(1), null, List.of(1),
                 null, new BigDecimal("5000000"), false, false, SubjectType.PROPERTY,
                 List.of("propertyAddress", "propertyUsage", "fireProtectionLevel", "propertyValue"), Boolean.TRUE);
+    }
+
+    /**
+     * 医疗险规则 + 自定义告知项清单（g12-02 AC-02，25 参主构造器）：住院史（必答+拒保）/
+     * 手术史（必答+仅记录）/慢病（选答+拒保），覆盖「必答校验」「拒保拦截」「仅记录不拦截」三种形态。
+     */
+    private static ProductIssueRules medicalRulesWithHealthDeclaration() {
+        return new ProductIssueRules(0, 65, new BigDecimal("1000000"), new BigDecimal("6000000"), 5, null,
+                List.of("HIGH_RISK_MINER", "HIGH_RISK_DIVER"), List.of(), List.of("XINJIANG"), 30, 15, null, false,
+                List.of(PaymentFrequency.ANNUAL, PaymentFrequency.LUMP_SUM), List.of(1, 5, 10), null, List.of(1, 5, 10),
+                null, new BigDecimal("5000000"), false, false, null, List.of(), null,
+                List.of(new HealthDeclarationItem(HealthDeclarationQuestion.HOSPITALIZATION_TWO_YEARS, true,
+                                HealthDeclarationHandling.REJECT),
+                        new HealthDeclarationItem(HealthDeclarationQuestion.SURGERY_HISTORY, true,
+                                HealthDeclarationHandling.RECORD_ONLY),
+                        new HealthDeclarationItem(HealthDeclarationQuestion.CHRONIC_DISEASE, false,
+                                HealthDeclarationHandling.REJECT)));
+    }
+
+    /**
+     * 医疗险方案行 + 段级自定义告知项答案（g12-02；结构：{@code extendData.healthDeclaration.answers}）。
+     * <p>
+     * 🔴 用例中的答案键一律用<b>字面量常量名</b>（如 {@code "HOSPITALIZATION_TWO_YEARS"}）——
+     * 它即线上报文的键形态（m8-1103 判据：枚举常量名即跨域契约），锁死契约而非枚举内部实现。
+     * </p>
+     */
+    private static IssuancePlanLine planLineWithHealthAnswers(Map<String, Object> answers) {
+        Map<String, Object> extendData = Map.of(LineExtendDataKey.HEALTH_DECLARATION,
+                Map.of(LineExtendDataKey.HEALTH_DECLARATION_ANSWERS, answers));
+        IssuancePlanLine.SubjectIntent subject = new IssuancePlanLine.SubjectIntent(SubjectType.PERSON, "CUST_INSURED",
+                "张三", null, "SELF", Map.of());
+        return new IssuancePlanLine(1, PRODUCT_ID, ProductCategory.MAIN, null,
+                Money.of(new BigDecimal("4000000"), "CNY"), 1, null, PaymentFrequency.ANNUAL, 1, List.of(subject),
+                extendData);
     }
 
     /** 构造一个合格的医疗险出单请求（35 岁男，保额 400 万，年缴 1 年期） */
@@ -455,5 +493,110 @@ class IssuanceEligibilityDomainServiceTest {
                 Map.of("PROD_PROPERTY_001", propertyRulesDisallowMultiple()));
 
         assertTrue(decision.passed(), "单标的段不应触发多标的限制: " + decision.defaultMessage());
+    }
+
+    @Test
+    @DisplayName("必答告知项未作答被拒绝（g12-02）")
+    void shouldRejectWhenRequiredHealthAnswerMissing() {
+        // 住院史/手术史均未作答（answers 缺键）——首个必答缺失即拒
+        RuleDecision decision = service.validate(
+                requestWith(insuredParties(35), planLineWithHealthAnswers(Map.of())),
+                Map.of(PRODUCT_ID, medicalRulesWithHealthDeclaration()));
+
+        assertFalse(decision.passed());
+        assertEquals(PolicyErrorCode.ELIGIBILITY_HEALTH_DECLARATION_REQUIRED, decision.errorCode());
+        assertEquals(1, decision.lineNo());
+        assertEquals("近两年住院史", decision.args().get(0), "应报出缺失的问题名");
+    }
+
+    @Test
+    @DisplayName("告知项全部作答且无拒保命中时通过（g12-02）")
+    void shouldAcceptWhenConfiguredHealthAnswersProvided() {
+        RuleDecision decision = service.validate(
+                requestWith(insuredParties(35), planLineWithHealthAnswers(Map.of(
+                        "HOSPITALIZATION_TWO_YEARS", false,
+                        "SURGERY_HISTORY", false,
+                        "CHRONIC_DISEASE", false))),
+                Map.of(PRODUCT_ID, medicalRulesWithHealthDeclaration()));
+
+        assertTrue(decision.passed(), "答否是有效答案，不得拦截: " + decision.defaultMessage());
+    }
+
+    @Test
+    @DisplayName("命中拒保处置的告知项答案为肯定时被拒绝（g12-02）")
+    void shouldRejectWhenRejectHandlingQuestionAnsweredYes() {
+        RuleDecision decision = service.validate(
+                requestWith(insuredParties(35), planLineWithHealthAnswers(Map.of(
+                        "HOSPITALIZATION_TWO_YEARS", true,
+                        "SURGERY_HISTORY", false))),
+                Map.of(PRODUCT_ID, medicalRulesWithHealthDeclaration()));
+
+        assertFalse(decision.passed());
+        assertEquals(PolicyErrorCode.ELIGIBILITY_HEALTH_DECLARATION_REJECTED, decision.errorCode());
+        assertEquals("近两年住院史", decision.args().get(0), "应报出命中拒保的问题名");
+    }
+
+    @Test
+    @DisplayName("字符串 \"TRUE\" 同样视为肯定答案（前端报文字面兼容，g12-02）")
+    void shouldTreatStringTrueAsAffirmativeAnswer() {
+        RuleDecision decision = service.validate(
+                requestWith(insuredParties(35), planLineWithHealthAnswers(Map.of(
+                        "HOSPITALIZATION_TWO_YEARS", "TRUE",
+                        "SURGERY_HISTORY", false))),
+                Map.of(PRODUCT_ID, medicalRulesWithHealthDeclaration()));
+
+        assertFalse(decision.passed());
+        assertEquals(PolicyErrorCode.ELIGIBILITY_HEALTH_DECLARATION_REJECTED, decision.errorCode());
+    }
+
+    @Test
+    @DisplayName("选答项命中拒保处置同样拦截（处置执行与必答无关，g12-02）")
+    void shouldRejectWhenOptionalQuestionAnsweredYesWithRejectHandling() {
+        RuleDecision decision = service.validate(
+                requestWith(insuredParties(35), planLineWithHealthAnswers(Map.of(
+                        "HOSPITALIZATION_TWO_YEARS", false,
+                        "SURGERY_HISTORY", false,
+                        "CHRONIC_DISEASE", true))),
+                Map.of(PRODUCT_ID, medicalRulesWithHealthDeclaration()));
+
+        assertFalse(decision.passed());
+        assertEquals(PolicyErrorCode.ELIGIBILITY_HEALTH_DECLARATION_REJECTED, decision.errorCode());
+    }
+
+    @Test
+    @DisplayName("产品未配置告知项清单时不校验（三态反向判据，g12-02）")
+    void shouldSkipHealthDeclarationCheckWhenProductNotConfigured() {
+        // medicalRules() 未配置告知项清单：答案全缺也不得拦截（防老产品出单被误拦）
+        RuleDecision decision = service.validate(
+                requestWith(insuredParties(35), planLineWithHealthAnswers(Map.of())),
+                Map.of(PRODUCT_ID, medicalRules()));
+
+        assertTrue(decision.passed(), "未配置告知项的产品不得要求作答: " + decision.defaultMessage());
+    }
+
+    @Test
+    @DisplayName("未识别的处置码仅做必答校验、不执行处置（g12-02 滚动升级窗口）")
+    void shouldOnlyCheckRequiredWhenHandlingUnrecognized() {
+        // handling=null 表示对端新增了本域未认识的处置码：答案为肯定也不得拦截
+        ProductIssueRules rules = new ProductIssueRules(0, 65, new BigDecimal("1000000"), new BigDecimal("6000000"),
+                5, null, List.of(), List.of(), List.of(), 30, 15, null, false,
+                List.of(PaymentFrequency.ANNUAL, PaymentFrequency.LUMP_SUM), List.of(1, 5, 10), null, List.of(1, 5, 10),
+                null, new BigDecimal("5000000"), false, false, null, List.of(), null,
+                List.of(new HealthDeclarationItem(HealthDeclarationQuestion.DRUG_ALLERGY, true, null)));
+
+        RuleDecision decision = service.validate(
+                requestWith(insuredParties(35), planLineWithHealthAnswers(Map.of("DRUG_ALLERGY", true))),
+                Map.of(PRODUCT_ID, rules));
+
+        assertTrue(decision.passed(), "未识别处置不得拦截: " + decision.defaultMessage());
+
+        // 「只做必答校验」的另一半：未识别的只是处置执行，必答校验不因此豁免——缺答仍拒。
+        // （若无此断言，「删掉整段校验改直放行」与本用例同貌，用例对校验存在性零区分力）
+        RuleDecision missing = service.validate(
+                requestWith(insuredParties(35), planLineWithHealthAnswers(Map.of())),
+                Map.of(PRODUCT_ID, rules));
+
+        assertFalse(missing.passed(), "必答校验不因处置未识别而豁免: " + missing.defaultMessage());
+        assertEquals(PolicyErrorCode.ELIGIBILITY_HEALTH_DECLARATION_REQUIRED, missing.errorCode());
     }
 }

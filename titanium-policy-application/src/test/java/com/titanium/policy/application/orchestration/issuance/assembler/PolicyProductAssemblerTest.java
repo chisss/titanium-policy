@@ -86,7 +86,7 @@ class PolicyProductAssemblerTest {
                 "P00" + lineNo, productName, "V" + lineNo + ".0", null,
                 Money.of(new BigDecimal("500000"), "CNY"),
                 Money.of(new BigDecimal(premium), "CNY"), null, null, List.of(), null, null,
-                PolicyLineStatus.UNDERWRITING);
+                PolicyLineStatus.UNDERWRITING, null);
     }
 
     private InsuranceLine lineWithoutVersion(String lineId, int lineNo, ProductCategory category, String parentLineId,

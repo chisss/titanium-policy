@@ -1,6 +1,9 @@
 package com.titanium.policy.application.saga;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -14,6 +17,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.axonframework.commandhandling.gateway.CommandGateway;
@@ -37,6 +41,7 @@ import com.titanium.policy.application.support.TestPolicyNoGenerator;
 import com.titanium.policy.command.CreatePolicyCommand;
 import com.titanium.policy.command.ReceiveUnderwritingResultCommand;
 import com.titanium.policy.command.TriggerIssuanceCommand;
+import com.titanium.policy.common.constant.PolicyConstants.LineExtendDataKey;
 import com.titanium.policy.event.insurance.InsuranceCreatedEvent;
 import com.titanium.policy.event.insurance.InsuranceIssuedEvent;
 import com.titanium.policy.event.insurance.InsuranceSubmittedForUnderwritingEvent;
@@ -54,6 +59,7 @@ import com.titanium.policy.valueobject.billing.PremiumScheduleRequest;
 import com.titanium.policy.valueobject.billing.UnpaidBill;
 import com.titanium.policy.valueobject.insurance.UnderwritingDecisionRequest;
 import com.titanium.policy.valueobject.insurance.UnderwritingResult;
+import com.titanium.policy.valueobject.issuance.HealthDeclarationInput;
 import com.titanium.policy.valueobject.policy.CollectionResult;
 import com.titanium.policy.valueobject.policy.LineCoveragePeriod;
 import com.titanium.policy.valueobject.policy.LinePaymentTerms;
@@ -146,6 +152,56 @@ public class IssuanceSagaTest {
 
         assertEquals(new BigDecimal("500000"), underwritingGateway.lastRequest().sumInsured());
         assertEquals(new BigDecimal("1000.00"), underwritingGateway.lastRequest().premium());
+    }
+
+    /**
+     * 🔴 G12/g12-01 AC-01 正向：段级 {@code extendData} 的健康告知必须随核保请求抵达网关
+     * <p>
+     * 此前该块在 {@code InsuranceLine} 处被丢弃、Saga 构造请求时末参恒为 null，核保域只能按
+     * 「无告知」评分——本用例锁死「同一投保单带『既往病史 = 高血压』时核保决策入参可观察到差异」
+     * 的「带」这一半。
+     * </p>
+     */
+    @Test
+    public void testHealthDeclarationFromLineExtendDataReachesUnderwritingRequest() {
+        underwritingGateway.setResult(approvedResult());
+        Map<String, Object> extendData = Map.of(LineExtendDataKey.HEALTH_DECLARATION, Map.of(
+                LineExtendDataKey.HEALTH_DECLARATION_MEDICAL_HISTORY, List.of("高血压"),
+                LineExtendDataKey.HEALTH_DECLARATION_FAMILY_HISTORY, List.of("糖尿病家族史"),
+                LineExtendDataKey.HEALTH_DECLARATION_SMOKING, true,
+                LineExtendDataKey.HEALTH_DECLARATION_HEIGHT_CM, new BigDecimal("175"),
+                LineExtendDataKey.HEALTH_DECLARATION_WEIGHT_KG, new BigDecimal("80")));
+
+        fixture.givenAggregate(INSURANCE_ID).published(insuranceCreatedEvent(mainInsuranceLine(extendData)))
+                .whenAggregate(INSURANCE_ID).publishes(insuranceSubmittedEvent())
+                .expectActiveSagas(1);
+
+        HealthDeclarationInput declaration = underwritingGateway.lastRequest().healthDeclaration();
+        assertNotNull(declaration, "段级 extendData 已携带完整健康告知，核保请求不得为空");
+        assertEquals(List.of("高血压"), declaration.medicalHistory());
+        assertEquals(List.of("糖尿病家族史"), declaration.familyHistory());
+        assertTrue(declaration.smoking());
+        assertEquals(new BigDecimal("175"), declaration.heightCm());
+        assertEquals(new BigDecimal("80"), declaration.weightKg());
+    }
+
+    /**
+     * 🔴 G12/g12-01 AC-01 反向：段上无告知块时核保请求的健康告知必须为 null（不代填默认值）
+     * <p>
+     * 「未提供」与「提供了低风险告知」必须在核保入参层可区分：若此处代填一个「无病史、不吸烟」
+     * 的空壳，核保域会把「没告知」读成「告知了低风险」，风险方向被反转。
+     * </p>
+     */
+    @Test
+    public void testHealthDeclarationStaysNullWhenLineCarriesNoExtendData() {
+        underwritingGateway.setResult(approvedResult());
+
+        fixture.givenAggregate(INSURANCE_ID).published(insuranceCreatedEvent())
+                .whenAggregate(INSURANCE_ID).publishes(insuranceSubmittedEvent())
+                .expectActiveSagas(1);
+
+        assertNull(underwritingGateway.lastRequest().healthDeclaration(),
+                "段上无健康告知块时不得代填默认告知");
     }
 
     /**
@@ -292,9 +348,13 @@ public class IssuanceSagaTest {
     // ==================== 测试夹具数据 ====================
 
     private InsuranceCreatedEvent insuranceCreatedEvent() {
+        return insuranceCreatedEvent(mainInsuranceLine());
+    }
+
+    private InsuranceCreatedEvent insuranceCreatedEvent(com.titanium.policy.entity.insurance.InsuranceLine mainLine) {
         return new InsuranceCreatedEvent(INSURANCE_ID, "INS_NO_001", null, PolicyForm.INDIVIDUAL, "HOLDER_001", 1,
                 new BigDecimal("1000.00"), LocalDateTime.now(), LocalDateTime.now().plusYears(1),
-                List.of(mainInsuranceLine()), 0, null, null, null, null, "BIZ_NO_001", null, LocalDateTime.now(),
+                List.of(mainLine), 0, null, null, null, null, "BIZ_NO_001", null, LocalDateTime.now(),
                 TENANT_ID, new BigDecimal("500000"), "ANNUAL", 20);
     }
 
@@ -312,6 +372,13 @@ public class IssuanceSagaTest {
 
     /** 主险段测试夹具（一单一险场景，段列表长度 1） */
     private com.titanium.policy.entity.insurance.InsuranceLine mainInsuranceLine() {
+        return mainInsuranceLine(null);
+    }
+
+    /**
+     * 主险段夹具（指定段级扩展数据，G12/g12-01 健康告知透传用例使用）
+     */
+    private com.titanium.policy.entity.insurance.InsuranceLine mainInsuranceLine(Map<String, Object> extendData) {
         return new com.titanium.policy.entity.insurance.InsuranceLine("LINE_001", 1,
                 com.titanium.metadata.enums.product.ProductEnum.ProductCategory.MAIN, null, PRODUCT_ID,
                 PRODUCT_CODE, "测试产品", "V1.0", null,
@@ -319,7 +386,7 @@ public class IssuanceSagaTest {
                 com.titanium.metadata.valueobject.Money.of(new BigDecimal("1000.00"), "CNY"),
                 LineCoveragePeriod.fixedTerm(LocalDateTime.now(), LocalDateTime.now().plusYears(1), null, null),
                 new LinePaymentTerms(PaymentFrequency.ANNUAL, 20), List.of(personSubject()),
-                null, null, com.titanium.metadata.enums.policy.PolicyLineStatus.UNDERWRITING);
+                null, null, com.titanium.metadata.enums.policy.PolicyLineStatus.UNDERWRITING, extendData);
     }
 
     private com.titanium.policy.entity.insurance.InsuranceLine riderInsuranceLine() {
@@ -330,7 +397,7 @@ public class IssuanceSagaTest {
                 com.titanium.metadata.valueobject.Money.of(new BigDecimal("200.00"), "CNY"),
                 LineCoveragePeriod.fixedTerm(LocalDateTime.now(), LocalDateTime.now().plusYears(1), null, null),
                 new LinePaymentTerms(PaymentFrequency.ANNUAL, 1), List.of(personSubject()),
-                null, null, com.titanium.metadata.enums.policy.PolicyLineStatus.UNDERWRITING);
+                null, null, com.titanium.metadata.enums.policy.PolicyLineStatus.UNDERWRITING, null);
     }
 
     private com.titanium.policy.entity.policy.InsuredSubject personSubject() {
