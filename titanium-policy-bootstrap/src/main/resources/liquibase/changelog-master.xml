@@ -18,4 +18,26 @@
     <include file="classpath:liquibase/ddl/policy_payment_method_202609111900_weisun_ddl.sql"/>
     <include file="classpath:liquibase/ddl/policy_holder_identity_202609141200_weisun_ddl.sql"/>
     <include file="classpath:liquibase/ddl/policy_shedlock_202609231800_weisun_ddl.sql"/>
+    <include file="classpath:liquibase/ddl/policy_underwriting_id_widen_202609271400_weisun_ddl.sql"/>
+    <include file="classpath:liquibase/ddl/policy_loan_202609281030_weisun_ddl.sql"/>
+    <include file="classpath:liquibase/ddl/policy_loan_view_version_202609281200_weisun_ddl.sql"/>
+    <include file="classpath:liquibase/ddl/policy_loan_repayment_202609281400_weisun_ddl.sql"/>
+    <include file="classpath:liquibase/ddl/policy_endorsement_amount_202609281600_weisun_ddl.sql"/>
+    <include file="classpath:liquibase/ddl/policy_service_restriction_202609291600_weisun_ddl.sql"/>
+    <!-- G07/g07-02a：policy 域字段目录表（平台标准元数据；种子由 g08-06 的 starter YAML 在 seed-mode=init 导入，本批次不产 INSERT 种子） -->
+    <include file="classpath:liquibase/ddl/policy_field_catalog_202610011800_weisun_ddl.sql"/>
+    <!-- G07/g07-02d：19 个既有字段的等价迁移种子（表驱动化后无种子则保全链路中断；starter INIT-ONLY 见非空即跳过，不冲突） -->
+    <include file="classpath:liquibase/dml/policy_field_catalog_seed_202610011900_weisun_dml.sql"/>
+    <!-- G07/g07-03：字段目录「可分析」能力位四列（ALTER；建表 changeset 已被 checksum 锁定，加列一律新增 changeset） -->
+    <include file="classpath:liquibase/ddl/policy_field_catalog_analysis_202610012300_weisun_ddl.sql"/>
+    <!-- G07/g07-03：19 行能力位初值（须紧跟在加列之后——含行数下界 precondition，半迁移即 HALT） -->
+    <include file="classpath:liquibase/dml/policy_field_catalog_analysis_seed_202610012310_weisun_dml.sql"/>
+    <!-- G07/g07-04：目录版本头表（版本号/内容哈希/生效区间/发布证据；行表加列与本表无关，见下条） -->
+    <include file="classpath:liquibase/ddl/policy_field_catalog_version_202610021100_weisun_ddl.sql"/>
+    <!-- G07/g07-04：既存版本 2026.09.14.2 的版本头种子（须在建表之后、行表回填之前——回填值取自本表） -->
+    <include file="classpath:liquibase/dml/policy_field_catalog_version_seed_202610021110_weisun_dml.sql"/>
+    <!-- G07/g07-04：行表加 catalog_version 列 + 改复合主键 (catalog_version, field_code) ⇒ 多版本行可共存 -->
+    <include file="classpath:liquibase/ddl/policy_field_catalog_row_version_202610021120_weisun_ddl.sql"/>
+    <!-- G10/g10-02：险种三级分类列宽 64 → 32 统一（4 处：3 张读模型表 + t_policy_product） -->
+    <include file="classpath:liquibase/ddl/policy_view_insurance_width_202610091849_weisun_ddl.sql"/>
 </databaseChangeLog>
