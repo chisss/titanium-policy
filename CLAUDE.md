@@ -153,7 +153,7 @@ InsuranceIssuedEvent   --@EndSaga----> commandGateway.sendAndWait(CreatePolicyCo
 
 - **枚举归属**：本域专属枚举统一在 `titanium-policy-common` 的 `enums` 子包；跨域共享枚举在 `titanium-metadata/enums/policy`。**domain/valueobject 内禁止再定义枚举**（原 8 个枚举已迁出）。
 - **domain/valueobject**：仅放 record 值对象（含 `IssuanceRequest`/`IssuanceResult`，已从 service 迁入）。
-- **domain/port（🆕 与 aggregate 平级）**：远程调用 Port，`ProductServicePort`/`ClauseServicePort`/`UnderwritingServicePort`/`RuleEngineServicePort`/`UnderwritingDecisionGateway` 等 12 个（六边形架构 Port，**保留后缀，非命名错误**）。🔴 **按对端域拆子包、顶层清零**（`billing`/`clause`/`customer`/`investment`/`payment`/`product`/`ruleengine`/`underwriting`，含单类子包），由 ArchUnit `portShouldNotContainFlatClasses` 构建期固化（见第七节第 17 条）。
+- **domain/port（🆕 与 aggregate 平级）**：远程调用 Port，`ProductServicePort`/`ClauseServicePort`/`UnderwritingServicePort`/`RuleEngineServicePort`/`UnderwritingDecisionGateway`/`ChannelAuthorizationPort` 等 13 个（六边形架构 Port，**保留后缀，非命名错误**）。🔴 **按对端域拆子包、顶层清零**（`billing`/`channel`/`clause`/`customer`/`investment`/`payment`/`product`/`ruleengine`/`underwriting`，含单类子包），由 ArchUnit `portShouldNotContainFlatClasses` 构建期固化（见第七节第 17 条）。
 - **domain/generator（🆕 与 aggregate 平级）**：`PolicyNoGenerator`/`EndorsementNoGenerator` 领域凭证号生成契约。
 - **domain/repository**：仓储接口保持独立（本质也是 driven port，位置尊重 DDD 惯例，不并入 port）。
 - **domain/service（🔴 只放跨聚合纯领域服务）**：判定铁律「三无 + 一不属于」——无 CommandGateway、无外部 Port、无基础设施依赖，且不属于任何单个聚合根。
@@ -299,6 +299,12 @@ mvn -pl titanium-policy-domain test
     - 🔴 **R-3 前六列恒 NULL 属刻意状态**（NCD 规则口径与版本待业务确认）：出单链路**尚未接入** product 域反算（规则表为零种子，接入即 fail-closed 拒绝出单），属性包不带取证键 ⇒ 投影**一律回写 NULL**，**绝不代填 1.0/0**——「未反算」必须与「确无赔款」（`ncd_claim_count = 0`）在库中可区分（AC-03 禁止事项）。
     - 🔴 **重投影语义**：缺失键**回写 null 而非保留旧值**——本方法在标的重投影（批改/换单）时同样会跑，沿用旧行会把上一版取证值留在列上（比留空更坏：列上的数字看起来是本次反算的）。守卫测试 `PolicySubjectNcdSnapshotProjectionTest`（5 例，含此场景）。
     - **接入与规则值登记**：索引文档 §五 第 10 条 `@Reserved` 清单条目 2/3（随 R-3 裁示同批）；供给侧契约/编排在设计上归 product 域（`NcdResolutionOrchestrator` + `ProductNcdApi`），policy 侧只消费。
+
+24. ✅ **渠道授权入出单链路（G13/g13-08，2026-10-12）**：出单主链路新增「发命令前渠道准入」——`IssuanceOrchestrator.orchestrate`（:136，**风控步骤之前**）调 `IssuanceChannelValidator`，经 `ChannelAuthorizationPort` → `ChannelAuthorizationAdapter`（infrastructure，注入 channel 域 `ChannelApi`）校验「渠道存在 ∧ ACTIVE ∧ 已授权该产品」，四错误码：`ISSUANCE_CHANNEL_NOT_EXIST`(20007028)/`ISSUANCE_CHANNEL_NOT_ACTIVE`(20007029)/`ISSUANCE_CHANNEL_PRODUCT_NOT_AUTHORIZED`(20007030)/`ISSUANCE_CHANNEL_AUTHORIZATION_UNAVAILABLE`(20007031)。
+    - 🔴 **fail-closed（R-3）**：Adapter 遇契约失败（错误信封 / 成功但无载荷 / Feign 异常）抛 `RemoteDependencyUnavailableException`（m21-02 契约，不折叠为「不授权」），Validator catch 后**拒绝出单**——「校验不可用」与「校验未通过」错误码可区分，排查方向不互扰；`channelId` 为空时跳过校验不阻断（兼容存量入口）。
+    - 🔴 **防腐**：值对象 `ChannelAuthorization` 用三布尔 + `authorized()` 派生（对端状态枚举→布尔的翻译只在 Adapter，domain 不携带对端词汇）；**新增出单入口/策略分支时必须同批接入此校验**（走 `IssuanceChannelValidator`，勿绕开编排器自建第二套判定）。
+    - 🔴 **Feign 装配双处登记（真机取证教训）**：`PolicyApplication` 的 `@EnableFeignClients(basePackages)` 与 `PolicyDeadLetterQueueContextTest` 的 `@MockitoBean(types=...)` 列表必须**同批**补入新 Feign 客户端。真机首跑即栽在缺 `com.titanium.channel.api`：容器启动报「required a bean of type ChannelApi could not be found」；而上下文测试因 `@MockitoBean` 会为缺失类型**造 mock** 而全绿——**测试绿 ≠ 装配齐**，装配缺口的机械守卫见 `ChannelAuthorizationContractTest`（AC-11「Port/Adapter/调用方/守卫测试」四处同批）。
+    - 配套：`channelApi` 配 Feign 短超时（connect 2s / read 3s，application.yml）——渠道校验位于出单主链路同步调用，失败关闭须快速转 20007031 而非悬挂请求。真机验收证据（channel 四态 + 出单四例 N1-N3 拒绝/P1 放行）见 `~/.g13-snapshots/g13-08/`。
 
 ---
 

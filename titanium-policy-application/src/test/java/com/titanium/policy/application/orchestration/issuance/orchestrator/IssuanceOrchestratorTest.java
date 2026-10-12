@@ -1,6 +1,7 @@
 package com.titanium.policy.application.orchestration.issuance.orchestrator;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -10,6 +11,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -50,6 +52,7 @@ import com.titanium.policy.application.orchestration.issuance.executor.RiskAsses
 import com.titanium.policy.application.orchestration.issuance.service.InsuranceLinePremiumConfirmationService;
 import com.titanium.policy.application.orchestration.issuance.service.ProductSumInsuredTiersLoader;
 import com.titanium.policy.application.orchestration.issuance.validator.ConfirmedPremiumRequestValidator;
+import com.titanium.policy.application.orchestration.issuance.validator.IssuanceChannelValidator;
 import com.titanium.policy.application.support.TestPolicyNoGenerator;
 import com.titanium.policy.command.CreateInsuranceDirectlyCommand;
 import com.titanium.policy.command.CreatePolicyDirectlyCommand;
@@ -61,6 +64,7 @@ import com.titanium.policy.entity.insurance.InsuredPartyList;
 import com.titanium.policy.port.billing.BillingServicePort;
 import com.titanium.policy.port.billing.ConfirmedPremiumPricingPort;
 import com.titanium.policy.port.product.ProductServicePort;
+import com.titanium.policy.valueobject.RuleDecision;
 import com.titanium.policy.valueobject.billing.PremiumScheduleRequest;
 import com.titanium.policy.valueobject.issuance.IssuancePlanLine;
 import com.titanium.policy.valueobject.issuance.IssuanceProcessConfig;
@@ -88,6 +92,7 @@ class IssuanceOrchestratorTest {
     private BillingServicePort billingServicePort;
     private RiskAssessmentExecutor riskAssessmentExecutor;
     private PremiumCollectionOrchestrator premiumCollectionOrchestrator;
+    private IssuanceChannelValidator issuanceChannelValidator;
     private IssuanceOrchestrator orchestrator;
 
     @BeforeEach
@@ -98,6 +103,10 @@ class IssuanceOrchestratorTest {
         billingServicePort = mock(BillingServicePort.class);
         riskAssessmentExecutor = mock(RiskAssessmentExecutor.class);
         premiumCollectionOrchestrator = mock(PremiumCollectionOrchestrator.class);
+        // 渠道授权校验（G13/g13-08）：既有用例锁定的行为在「渠道校验通过」前提下不变；
+        // 校验器交互本身由 IssuanceChannelValidatorTest 与 channelAuthorizationRejection* 单独锁定
+        issuanceChannelValidator = mock(IssuanceChannelValidator.class);
+        when(issuanceChannelValidator.validate(any(), any(), any())).thenReturn(RuleDecision.accepted());
         InsuranceLineAssembler insuranceLineAssembler = new InsuranceLineAssembler(productServicePort);
         ProposalLineAssembler proposalLineAssembler = new ProposalLineAssembler(productServicePort);
         PolicyProductAssembler policyProductAssembler = new PolicyProductAssembler(productServicePort, null,
@@ -110,7 +119,8 @@ class IssuanceOrchestratorTest {
                         new ConfirmedPremiumRequestValidator(), new ConfirmedPremiumRequestAssembler()),
                 new ProductSumInsuredTiersLoader(productServicePort),
                 premiumCollectionOrchestrator,
-                new PremiumScheduleOrchestrator(billingServicePort));
+                new PremiumScheduleOrchestrator(billingServicePort),
+                issuanceChannelValidator);
         when(riskAssessmentExecutor.execute(any(), any())).thenReturn(true);
         when(productServicePort.getProductBasicInfo(PRODUCT_ID))
                 .thenReturn(new ProductBasicInfo(PRODUCT_ID, "P001", "测试产品", "V1", null, "EFFECTIVE"));
@@ -311,6 +321,21 @@ class IssuanceOrchestratorTest {
 
         assertEquals(PolicyErrorCode.ISSUANCE_PREMIUM_CONFIRMATION_FAILED.getCode(), exception.getErrorCodeValue());
         verifyNoInteractions(commandGateway, premiumCollectionOrchestrator);
+    }
+
+    @Test
+    void channelAuthorizationRejectionStopsBeforeRiskStepsAndCommands() {
+        when(issuanceChannelValidator.validate(any(), any(), any()))
+                .thenReturn(RuleDecision.rejected(PolicyErrorCode.ISSUANCE_CHANNEL_NOT_ACTIVE, "CHANNEL_001"));
+
+        IssuanceResult result = orchestrator.orchestrate(IssuanceProcessConfig.oneStep(PRODUCT_ID), request());
+
+        assertFalse(result.success());
+        assertEquals(IssuanceStage.REJECTED, result.currentStage());
+        assertEquals(PolicyErrorCode.ISSUANCE_CHANNEL_NOT_ACTIVE.getCode(), result.rejectCode());
+        // 渠道拒绝必须早于风控与一切命令——「发命令前准入」语义的机械判据
+        verify(riskAssessmentExecutor, never()).execute(any(), any());
+        verifyNoInteractions(commandGateway);
     }
 
     private IssuanceRequest request() {

@@ -27,6 +27,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import com.titanium.billing.api.BillApi;
 import com.titanium.billing.api.BillingAccountApi;
 import com.titanium.billing.api.PremiumCalculationApi;
+import com.titanium.channel.api.ChannelApi;
 import com.titanium.clause.api.ClauseApi;
 import com.titanium.customer.api.CustomerApi;
 import com.titanium.investment.api.InvestmentAccountApi;
@@ -59,6 +60,7 @@ import jakarta.persistence.EntityManagerFactory;
         BillApi.class,
         BillingAccountApi.class,
         PremiumCalculationApi.class,
+        ChannelApi.class,
         ClauseApi.class,
         CustomerApi.class,
         InvestmentAccountApi.class,

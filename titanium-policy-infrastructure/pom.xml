@@ -127,6 +127,13 @@
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
 
+        <!-- 渠道系统API（出单准入经 ChannelAuthorizationPort 校验渠道授权，G13/g13-08） -->
+        <dependency>
+            <groupId>com.titanium</groupId>
+            <artifactId>titanium-channel-api</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+
         <!-- Liquibase -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

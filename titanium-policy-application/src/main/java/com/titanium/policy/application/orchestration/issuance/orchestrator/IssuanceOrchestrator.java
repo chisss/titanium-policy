@@ -21,6 +21,7 @@ import com.titanium.policy.application.orchestration.issuance.executor.RiskAsses
 import com.titanium.policy.application.orchestration.issuance.service.InsuranceLinePremiumConfirmationService;
 import com.titanium.policy.application.orchestration.issuance.service.InsuranceLinePremiumConfirmationService.ConfirmationSummary;
 import com.titanium.policy.application.orchestration.issuance.service.ProductSumInsuredTiersLoader;
+import com.titanium.policy.application.orchestration.issuance.validator.IssuanceChannelValidator;
 import com.titanium.policy.command.ActivatePolicyCommand;
 import com.titanium.policy.command.SubmitProposalCommand;
 import com.titanium.policy.command.SubmitUnderwritingCommand;
@@ -94,6 +95,7 @@ public class IssuanceOrchestrator {
     private final ProductSumInsuredTiersLoader          productSumInsuredTiersLoader;
     private final PremiumCollectionOrchestrator           premiumCollectionOrchestrator;
     private final PremiumScheduleOrchestrator             premiumScheduleOrchestrator;
+    private final IssuanceChannelValidator                issuanceChannelValidator;
 
     /**
      * 产品驱动出单编排：由产品域配置决定出单模式（一步/两步/三步），取代调用方硬编码。
@@ -127,6 +129,15 @@ public class IssuanceOrchestrator {
         if (request.isSplitStrategy()) {
             return IssuanceResult.rejected(request.bizNo(),
                     RuleDecision.rejected(PolicyErrorCode.ISSUANCE_STRATEGY_UNSUPPORTED));
+        }
+
+        // 渠道授权校验（G13/g13-08）：发命令前的准入检查，失败关闭；channelId 为空时跳过不阻断
+        RuleDecision channelDecision =
+                issuanceChannelValidator.validate(request.channelId(), request.mainProductId(), request.tenantId());
+        if (!channelDecision.passed()) {
+            log.warn("渠道授权校验不通过: bizNo={}, channelId={}, 错误码={}", request.bizNo(), request.channelId(),
+                    channelDecision.errorCode() != null ? channelDecision.errorCode().getCode() : null);
+            return IssuanceResult.rejected(request.bizNo(), channelDecision);
         }
 
         // 执行风控校验步骤

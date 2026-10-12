@@ -13,6 +13,18 @@ spring:
   main:
     allow-bean-definition-overriding: true
 
+  # Feign 客户端超时（G13/g13-08）：渠道授权校验位于出单主链路（发命令前的同步调用），
+  # 按 R-3 失败关闭处置配**短超时**——渠道域不可达时快速失败并转
+  # ISSUANCE_CHANNEL_AUTHORIZATION_UNAVAILABLE，不让出单请求在等待中悬挂。
+  # 各客户端 URL 由 docker-compose 共享锚点按 contextId 注入（channelApi 已有），此处只配超时。
+  cloud:
+    openfeign:
+      client:
+        config:
+          channelApi:
+            connectTimeout: 2000
+            readTimeout: 3000
+
   # 事件溯源兼容：容忍事件 payload 中的派生 getter 字段（如 Money.zero / LineCoveragePeriod.wholeLife），
   # 否则历史事件反序列化失败会导致读模型投影永久卡死（详见 AxonSerializerConfig）
   jackson:
