@@ -1,6 +1,7 @@
 package com.titanium.policy.application.saga;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -30,6 +31,7 @@ import com.titanium.common.context.RequestContextHolder;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.enums.product.ProductEnum.PaymentFrequency;
 import com.titanium.metadata.enums.underwriting.UnderwritingEnum.ConclusionType;
+import com.titanium.metadata.errorcode.SystemErrorCode;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.application.orchestration.issuance.assembler.InsuranceLineAssembler;
 import com.titanium.policy.application.orchestration.issuance.assembler.PolicyProductAssembler;
@@ -46,6 +48,7 @@ import com.titanium.policy.event.insurance.InsuranceCreatedEvent;
 import com.titanium.policy.event.insurance.InsuranceIssuedEvent;
 import com.titanium.policy.event.insurance.InsuranceSubmittedForUnderwritingEvent;
 import com.titanium.policy.event.insurance.UnderwritingResultReceivedEvent;
+import com.titanium.policy.exception.RemoteDependencyUnavailableException;
 import com.titanium.policy.port.billing.BillingServicePort;
 import com.titanium.policy.port.billing.ConfirmedPremiumPricingPort;
 import com.titanium.policy.port.clause.ClauseServicePort;
@@ -95,6 +98,8 @@ public class IssuanceSagaTest {
     private StubBillingServicePort billingServicePort;
     private StubConfirmedPremiumPricingPort confirmedPremiumPricingPort;
     private PremiumCollectionOrchestrator premiumCollectionOrchestrator;
+    private StubProductServicePort productServicePort;
+    private StubInvestmentAccountPort investmentAccountPort;
 
     @BeforeEach
     public void setUp() {
@@ -109,12 +114,13 @@ public class IssuanceSagaTest {
                 new ConfirmedPremiumRequestValidator(),
                 new com.titanium.policy.application.orchestration.issuance.assembler.ConfirmedPremiumRequestAssembler()));
         // 险种段化后 Saga 新增依赖：产品配置（等待期/犹豫期）、条款责任装配、计费开单、投资开户
-        StubProductServicePort productServicePort = new StubProductServicePort();
+        productServicePort = new StubProductServicePort();
         fixture.registerResource(productServicePort);
         fixture.registerResource(new StubClauseServicePort());
         billingServicePort = new StubBillingServicePort();
         fixture.registerResource(new PremiumScheduleOrchestrator(billingServicePort));
-        fixture.registerResource(new StubInvestmentAccountPort());
+        investmentAccountPort = new StubInvestmentAccountPort();
+        fixture.registerResource(investmentAccountPort);
         fixture.registerResource(new PolicyProductAssembler(productServicePort, new StubClauseServicePort(),
                 new InsuranceLineAssembler(productServicePort)));
         premiumCollectionOrchestrator = mock(PremiumCollectionOrchestrator.class);
@@ -345,6 +351,62 @@ public class IssuanceSagaTest {
         assertEquals(new BigDecimal("1000.00"), attemptedSchedule.totalPremium());
     }
 
+    // ==================== G14/g14-04a 管理费费率来源 ====================
+
+    /**
+     * 投连保单出单：管理费费率取产品定价配置（{@code ProductServicePort.getManagementFeeRate}）并透传开户端口。
+     * <p>
+     * 桩值 0.0234 刻意区别于 policy 侧原硬编码兜底 0.015——若链路仍走兜底常量、或取数未接通而传 null，
+     * 本断言即红（有区分力的判据）。
+     * </p>
+     */
+    @Test
+    public void testInvestmentLinkedIssuancePassesManagementFeeRateFromProduct() {
+        fixture.givenAggregate(INSURANCE_ID).published(investmentLinkedInsuranceCreatedEvent())
+                .whenAggregate(INSURANCE_ID).publishes(insuranceIssuedEvent())
+                .expectActiveSagas(0);
+
+        assertTrue(investmentAccountPort.openAccountCalled, "投连保单出单必须开立投资账户");
+        assertEquals(PRODUCT_ID, productServicePort.lastManagementFeeRateProductId,
+                "费率须按保单标的产品ID取数");
+        assertEquals(new BigDecimal("0.0234"), investmentAccountPort.lastManagementFeeRate,
+                "开户须透传取数所得费率，不得回退硬编码兜底");
+    }
+
+    /**
+     * 费率取数失败（远程依赖不可用）：本期不建账户、待补偿，且不阻断出单。
+     * <p>
+     * 「无账户（可见的缺失）」优于「有账户但费率被静默折叠成 null」（后者每月计提静默跳过、事后无从对账）。
+     * </p>
+     */
+    @Test
+    public void testManagementFeeRateUnavailableSkipsAccountOpening() {
+        productServicePort.failManagementFeeRate(new RemoteDependencyUnavailableException(
+                SystemErrorCode.DEPENDENCY_SERVICE_ERROR, "产品服务不可用"));
+
+        fixture.givenAggregate(INSURANCE_ID).published(investmentLinkedInsuranceCreatedEvent())
+                .whenAggregate(INSURANCE_ID).publishes(insuranceIssuedEvent())
+                .expectActiveSagas(0);
+
+        assertFalse(investmentAccountPort.openAccountCalled,
+                "取数失败不得以 null 顶替开户——应不建账户待补偿");
+    }
+
+    /**
+     * 产品未配置管理费率（null）：合法形态，仍开立账户且原样透传 null（=不收费）。
+     */
+    @Test
+    public void testUnconfiguredManagementFeeRateStillOpensAccount() {
+        productServicePort.setManagementFeeRate(null);
+
+        fixture.givenAggregate(INSURANCE_ID).published(investmentLinkedInsuranceCreatedEvent())
+                .whenAggregate(INSURANCE_ID).publishes(insuranceIssuedEvent())
+                .expectActiveSagas(0);
+
+        assertTrue(investmentAccountPort.openAccountCalled, "未配置费率是合法形态，仍须开户");
+        assertNull(investmentAccountPort.lastManagementFeeRate, "未配置须原样透传 null，不得以默认值兜底");
+    }
+
     // ==================== 测试夹具数据 ====================
 
     private InsuranceCreatedEvent insuranceCreatedEvent() {
@@ -364,6 +426,18 @@ public class IssuanceSagaTest {
                 event.policyForm(), event.holderId(), event.insuredCount(), new BigDecimal("1200.00"),
                 event.insurancePeriodStart(), event.insurancePeriodEnd(),
                 List.of(mainInsuranceLine().withPremium(null), riderInsuranceLine().withPremium(null)),
+                event.underwritingPriority(),
+                event.insuredPartyList(), event.insuranceType(), event.collectionMode(), event.channelInfo(),
+                event.bizNo(), event.marketPackageId(), event.createTime(), event.tenantId(), event.sumInsured(),
+                event.paymentMode(), event.premiumPaymentYears());
+    }
+
+    /** 投连（万能险）形态投保单事件：触发 Saga 的投连/万能分支（开户 + 费率透传） */
+    private InsuranceCreatedEvent investmentLinkedInsuranceCreatedEvent() {
+        InsuranceCreatedEvent event = insuranceCreatedEvent();
+        return new InsuranceCreatedEvent(event.insuranceId(), event.insuranceNo(), event.proposalId(),
+                PolicyForm.UNIVERSAL, event.holderId(), event.insuredCount(), new BigDecimal("1000.00"),
+                event.insurancePeriodStart(), event.insurancePeriodEnd(), List.of(mainInsuranceLine()),
                 event.underwritingPriority(),
                 event.insuredPartyList(), event.insuranceType(), event.collectionMode(), event.channelInfo(),
                 event.bizNo(), event.marketPackageId(), event.createTime(), event.tenantId(), event.sumInsured(),
@@ -484,6 +558,16 @@ public class IssuanceSagaTest {
      * 产品服务端口桩：返回固定投保规则（等待期 30 天 / 犹豫期 15 天，对齐医疗险常见配置）。
      */
     private static class StubProductServicePort implements ProductServicePort {
+
+        /** G14/g14-04a：管理费费率桩值。刻意取与历史硬编码兜底 0.015 不同的值——透传断言因此有区分力。 */
+        private BigDecimal managementFeeRate = new BigDecimal("0.0234");
+
+        /** 非 null 时 getManagementFeeRate 抛出，模拟远程依赖不可用。 */
+        private RuntimeException managementFeeRateFailure;
+
+        /** 记录最近一次被取费率的 productId。 */
+        private String lastManagementFeeRateProductId;
+
         @Override
         public ProductBasicInfo getProductBasicInfo(String productId) {
             return new ProductBasicInfo(productId, productId, "测试产品", "V1.0", null, "EFFECTIVE");
@@ -504,6 +588,23 @@ public class IssuanceSagaTest {
         public ProductSumInsuredTiers getCoverageSumInsuredConfigs(String productId) {
             // 本桩不模拟责任档次配置：空 coverages ⇒ 聚合按「产品未配置档次」放行（档次校验另有专项测试）
             return new ProductSumInsuredTiers(productId, List.of());
+        }
+
+        @Override
+        public BigDecimal getManagementFeeRate(String productId) {
+            this.lastManagementFeeRateProductId = productId;
+            if (managementFeeRateFailure != null) {
+                throw managementFeeRateFailure;
+            }
+            return managementFeeRate;
+        }
+
+        void setManagementFeeRate(BigDecimal rate) {
+            this.managementFeeRate = rate;
+        }
+
+        void failManagementFeeRate(RuntimeException failure) {
+            this.managementFeeRateFailure = failure;
         }
 
         @Override
@@ -565,11 +666,23 @@ public class IssuanceSagaTest {
     }
 
     /**
-     * 投资账户端口桩：非投连保单不触发，返回固定账户ID。
+     * 投资账户端口桩：非投连保单不触发，返回固定账户ID；记录开户入参供 G14/g14-04a 费率透传断言。
      */
     private static class StubInvestmentAccountPort implements InvestmentAccountPort {
+
+        /** 记录最近一次 openAccount 的入参（未调用时为 null）。 */
+        private String lastPolicyId;
+        private PolicyForm lastForm;
+        private BigDecimal lastManagementFeeRate;
+        private boolean openAccountCalled;
+
         @Override
-        public String openAccount(String policyId, PolicyForm form, com.titanium.metadata.valueobject.Money premium) {
+        public String openAccount(String policyId, PolicyForm form,
+                com.titanium.metadata.valueobject.Money premium, BigDecimal managementFeeRate) {
+            this.openAccountCalled = true;
+            this.lastPolicyId = policyId;
+            this.lastForm = form;
+            this.lastManagementFeeRate = managementFeeRate;
             return "ACC_001";
         }
 

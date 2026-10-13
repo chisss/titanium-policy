@@ -1,5 +1,6 @@
 package com.titanium.policy.infrastructure.adapter.product;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -38,6 +39,7 @@ import com.titanium.product.api.response.config.IssuanceProcessConfigResponse;
 import com.titanium.product.api.response.config.PaymentConfigResponse;
 import com.titanium.product.api.response.config.PolicyFormConfigResponse;
 import com.titanium.product.api.response.config.UnderwritingConfigResponse;
+import com.titanium.product.api.response.pricing.PricingBasicRuleResponse;
 import com.titanium.product.api.response.product.ProductResponse;
 import com.titanium.product.api.response.product.ProductTemplateResponse;
 
@@ -244,6 +246,23 @@ public class ProductServiceAdapter implements ProductServicePort {
                 response.getData() != null ? response.getData() : List.of();
         return new ProductSumInsuredTiers(productId,
                 coverages.stream().map(this::toCoverageSumInsuredConfig).toList());
+    }
+
+    @Override
+    public BigDecimal getManagementFeeRate(String productId) {
+        ApiResponse<PricingBasicRuleResponse> response = productApi.getPricingRule(productId);
+        if (response == null || !response.isSuccess()) {
+            // 🔴 失败不折叠成 null：null 是「产品未配置管理费率」的合法语义（=不收费），
+            // 把「服务不可用」折叠成它会让账户固化成「永久无费率」，此后每月计提静默跳过、
+            // 事后无从对账（与 getCoverageSumInsuredConfigs 同一红线，G14/g14-04a）。
+            throw new RemoteDependencyUnavailableException(SystemErrorCode.DEPENDENCY_SERVICE_ERROR,
+                    "获取产品管理费费率失败: productId=" + productId + ", downstreamCode="
+                            + (response != null ? response.getCode() : null) + ", message="
+                            + (response != null ? response.getMessage() : "无响应"));
+        }
+        // 查询成功但无定价数据 ⇒ 该产品未配置定价基础规则；就管理费而言即「未配置」⇒ null（不收费）
+        PricingBasicRuleResponse rule = response.getData();
+        return rule != null ? rule.getManagementFeeRate() : null;
     }
 
     @Override

@@ -9,6 +9,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
@@ -22,13 +23,16 @@ import com.titanium.metadata.enums.product.ProductEnum.IssuanceMode;
 import com.titanium.metadata.enums.underwriting.HealthDeclarationHandling;
 import com.titanium.metadata.enums.underwriting.HealthDeclarationQuestion;
 import com.titanium.metadata.errorcode.PolicyErrorCode;
+import com.titanium.metadata.errorcode.SystemErrorCode;
 import com.titanium.metadata.response.ApiResponse;
 import com.titanium.policy.exception.PolicyBusinessRuleException;
+import com.titanium.policy.exception.RemoteDependencyUnavailableException;
 import com.titanium.product.api.ProductApi;
 import com.titanium.product.api.ProductTemplateApi;
 import com.titanium.product.api.response.config.HealthDeclarationItemResponse;
 import com.titanium.product.api.response.config.InsureConditionResponse;
 import com.titanium.product.api.response.config.IssuanceProcessConfigResponse;
+import com.titanium.product.api.response.pricing.PricingBasicRuleResponse;
 import com.titanium.product.api.response.product.ProductResponse;
 import com.titanium.product.api.response.product.ProductTemplateResponse;
 
@@ -161,6 +165,53 @@ class ProductServiceAdapterTest {
 
         var items = adapter.getIssueRules("product-1").healthDeclarationItems();
         assertTrue(items.isEmpty(), "未配置（条件缺失）与配置为空列表两态必须同为空清单");
+    }
+
+    // ==================== G14/g14-04a 管理费费率取数 ====================
+
+    /** 产品已配置管理费率：data 强类型字段原样返回（费率来源=产品定价基础规则 typeSpecificConfig）。 */
+    @Test
+    void shouldReturnManagementFeeRateFromPricingRule() {
+        PricingBasicRuleResponse rule = new PricingBasicRuleResponse();
+        rule.setManagementFeeRate(new BigDecimal("0.015"));
+        when(productApi.getPricingRule("product-1")).thenReturn(ApiResponse.success(rule));
+        ProductServiceAdapter adapter = new ProductServiceAdapter(OBJECT_MAPPER, productApi, productTemplateApi);
+
+        assertEquals(new BigDecimal("0.015"), adapter.getManagementFeeRate("product-1"));
+    }
+
+    /** 产品未配置定价规则（data 为 null）：就管理费而言即「未配置」——合法形态，返回 null（不收费）。 */
+    @Test
+    void shouldReturnNullWhenPricingRuleAbsent() {
+        when(productApi.getPricingRule("product-1")).thenReturn(ApiResponse.success(null));
+        ProductServiceAdapter adapter = new ProductServiceAdapter(OBJECT_MAPPER, productApi, productTemplateApi);
+
+        assertNull(adapter.getManagementFeeRate("product-1"), "未配置=不收费是合法语义，不得上抛");
+    }
+
+    /**
+     * 🔴 下游失败信封不得折叠成 null：折叠会把「服务不可用」静默固化成「永久无费率账户」，
+     * 此后每月计提按「不收费」静默跳过、事后无从对账（同 {@code getCoverageSumInsuredConfigs} 红线）。
+     */
+    @Test
+    void shouldThrowWhenManagementFeeRateQueryFails() {
+        when(productApi.getPricingRule("product-1"))
+                .thenReturn(ApiResponse.error(SystemErrorCode.DEPENDENCY_SERVICE_ERROR));
+        ProductServiceAdapter adapter = new ProductServiceAdapter(OBJECT_MAPPER, productApi, productTemplateApi);
+
+        RemoteDependencyUnavailableException exception = assertThrows(RemoteDependencyUnavailableException.class,
+                () -> adapter.getManagementFeeRate("product-1"));
+
+        assertEquals(SystemErrorCode.DEPENDENCY_SERVICE_ERROR.getCode(), exception.getErrorCode().getCode());
+    }
+
+    /** 下游无响应（Feign 返回 null）同样按依赖不可用上抛，不得视作「未配置」。 */
+    @Test
+    void shouldThrowWhenManagementFeeRateResponseIsNull() {
+        when(productApi.getPricingRule("product-1")).thenReturn(null);
+        ProductServiceAdapter adapter = new ProductServiceAdapter(OBJECT_MAPPER, productApi, productTemplateApi);
+
+        assertThrows(RemoteDependencyUnavailableException.class, () -> adapter.getManagementFeeRate("product-1"));
     }
 
     /** 投保条件 Response 工厂：只填告知项清单，其余组件对出单规则校验无影响置空。 */

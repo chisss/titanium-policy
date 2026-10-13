@@ -31,34 +31,21 @@ public class InvestmentAccountAdapter implements InvestmentAccountPort {
 
     /** 默认初始单位净值 1.00（开户时净值，后续由投资域估值调整） */
     private static final BigDecimal DEFAULT_INITIAL_UNIT_PRICE = BigDecimal.ONE;
-    /**
-     * 默认管理费率（年化）。
-     * <p>
-     * 🔴 <b>登记（G14/g14-04，2026-10-12）：本常量是「费率无权威来源」的临时兜底，待产品参数化后移除</b>——
-     * 管理费率应由产品/合同参数给定，而非代码常量。阻断依据（实测三条）：
-     * ① 产品侧 {@code PricingBasicRule.typeSpecificConfig}（柔性 {@code Map}，注释即「投连险投资账户费率」）
-     * 的结构化改造（{@code →InvestmentConfig}）未实施（见 {@code docs/领域模型系统性整改路线图.md}）；
-     * ② 产品费用组件（{@code t_product_charge_component}）是目录定义（无费率值列），且无投连/万能产品的
-     * 管理费组件数据；③ 缺口文档已定性「费率本身没有权威来源」（{@code Titanium业务功能缺口与后续推进指导文档-2026-09.md:636}）。
-     * </p>
-     * <p>
-     * 🔴 在权威来源落地前<b>不得删除本兜底</b>：开户费率为空即「未配置」⇒ 投资域计提按 AC-06 静默跳过
-     * ⇒ 管理费永久收不到（功能倒退）。替代路径落地时须同批：产品侧参数 + 本 Adapter 取数 + 本常量删除。
-     * </p>
-     */
-    private static final BigDecimal DEFAULT_MANAGEMENT_FEE_RATE = new BigDecimal("0.015");
 
     private final InvestmentAccountApi investmentAccountApi;
 
     @Override
-    public String openAccount(String policyId, PolicyForm form, Money initialPremium) {
+    public String openAccount(String policyId, PolicyForm form, Money initialPremium, BigDecimal managementFeeRate) {
         String currency = initialPremium != null ? initialPremium.currency() : CurrencyEnum.CNY.getCode();
         CreateAccountRequest request = new CreateAccountRequest();
         request.setPolicyId(policyId);
         request.setAccountType(resolveAccountType(form));
         request.setInitialUnitPrice(DEFAULT_INITIAL_UNIT_PRICE);
         request.setCurrency(currency);
-        request.setManagementFeeRate(DEFAULT_MANAGEMENT_FEE_RATE);
+        // G14/g14-04a：费率来源已参数化（产品定价配置 → IssuanceSaga 取数 → 此处透传），
+        // 原 0.015 硬编码兜底（g14-04 登记）已删除。null = 产品未配置（合法不收费），原样透传——
+        // 取数失败在 ProductServicePort 侧即上抛、不会以 null 到达此处（见 Port javadoc）。
+        request.setManagementFeeRate(managementFeeRate);
 
         ApiResponse<InvestmentAccountQueryResult> response = investmentAccountApi.createAccount(request);
         if (response == null || !response.isSuccess() || response.getData() == null) {

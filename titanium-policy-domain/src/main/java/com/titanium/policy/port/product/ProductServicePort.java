@@ -1,5 +1,6 @@
 package com.titanium.policy.port.product;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 import com.titanium.metadata.enums.product.ProductEnum.IssuanceMode;
@@ -93,6 +94,30 @@ public interface ProductServicePort {
      * @throws com.titanium.policy.exception.RemoteDependencyUnavailableException 远程调用失败或下游返回失败码
      */
     ProductSumInsuredTiers getCoverageSumInsuredConfigs(String productId);
+
+    /**
+     * 取产品的管理费年费率（投连/万能投资账户按月计提管理费的年化费率，G14/g14-04a）。
+     * <p>
+     * 来源：产品定价基础规则 {@code typeSpecificConfig} 的 {@code managementFeeRate} 键（产品域
+     * {@code PricingBasicRuleResponse.managementFeeRate} 强类型暴露）。出单时由 {@code IssuanceSaga}
+     * 取数并随开户命令固化到投资账户合同字段，investment 域据此逐月计提（G14/R-3）。
+     * </p>
+     * <p>
+     * 🔴 <b>三态语义</b>：产品查询成功但未配置管理费率 ⇒ 返回 {@code null}——这是<b>合法形态</b>
+     * （该产品不收取管理费，账户以「无费率」开户）；远程调用失败 ⇒ 抛
+     * {@code RemoteDependencyUnavailableException}，<b>绝不折叠成 null</b>——折叠会把「服务不可用」
+     * 静默固化成「永久无费率账户」，此后每月计提按「不收费」静默跳过、事后无从对账
+     * （与 {@link #getCoverageSumInsuredConfigs(String)} 同一红线）。
+     * </p>
+     * <p>
+     * ⚠️ 读自产品域读模型，<b>最终一致</b>：刚写入的费率配置可能短暂不可见。
+     * </p>
+     *
+     * @param productId 产品ID
+     * @return 管理费年费率（如 0.015）；产品未配置时返回 null（合法，不收费）
+     * @throws com.titanium.policy.exception.RemoteDependencyUnavailableException 远程调用失败或下游返回失败码
+     */
+    BigDecimal getManagementFeeRate(String productId);
 
     /**
      * 取产品绑定的条款关联（条款ID + 版本 + 是否主条款）。

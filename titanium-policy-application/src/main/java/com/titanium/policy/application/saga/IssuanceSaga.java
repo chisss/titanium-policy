@@ -46,6 +46,7 @@ import com.titanium.policy.event.insurance.InsuranceSubmittedForUnderwritingEven
 import com.titanium.policy.event.insurance.UnderwritingResultReceivedEvent;
 import com.titanium.policy.generator.PolicyNoGenerator;
 import com.titanium.policy.port.investment.InvestmentAccountPort;
+import com.titanium.policy.port.product.ProductServicePort;
 import com.titanium.policy.port.underwriting.UnderwritingDecisionGateway;
 import com.titanium.policy.service.PolicyIssuanceDomainService;
 import com.titanium.policy.valueobject.insurance.UnderwritingDecisionRequest;
@@ -121,6 +122,10 @@ public class IssuanceSaga {
 
     @Autowired
     private transient InvestmentAccountPort investmentAccountPort;
+
+    /** 产品服务端口（G14/g14-04a：开户前取管理费费率——产品定价配置是费率的唯一权威来源） */
+    @Autowired
+    private transient ProductServicePort productServicePort;
 
     @Autowired
     private transient PolicyProductAssembler policyProductAssembler;
@@ -368,7 +373,13 @@ public class IssuanceSaga {
         // 投连/万能保单：出单后经 InvestmentAccountPort 开立投资账户并挂接到保单（账户失败不阻断出单，待补偿）
         if (policyForm != null && policyForm.isInvestmentLinked()) {
             try {
-                String accountId = investmentAccountPort.openAccount(policyId, policyForm, payablePremium);
+                // G14/g14-04a：费率取产品定价配置（唯一权威来源，替代 policy 侧原 0.015 硬编码兜底）。
+                // 取数失败抛 RemoteDependencyUnavailableException 由下方 catch 捕获 ⇒ 本期不建账户、待补偿：
+                // 「无账户（可见的缺失）」优于「有账户但费率被静默折叠」（后者每月计提静默跳过、事后无从对账）。
+                // null=产品未配置（合法不收费）原样透传。
+                BigDecimal managementFeeRate = productServicePort.getManagementFeeRate(productId);
+                String accountId = investmentAccountPort.openAccount(policyId, policyForm, payablePremium,
+                        managementFeeRate);
                 if (accountId != null) {
                     commandGateway.sendAndWait(
                             new LinkInvestmentAccountCommand(policyId, accountId, PolicyConstants.POLICY_SYSTEM,
