@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 import com.alibaba.fastjson2.JSONObject;
 
 import com.titanium.common.context.RequestContextHolder;
+import com.titanium.common.messaging.Idempotent;
 import com.titanium.metadata.topic.CrossDomainTopics;
 import com.titanium.policy.application.orchestration.maintenance.context.MaintenanceWriteBackContext;
 import com.titanium.policy.application.orchestration.maintenance.strategy.MaintenanceWriteBackStrategy;
@@ -59,6 +60,8 @@ public class MaintenanceExecutedEventListener {
      *
      * @param payload 事件 JSON 报文
      */
+    @Idempotent(strategy = Idempotent.Strategy.AGGREGATE_GUARD,
+            reason = "重复投递的保全回写命令由聚合幂等吸收（状态/要素不再变更时不落重复事件）；异常一律重抛，由 Kafka 有界重试+死信主题兜底（G16/AC-03）")
     @KafkaListener(topics = MAINTENANCE_EXECUTED_TOPIC, groupId = "${spring.kafka.consumer.group-id}")
     public void onMaintenanceExecuted(String payload) {
         // 一次性反序列化为防腐入站消息（不依赖 maintenance 域类型），取代手工逐字段解析
@@ -97,9 +100,10 @@ public class MaintenanceExecutedEventListener {
             RequestContextHolder.runAsTenant(context.tenantId(), () -> strategy.writeBack(context));
             log.info("保全回写完成, type={}, policyId={}", message.maintenanceType(), message.policyId());
         } catch (Exception e) {
-            // 幂等保护：保单状态已达目标态（重复投递）等场景会抛业务异常，记录但不阻塞消费
+            // 重抛：保单状态已达目标态（重复投递）等失败交 Kafka 有界重试 → 死信主题兜底，不静默吞掉（G16/AC-03）
             log.error("保全回写失败, type={}, policyId={}, 原因={}", message.maintenanceType(), message.policyId(),
                     e.getMessage(), e);
+            throw e;
         }
     }
 }

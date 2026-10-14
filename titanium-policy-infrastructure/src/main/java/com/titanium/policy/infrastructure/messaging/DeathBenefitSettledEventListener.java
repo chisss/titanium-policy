@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component;
 import com.alibaba.fastjson2.JSONObject;
 
 import com.titanium.common.context.RequestContextHolder;
+import com.titanium.common.messaging.Idempotent;
 import com.titanium.metadata.topic.CrossDomainTopics;
 import com.titanium.policy.application.orchestration.lifecycle.DeathBenefitTerminationOrchestrator;
 import com.titanium.policy.infrastructure.messaging.inbound.DeathBenefitSettledMessage;
@@ -48,6 +49,8 @@ public class DeathBenefitSettledEventListener {
      *
      * @param payload 事件 JSON 报文
      */
+    @Idempotent(strategy = Idempotent.Strategy.AGGREGATE_GUARD,
+            reason = "重复投递的终止命令被聚合状态守卫拒绝（仅可终止态可终止）；异常一律重抛，由 Kafka 有界重试+死信主题兜底（G16/AC-03）")
     @KafkaListener(topics = DEATH_BENEFIT_SETTLED_TOPIC, groupId = "${spring.kafka.consumer.group-id}")
     public void onDeathBenefitSettled(String payload) {
         // 一次性反序列化为防腐入站消息（不依赖 claim 域类型），取代手工逐字段解析
@@ -74,8 +77,9 @@ public class DeathBenefitSettledEventListener {
                     terminationOrchestrator.terminateOnBenefitSettled(policyId, operatorId, tenantId,
                             TERMINATION_DESCRIPTION));
         } catch (Exception e) {
-            // 幂等保护：保单已达终态（重复投递）会抛业务异常，记录但不阻塞消费
+            // 重抛：保单已达终态（重复投递）等失败交 Kafka 有界重试 → 死信主题兜底，不静默吞掉（G16/AC-03）
             log.error("[身故给付-入站] 保单终止失败, policyId={}, 原因={}", policyId, e.getMessage(), e);
+            throw e;
         }
     }
 }

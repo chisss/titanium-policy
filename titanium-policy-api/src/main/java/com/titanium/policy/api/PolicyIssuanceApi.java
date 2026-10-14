@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
+import com.titanium.metadata.enums.Reserved;
 import com.titanium.metadata.response.ApiResponse;
 import com.titanium.policy.api.request.issuance.SubmitIssuanceRequest;
 import com.titanium.policy.api.response.issuance.IssuanceResponse;
@@ -46,6 +47,7 @@ public interface PolicyIssuanceApi {
      * @return 出单结果（含当前阶段、各单据ID、保费、支付凭据或拒绝原因）
      */
     @PostMapping
+    @Reserved("g16-04: 跨域零消费者（预留）；登记见 docs/技术文档/契约登记表.md")
     ApiResponse<IssuanceResponse> submitIssuance(@RequestBody SubmitIssuanceRequest request);
 
     /**
@@ -58,5 +60,6 @@ public interface PolicyIssuanceApi {
      * @return 出单进度；流水号不存在时 data 为空
      */
     @GetMapping("/{bizNo}")
+    @Reserved("g16-04: 跨域零消费者（预留）；登记见 docs/技术文档/契约登记表.md")
     ApiResponse<IssuanceResponse> getIssuanceProgress(@PathVariable String bizNo);
 }

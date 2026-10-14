@@ -25,6 +25,9 @@ import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.listener.ConcurrentMessageListenerContainer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+
+
 /**
  * 入站消息死信配置守护测试（D-501-15）。
  * <p>
@@ -116,7 +119,8 @@ class PolicyKafkaDeadLetterConfigTest {
     void shouldAttachCustomErrorHandlerToListenerContainerFactory() {
         KafkaConfig config = kafkaConfig();
         ConcurrentKafkaListenerContainerFactory<String, String> factory =
-                (ConcurrentKafkaListenerContainerFactory<String, String>) config.kafkaListenerContainerFactory();
+                (ConcurrentKafkaListenerContainerFactory<String, String>)
+                        config.kafkaListenerContainerFactory(new SimpleMeterRegistry());
         ConcurrentMessageListenerContainer<String, String> container = factory.createContainer("dlq-probe-topic");
 
         // 未调用 setCommonErrorHandler 时该值为 null（框架不会在裸工厂上补默认值）

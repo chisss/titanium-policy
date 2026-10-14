@@ -1,6 +1,7 @@
 package com.titanium.policy.common.enums;
 
 import com.titanium.metadata.enums.BaseEnum;
+import com.titanium.metadata.enums.Reserved;
 
 import lombok.Getter;
 
@@ -16,10 +17,12 @@ public enum FamilyRelation implements BaseEnum {
     /** 本人：家庭主投保人自身 */
     SELF(1, "SELF", "本人"),
     /** 配偶 */
+    @Reserved("2026-10-14 g16-05 零引用登记（枚举级消费）：存在 values/valueOf/自定方法/:: 调用，常量名零出现；接入时摘标注+删清单行。见 docs/技术文档/枚举零引用清单.md")
     SPOUSE(2, "SPOUSE", "配偶"),
     /** 子女 */
     CHILD(3, "CHILD", "子女"),
     /** 父母 */
+    @Reserved("2026-10-14 g16-05 零引用登记（枚举级消费）：存在 values/valueOf/自定方法/:: 调用，常量名零出现；接入时摘标注+删清单行。见 docs/技术文档/枚举零引用清单.md")
     PARENT(4, "PARENT", "父母");
 
     private final Integer enumCode;

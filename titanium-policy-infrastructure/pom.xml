@@ -52,6 +52,13 @@
             <groupId>org.springframework.kafka</groupId>
             <artifactId>spring-kafka</artifactId>
         </dependency>
+
+        <!-- 死信投递指标：DltMetricsRecoverer 直接引用 MeterRegistry（编译期类型）；
+             运行时 registry 由 bootstrap 的 actuator/prometheus 提供，版本由 Boot BOM 管理 -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-core</artifactId>
+        </dependency>
         
         <!-- Common Project -->
         <dependency>

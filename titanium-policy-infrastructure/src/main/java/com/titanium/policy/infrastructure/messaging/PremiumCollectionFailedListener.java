@@ -5,6 +5,7 @@ import org.springframework.stereotype.Component;
 
 import com.alibaba.fastjson2.JSONObject;
 
+import com.titanium.common.messaging.Idempotent;
 import com.titanium.metadata.enums.BusinessDomainType;
 import com.titanium.metadata.topic.CrossDomainTopics;
 import com.titanium.policy.infrastructure.messaging.inbound.PaymentOrderFailedMessage;
@@ -31,8 +32,11 @@ import lombok.extern.slf4j.Slf4j;
  * 统一出口（理赔赔付、保全退费同样发布到此），不过滤会把赔付失败误报为保费收取失败。
  * </p>
  * <p>
- * <b>吞异常不重抛</b>（与 {@link PaymentPaidListener} 同策略）：报文无法解析、字段缺失等场景重抛
- * 只会让同一条消息被无限重放而结果不变。⚠️ 与同域其他入站链路一致，当前无 DLQ。
+ * <b>失败一律重抛</b>（与 {@link PaymentPaidListener} 同策略，G16/AC-03）：本监听器自身无状态写入，
+ * 但报文无法解析等失败不再就地吞掉——交由 Kafka 监听容器的有界重试（{@code FixedBackOff} 3 次×2s）
+ * 与死信主题 {@code payment-order-failed-dlt} 兜底，使「解析失败」成为死信队列中可见、可重放的事实。
+ * 🔴 原「抛出会卡住消费位点、连带阻塞理赔与保全域感知」的顾虑已被 {@code DefaultErrorHandler} 消解：
+ * 重试耗尽投递死信后位点照常推进，不阻塞该共享主题上的后续消息。
  * </p>
  */
 @Slf4j
@@ -50,6 +54,8 @@ public class PremiumCollectionFailedListener {
      *
      * @param payload 事件 JSON 报文
      */
+    @Idempotent(strategy = Idempotent.Strategy.NO_SIDE_EFFECT,
+            reason = "仅结构化日志（无写入/无命令/无状态变更），重复投递天然无副作用")
     @KafkaListener(topics = PAYMENT_ORDER_FAILED_TOPIC, groupId = "${spring.kafka.consumer.group-id}")
     public void onPaymentFailed(String payload) {
         log.debug("[保费收取失败-入站] 收到支付出账未成功消息: {}", payload);
@@ -75,9 +81,10 @@ public class PremiumCollectionFailedListener {
                         message.resultType(), message.reason());
             }
         } catch (Exception e) {
-            // 报文无法解析等场景重试不可能成功，记录但不阻塞消费，避免 Kafka 无限重试。
-            // ⚠️ 无 DLQ，失败仅留痕（与同域其他入站链路一致）
+            // 重抛：报文无法解析等失败交 Kafka 有界重试 → 死信主题兜底；重试耗尽后位点照常推进，
+            // 不阻塞该共享主题的后续消息（G16/AC-03）
             log.error("[保费收取失败-入站] 消息处理失败: payload={}, 原因={}", payload, e.getMessage(), e);
+            throw e;
         }
     }
 }

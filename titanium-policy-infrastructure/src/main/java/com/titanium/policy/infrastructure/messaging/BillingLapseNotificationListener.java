@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component;
 import com.alibaba.fastjson2.JSONObject;
 
 import com.titanium.common.context.RequestContextHolder;
+import com.titanium.common.messaging.Idempotent;
 import com.titanium.metadata.topic.CrossDomainTopics;
 import com.titanium.policy.application.orchestration.lifecycle.BillingLapseOrchestrator;
 import com.titanium.policy.infrastructure.messaging.inbound.BillingLapseNotificationMessage;
@@ -46,6 +47,8 @@ public class BillingLapseNotificationListener {
      *
      * @param payload 事件 JSON 报文
      */
+    @Idempotent(strategy = Idempotent.Strategy.AGGREGATE_GUARD,
+            reason = "重复投递的失效命令被聚合状态守卫拒绝（仅可失效态可置 LAPSED）；异常一律重抛，由 Kafka 有界重试+死信主题兜底（G16/AC-03）")
     @KafkaListener(topics = LAPSE_NOTIFICATION_TOPIC, groupId = "${spring.kafka.consumer.group-id}")
     public void onLapseNotification(String payload) {
         try {
@@ -78,9 +81,9 @@ public class BillingLapseNotificationListener {
             log.info("[计费失效-入站] 保单失效命令已发送, policyId={}", policyId);
 
         } catch (Exception e) {
-            // 幂等保护：保单已达失效状态（重复投递）或其他业务异常，记录但不阻塞消费
-            // 避免 Kafka 无限重试，可选记死信队列（TODO：集成 DLQ）
+            // 重抛：保单已达失效状态（重复投递）等失败交 Kafka 有界重试 → 死信主题兜底，不静默吞掉（G16/AC-03）
             log.error("[计费失效-入站] 保单失效处理失败, payload={}, 原因={}", payload, e.getMessage(), e);
+            throw e;
         }
     }
 }

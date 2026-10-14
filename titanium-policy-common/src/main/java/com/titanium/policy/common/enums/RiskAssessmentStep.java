@@ -1,6 +1,7 @@
 package com.titanium.policy.common.enums;
 
 import com.titanium.metadata.enums.BaseEnum;
+import com.titanium.metadata.enums.Reserved;
 
 import lombok.Getter;
 
@@ -21,6 +22,7 @@ public enum RiskAssessmentStep implements BaseEnum {
     /** 人工核保 */
     MANUAL_UNDERWRITING(4, "MANUAL_UNDERWRITING", "人工核保"),
     /** 反洗钱校验 */
+    @Reserved("2026-10-14 g16-05 零引用登记（未见消费）：待业务核对——接入触发链路或删除；核毕摘标注+删清单行。见 docs/技术文档/枚举零引用清单.md")
     AML_CHECK(5, "AML_CHECK", "反洗钱校验"),
     /** 健康告知校验 */
     HEALTH_DECLARATION_CHECK(6, "HEALTH_DECLARATION_CHECK", "健康告知校验");

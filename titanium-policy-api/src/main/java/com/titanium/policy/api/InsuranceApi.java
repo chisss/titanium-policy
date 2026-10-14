@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
+import com.titanium.metadata.enums.Reserved;
 import com.titanium.metadata.response.ApiResponse;
 import com.titanium.policy.api.request.issuance.ConvertToInsuranceRequest;
 import com.titanium.policy.api.response.issuance.InsuranceResponse;
@@ -33,6 +34,7 @@ public interface InsuranceApi {
      * @return 投保单ID
      */
     @PostMapping("/from-proposal")
+    @Reserved("g16-04: 跨域零消费者（预留）；登记见 docs/技术文档/契约登记表.md")
     ApiResponse<String> convertFromProposal(@RequestBody ConvertToInsuranceRequest dto);
 
     /**
@@ -51,5 +53,6 @@ public interface InsuranceApi {
      * @return 空响应
      */
     @PutMapping("/{insuranceId}/underwriting")
+    @Reserved("g16-04: 跨域零消费者（预留）；登记见 docs/技术文档/契约登记表.md")
     ApiResponse<Void> submitUnderwriting(@PathVariable String insuranceId);
 }

@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
+import com.titanium.metadata.enums.Reserved;
 import com.titanium.metadata.response.ApiResponse;
 import com.titanium.policy.api.request.issuance.CreateProposalRequest;
 import com.titanium.policy.api.response.issuance.ProposalResponse;
@@ -48,6 +49,7 @@ public interface ProposalApi {
      * @return 意向单ID
      */
     @PostMapping
+    @Reserved("g16-04: 跨域零消费者（预留）；登记见 docs/技术文档/契约登记表.md")
     ApiResponse<String> createProposal(@RequestBody CreateProposalRequest dto);
 
     /**
@@ -57,6 +59,7 @@ public interface ProposalApi {
      * @return 意向单详情，不存在时 code=404
      */
     @GetMapping("/{proposalId}")
+    @Reserved("g16-04: 跨域零消费者（预留）；登记见 docs/技术文档/契约登记表.md")
     ApiResponse<ProposalResponse> getProposal(@PathVariable String proposalId);
 
     /**
@@ -77,5 +80,6 @@ public interface ProposalApi {
      * @return 空响应
      */
     @PutMapping("/{proposalId}/submit")
+    @Reserved("g16-04: 跨域零消费者（预留）；登记见 docs/技术文档/契约登记表.md")
     ApiResponse<Void> submitProposal(@PathVariable String proposalId);
 }

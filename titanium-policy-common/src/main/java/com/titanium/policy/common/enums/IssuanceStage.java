@@ -1,6 +1,7 @@
 package com.titanium.policy.common.enums;
 
 import com.titanium.metadata.enums.BaseEnum;
+import com.titanium.metadata.enums.Reserved;
 
 import lombok.Getter;
 
@@ -18,8 +19,10 @@ public enum IssuanceStage implements BaseEnum {
     /** 已受理（幂等校验通过，进入流程） */
     ACCEPTED(1, "ACCEPTED", "已受理", "出单请求已受理，等待要素校验"),
     /** 要素校验中（依产品投保条件裁决年龄/保额/职业等） */
+    @Reserved("2026-10-14 g16-05 零引用登记（枚举级消费）：存在 values/valueOf/自定方法/:: 调用，常量名零出现；接入时摘标注+删清单行。见 docs/技术文档/枚举零引用清单.md")
     VALIDATING(2, "VALIDATING", "要素校验中", "依产品投保条件校验投保要素"),
     /** 保费试算中 */
+    @Reserved("2026-10-14 g16-05 零引用登记（枚举级消费）：存在 values/valueOf/自定方法/:: 调用，常量名零出现；接入时摘标注+删清单行。见 docs/技术文档/枚举零引用清单.md")
     QUOTING(3, "QUOTING", "保费试算中", "向计费域请求标准保费计算"),
     /** 意向单已创建（三步出单起点） */
     PROPOSAL_CREATED(4, "PROPOSAL_CREATED", "意向单已创建", "三步出单：意向单已建，待转投保单"),

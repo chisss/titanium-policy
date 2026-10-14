@@ -1,6 +1,7 @@
 package com.titanium.policy.common.enums;
 
 import com.titanium.metadata.enums.BaseEnum;
+import com.titanium.metadata.enums.Reserved;
 
 import lombok.Getter;
 
@@ -14,12 +15,16 @@ import lombok.Getter;
 @Getter
 public enum PolicyItemType implements BaseEnum {
     /** 主险项目 */
+    @Reserved("2026-10-14 g16-05 零引用登记（未见消费）：待业务核对——接入触发链路或删除；核毕摘标注+删清单行。见 docs/技术文档/枚举零引用清单.md")
     MAIN(1, "MAIN", "主险", "主险保单项"),
     /** 附加险项目 */
+    @Reserved("2026-10-14 g16-05 零引用登记（未见消费）：待业务核对——接入触发链路或删除；核毕摘标注+删清单行。见 docs/技术文档/枚举零引用清单.md")
     RIDER(2, "RIDER", "附加险", "附加险保单项"),
     /** 责任项目 */
+    @Reserved("2026-10-14 g16-05 零引用登记（未见消费）：待业务核对——接入触发链路或删除；核毕摘标注+删清单行。见 docs/技术文档/枚举零引用清单.md")
     LIABILITY(3, "LIABILITY", "责任", "保障责任项"),
     /** 费用项目 */
+    @Reserved("2026-10-14 g16-05 零引用登记（未见消费）：待业务核对——接入触发链路或删除；核毕摘标注+删清单行。见 docs/技术文档/枚举零引用清单.md")
     FEE(4, "FEE", "费用", "费用项");
 
     private final Integer enumCode;

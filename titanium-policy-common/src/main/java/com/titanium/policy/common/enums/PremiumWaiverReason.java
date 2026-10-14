@@ -1,6 +1,7 @@
 package com.titanium.policy.common.enums;
 
 import com.titanium.metadata.enums.BaseEnum;
+import com.titanium.metadata.enums.Reserved;
 
 import lombok.Getter;
 
@@ -15,15 +16,19 @@ import lombok.Getter;
 public enum PremiumWaiverReason implements BaseEnum {
 
     /** 投保人身故豁免：投保人身故，豁免被保险人后续保费 */
+    @Reserved("2026-10-14 g16-05 零引用登记（未见消费）：待业务核对——接入触发链路或删除；核毕摘标注+删清单行。见 docs/技术文档/枚举零引用清单.md")
     POLICY_HOLDER_DEATH(1, "POLICY_HOLDER_DEATH", "投保人身故豁免"),
 
     /** 投保人全残豁免：投保人全残丧失缴费能力，豁免后续保费 */
+    @Reserved("2026-10-14 g16-05 零引用登记（未见消费）：待业务核对——接入触发链路或删除；核毕摘标注+删清单行。见 docs/技术文档/枚举零引用清单.md")
     POLICY_HOLDER_DISABILITY(2, "POLICY_HOLDER_DISABILITY", "投保人全残豁免"),
 
     /** 被保险人重疾豁免：被保险人确诊约定重疾，豁免后续保费 */
+    @Reserved("2026-10-14 g16-05 零引用登记（未见消费）：待业务核对——接入触发链路或删除；核毕摘标注+删清单行。见 docs/技术文档/枚举零引用清单.md")
     INSURED_CRITICAL_ILLNESS(3, "INSURED_CRITICAL_ILLNESS", "被保险人重疾豁免"),
 
     /** 被保险人全残豁免：被保险人全残，豁免后续保费 */
+    @Reserved("2026-10-14 g16-05 零引用登记（未见消费）：待业务核对——接入触发链路或删除；核毕摘标注+删清单行。见 docs/技术文档/枚举零引用清单.md")
     INSURED_DISABILITY(4, "INSURED_DISABILITY", "被保险人全残豁免");
 
     private final Integer enumCode;

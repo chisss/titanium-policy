@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 
+import com.titanium.metadata.enums.Reserved;
 import com.titanium.metadata.response.ApiResponse;
 import com.titanium.policy.api.request.issuance.CreatePolicyRequest;
 import com.titanium.policy.api.request.maintenance.AccountValueWriteBackRequest;
@@ -55,6 +56,7 @@ public interface PolicyApi {
      * @return 保单ID
      */
     @PostMapping
+    @Reserved("g16-04: 跨域零消费者（管理面经 web 层）；登记见 docs/技术文档/契约登记表.md")
     ApiResponse<String> createPolicy(@RequestBody CreatePolicyRequest dto);
 
     /**
@@ -64,6 +66,7 @@ public interface PolicyApi {
      * @return 保单ID
      */
     @PostMapping("/direct")
+    @Reserved("g16-04: 跨域零消费者（管理面经 web 层）；登记见 docs/技术文档/契约登记表.md")
     ApiResponse<String> createPolicyDirectly(@RequestBody CreatePolicyRequest dto);
 
     /**
@@ -101,6 +104,7 @@ public interface PolicyApi {
      * @return 空响应
      */
     @PutMapping("/{policyId}/issue")
+    @Reserved("g16-04: 跨域零消费者（管理面经 web 层）；登记见 docs/技术文档/契约登记表.md")
     ApiResponse<Void> issuePolicy(@PathVariable String policyId);
 
     /**
@@ -110,10 +114,12 @@ public interface PolicyApi {
      * @return 空响应
      */
     @PutMapping("/{policyId}/activate")
+    @Reserved("g16-04: 跨域零消费者（管理面经 web 层）；登记见 docs/技术文档/契约登记表.md")
     ApiResponse<Void> activatePolicy(@PathVariable String policyId);
 
     /** Payment 或 Billing 回写已核验的保费收讫事实。 */
     @PostMapping("/{policyId}/collections")
+    @Reserved("g16-04: 跨域零消费者（管理面经 web 层）；登记见 docs/技术文档/契约登记表.md")
     ApiResponse<Void> recordPremiumCollection(
             @PathVariable String policyId,
             @Valid @RequestBody RecordPremiumCollectionRequest request);
@@ -159,6 +165,7 @@ public interface PolicyApi {
      * @return 空响应
      */
     @PostMapping("/{policyId}/insured-members")
+    @Reserved("g16-04: 跨域零消费者（管理面经 web 层）；登记见 docs/技术文档/契约登记表.md")
     ApiResponse<Void> addInsuredMember(@PathVariable String policyId,
                                        @Valid @RequestBody AddInsuredMemberRequest request);
 
@@ -171,6 +178,7 @@ public interface PolicyApi {
      * @return 空响应
      */
     @DeleteMapping("/{policyId}/insured-members/{insuredId}")
+    @Reserved("g16-04: 跨域零消费者（管理面经 web 层）；登记见 docs/技术文档/契约登记表.md")
     ApiResponse<Void> removeInsuredMember(@PathVariable String policyId, @PathVariable String insuredId,
                                           @RequestParam(required = false) String reason);
 }

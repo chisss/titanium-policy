@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component;
 import com.alibaba.fastjson2.JSONObject;
 
 import com.titanium.common.context.RequestContextHolder;
+import com.titanium.common.messaging.Idempotent;
 import com.titanium.metadata.enums.BusinessDomainType;
 import com.titanium.metadata.topic.CrossDomainTopics;
 import com.titanium.policy.application.orchestration.payment.PremiumCollectionResultOrchestrator;
@@ -34,10 +35,11 @@ import lombok.extern.slf4j.Slf4j;
  * 统一出口（理赔赔付、保全退费同样发布到此），不过滤则赔付金额会被当作保费收讫写回保单。
  * </p>
  * <p>
- * <b>吞异常不重抛（与理赔域 PaymentResultConsumer 的重抛策略有意不同）</b>：本链路的重试不可能
- * 成功的场景占多数——重复投递（实收已记账，聚合按 paymentId 抛重复异常）、保单不存在、
- * 报文无法解析，重抛只会让同一条消息被无限重放而结果不变。故此处记录并返回，
- * ⚠️ 后续应改投死信队列以便人工核查（当前无 DLQ）。
+ * <b>失败一律重抛（G16/AC-03 起，与理赔域 PaymentResultConsumer 同策略）</b>：原「记录后返回」
+ * 把重复投递（实收已记账，聚合按 paymentId 抛重复异常）、保单不存在、报文无法解析三类失败
+ * 一并静默吞掉，与「消息从未到达」不可区分。现交由 Kafka 监听容器的有界重试
+ * （{@code FixedBackOff} 3 次×2s）与死信主题 {@code payment-order-paid-dlt} 兜底，死信条数经
+ * {@code titanium.kafka.dlt.published} 指标暴露，人工可查、可告警、可重放。
  * </p>
  */
 @Slf4j
@@ -59,6 +61,8 @@ public class PaymentPaidListener {
      *
      * @param payload 事件 JSON 报文
      */
+    @Idempotent(strategy = Idempotent.Strategy.AGGREGATE_GUARD,
+            reason = "重复投递的实收回写命令被聚合按 paymentId 拒绝（实收已记账）；异常一律重抛，由 Kafka 有界重试+死信主题兜底（G16/AC-03）")
     @KafkaListener(topics = PAYMENT_ORDER_PAID_TOPIC, groupId = "${spring.kafka.consumer.group-id}")
     public void onPaymentPaid(String payload) {
         log.debug("[保费收讫-入站] 收到支付出账成功消息: {}", payload);
@@ -92,9 +96,10 @@ public class PaymentPaidListener {
                     () -> premiumCollectionResultOrchestrator.onPaymentSucceeded(notice));
 
         } catch (Exception e) {
-            // 重复投递（实收已记账）与保单不存在等场景重试不可能成功，记录但不阻塞消费，避免 Kafka 无限重试。
-            // ⚠️ 无 DLQ，失败仅留痕（TODO：集成死信队列）
+            // 重抛：重复投递（实收已记账）、保单不存在、报文异常等全交 Kafka 有界重试 → 死信主题兜底，
+            // 不再静默吞掉（G16/AC-03；原「避免 Kafka 无限重试」的顾虑由有界 FixedBackOff + 死信主题消解）
             log.error("[保费收讫-入站] 实收回写失败: payload={}, 原因={}", payload, e.getMessage(), e);
+            throw e;
         }
     }
 }

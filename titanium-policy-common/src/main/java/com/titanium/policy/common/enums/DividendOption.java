@@ -1,6 +1,7 @@
 package com.titanium.policy.common.enums;
 
 import com.titanium.metadata.enums.BaseEnum;
+import com.titanium.metadata.enums.Reserved;
 
 import lombok.Getter;
 
@@ -19,15 +20,18 @@ import lombok.Getter;
 public enum DividendOption implements BaseEnum {
 
     /** 现金领取：红利以现金形式给付投保人 */
+    @Reserved("2026-10-14 g16-05 零引用登记（未见消费）：待业务核对——接入触发链路或删除；核毕摘标注+删清单行。见 docs/技术文档/枚举零引用清单.md")
     CASH(1, "CASH", "现金领取"),
 
     /** 累积生息：红利留存保单账户按约定利率累积生息 */
     ACCUMULATE(2, "ACCUMULATE", "累积生息"),
 
     /** 抵缴保费：红利用于抵缴后续应缴保费 */
+    @Reserved("2026-10-14 g16-05 零引用登记（未见消费）：待业务核对——接入触发链路或删除；核毕摘标注+删清单行。见 docs/技术文档/枚举零引用清单.md")
     OFFSET_PREMIUM(3, "OFFSET_PREMIUM", "抵缴保费"),
 
     /** 购买交清增额：红利用于购买交清增额保险，增加保额 */
+    @Reserved("2026-10-14 g16-05 零引用登记（未见消费）：待业务核对——接入触发链路或删除；核毕摘标注+删清单行。见 docs/技术文档/枚举零引用清单.md")
     PAID_UP_ADDITION(4, "PAID_UP_ADDITION", "购买交清增额");
 
     private final Integer enumCode;

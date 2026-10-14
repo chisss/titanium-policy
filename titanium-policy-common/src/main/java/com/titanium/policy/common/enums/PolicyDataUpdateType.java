@@ -1,6 +1,7 @@
 package com.titanium.policy.common.enums;
 
 import com.titanium.metadata.enums.BaseEnum;
+import com.titanium.metadata.enums.Reserved;
 
 import lombok.Getter;
 
@@ -19,45 +20,58 @@ import lombok.Getter;
 @Getter
 public enum PolicyDataUpdateType implements BaseEnum {
     /** 投保人变更 */
+    @Reserved("2026-10-14 g16-05 零引用登记（枚举级消费）：存在 values/valueOf/自定方法/:: 调用，常量名零出现；接入时摘标注+删清单行。见 docs/技术文档/枚举零引用清单.md")
     HOLDER_CHANGE(1, "HOLDER_CHANGE", "投保人变更", EndorsementCategory.PARTY, false, false,
             EndorsementEffectiveType.IMMEDIATE),
     /** 受益人变更 */
+    @Reserved("2026-10-14 g16-05 零引用登记（枚举级消费）：存在 values/valueOf/自定方法/:: 调用，常量名零出现；接入时摘标注+删清单行。见 docs/技术文档/枚举零引用清单.md")
     BENEFICIARY_CHANGE(2, "BENEFICIARY_CHANGE", "受益人变更", EndorsementCategory.PARTY, false, false,
             EndorsementEffectiveType.IMMEDIATE),
     /** 缴费方式变更 */
+    @Reserved("2026-10-14 g16-05 零引用登记（枚举级消费）：存在 values/valueOf/自定方法/:: 调用，常量名零出现；接入时摘标注+删清单行。见 docs/技术文档/枚举零引用清单.md")
     PAYMENT_METHOD_CHANGE(3, "PAYMENT_METHOD_CHANGE", "缴费方式变更", EndorsementCategory.PREMIUM_TERMS, false, true,
             EndorsementEffectiveType.NEXT_PERIOD),
     /** 加保 */
+    @Reserved("2026-10-14 g16-05 零引用登记（枚举级消费）：存在 values/valueOf/自定方法/:: 调用，常量名零出现；接入时摘标注+删清单行。见 docs/技术文档/枚举零引用清单.md")
     COVERAGE_INCREASE(4, "COVERAGE_INCREASE", "加保", EndorsementCategory.SUM_INSURED, true, true,
             EndorsementEffectiveType.SPECIFIED_DATE),
     /** 减保 */
+    @Reserved("2026-10-14 g16-05 零引用登记（枚举级消费）：存在 values/valueOf/自定方法/:: 调用，常量名零出现；接入时摘标注+删清单行。见 docs/技术文档/枚举零引用清单.md")
     COVERAGE_DECREASE(5, "COVERAGE_DECREASE", "减保", EndorsementCategory.SUM_INSURED, false, true,
             EndorsementEffectiveType.IMMEDIATE),
     /** 加额缴费 */
+    @Reserved("2026-10-14 g16-05 零引用登记（枚举级消费）：存在 values/valueOf/自定方法/:: 调用，常量名零出现；接入时摘标注+删清单行。见 docs/技术文档/枚举零引用清单.md")
     ADDITIONAL_PAYMENT(6, "ADDITIONAL_PAYMENT", "加额缴费", EndorsementCategory.PREMIUM_TERMS, false, true,
             EndorsementEffectiveType.NEXT_PERIOD),
     /** 减额缴费 */
+    @Reserved("2026-10-14 g16-05 零引用登记（枚举级消费）：存在 values/valueOf/自定方法/:: 调用，常量名零出现；接入时摘标注+删清单行。见 docs/技术文档/枚举零引用清单.md")
     REDUCTION_PAYMENT(7, "REDUCTION_PAYMENT", "减额缴费", EndorsementCategory.PREMIUM_TERMS, false, true,
             EndorsementEffectiveType.NEXT_PERIOD),
     /** 保单信息变更 */
     POLICY_INFO_CHANGE(8, "POLICY_INFO_CHANGE", "保单信息变更", EndorsementCategory.INFO, false, false,
             EndorsementEffectiveType.IMMEDIATE),
     /** 保险期间变更 */
+    @Reserved("2026-10-14 g16-05 零引用登记（枚举级消费）：存在 values/valueOf/自定方法/:: 调用，常量名零出现；接入时摘标注+删清单行。见 docs/技术文档/枚举零引用清单.md")
     POLICY_PERIOD_CHANGE(9, "POLICY_PERIOD_CHANGE", "保险期间变更", EndorsementCategory.PERIOD, true, true,
             EndorsementEffectiveType.SPECIFIED_DATE),
     /** 保额变更 */
+    @Reserved("2026-10-14 g16-05 零引用登记（枚举级消费）：存在 values/valueOf/自定方法/:: 调用，常量名零出现；接入时摘标注+删清单行。见 docs/技术文档/枚举零引用清单.md")
     COVERAGE_AMOUNT_CHANGE(10, "COVERAGE_AMOUNT_CHANGE", "保额变更", EndorsementCategory.SUM_INSURED, true, true,
             EndorsementEffectiveType.SPECIFIED_DATE),
     /** 被保人信息变更 */
+    @Reserved("2026-10-14 g16-05 零引用登记（枚举级消费）：存在 values/valueOf/自定方法/:: 调用，常量名零出现；接入时摘标注+删清单行。见 docs/技术文档/枚举零引用清单.md")
     INSURED_INFO_CHANGE(11, "INSURED_INFO_CHANGE", "被保人信息变更", EndorsementCategory.PARTY, false, false,
             EndorsementEffectiveType.IMMEDIATE),
     /** 标的变更 */
+    @Reserved("2026-10-14 g16-05 零引用登记（枚举级消费）：存在 values/valueOf/自定方法/:: 调用，常量名零出现；接入时摘标注+删清单行。见 docs/技术文档/枚举零引用清单.md")
     SUBJECT_CHANGE(12, "SUBJECT_CHANGE", "标的变更", EndorsementCategory.SUBJECT, true, true,
             EndorsementEffectiveType.SPECIFIED_DATE),
     /** 吸烟状态变更 */
+    @Reserved("2026-10-14 g16-05 零引用登记（枚举级消费）：存在 values/valueOf/自定方法/:: 调用，常量名零出现；接入时摘标注+删清单行。见 docs/技术文档/枚举零引用清单.md")
     SMOKING_STATUS_CHANGE(13, "SMOKING_STATUS_CHANGE", "吸烟状态变更", EndorsementCategory.SUBJECT, true, true,
             EndorsementEffectiveType.SPECIFIED_DATE),
     /** 保障责任变更 */
+    @Reserved("2026-10-14 g16-05 零引用登记（枚举级消费）：存在 values/valueOf/自定方法/:: 调用，常量名零出现；接入时摘标注+删清单行。见 docs/技术文档/枚举零引用清单.md")
     COVERAGE_CHANGE(14, "COVERAGE_CHANGE", "保障责任变更", EndorsementCategory.COVERAGE, true, true,
             EndorsementEffectiveType.SPECIFIED_DATE),
     /**
@@ -67,6 +81,7 @@ public enum PolicyDataUpdateType implements BaseEnum {
      * 是否触发保费重算、生效日与等待期如何衔接均待业务确认；确认前本项只作入口，不做规则。
      * </p>
      */
+    @Reserved("2026-10-14 g16-05 零引用登记（枚举级消费）：存在 values/valueOf/自定方法/:: 调用，常量名零出现；接入时摘标注+删清单行。见 docs/技术文档/枚举零引用清单.md")
     INSURED_MEMBER_ADD(15, "INSURED_MEMBER_ADD", "增员", EndorsementCategory.SUBJECT, true, true,
             EndorsementEffectiveType.SPECIFIED_DATE),
     /**
@@ -76,6 +91,7 @@ public enum PolicyDataUpdateType implements BaseEnum {
      * 名单人数低于 {@code minGroupSize} 时如何处置待业务确认；确认前本项只作入口，不做规则。
      * </p>
      */
+    @Reserved("2026-10-14 g16-05 零引用登记（枚举级消费）：存在 values/valueOf/自定方法/:: 调用，常量名零出现；接入时摘标注+删清单行。见 docs/技术文档/枚举零引用清单.md")
     INSURED_MEMBER_REMOVE(16, "INSURED_MEMBER_REMOVE", "减员", EndorsementCategory.SUBJECT, false, true,
             EndorsementEffectiveType.IMMEDIATE);
 

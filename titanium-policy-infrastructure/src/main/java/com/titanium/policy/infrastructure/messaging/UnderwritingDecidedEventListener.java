@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 import com.alibaba.fastjson2.JSONObject;
 
 import com.titanium.common.context.RequestContextHolder;
+import com.titanium.common.messaging.Idempotent;
 import com.titanium.metadata.enums.underwriting.UnderwritingEnum.ConclusionType;
 import com.titanium.metadata.topic.CrossDomainTopics;
 import com.titanium.policy.application.command.insurance.InsuranceApplicationService;
@@ -52,6 +53,8 @@ public class UnderwritingDecidedEventListener {
      *
      * @param payload 事件 JSON 报文
      */
+    @Idempotent(strategy = Idempotent.Strategy.AGGREGATE_GUARD,
+            reason = "重复投递的核保结论由聚合静默吸收（Insurance.isRedeliveredResult：同核保单号+同结论不发事件），同步/异步两轨收敛到同一命令")
     @KafkaListener(topics = UNDERWRITING_DECIDED_TOPIC, groupId = "${spring.kafka.consumer.group-id}")
     public void onUnderwritingDecided(String payload) {
         // 一次性反序列化为防腐入站消息（不依赖核保域类型），取代手工逐字段解析与嵌套值对象提取
@@ -86,7 +89,17 @@ public class UnderwritingDecidedEventListener {
                 () -> insuranceApplicationService.receiveUnderwritingResult(insuranceId, result, tenantId));
     }
 
-    /** 核保结论 code → 枚举，非法/缺失时按延期处理，避免异常逃逸阻断消费 */
+    /**
+     * 核保结论 code → 枚举，非法/缺失时按延期处理，避免异常逃逸阻断消费。
+     * <p>
+     * 🔴 <b>此处窄捕获 {@link IllegalArgumentException} 属刻意例外，不适用 G16/AC-03「失败一律重抛」</b>：
+     * ① 只包住 {@code valueOf} 一行纯转换——失败时无任何已发生的副作用需回滚或重试；
+     * ② 降级方向保守且显式——未知结论按 {@code POSTPONE}（延期）处置并落 warn，既不放行出单也不丢结论；
+     * ③ 重抛只会把一条可处置的消息变成死信、结论本身反被丢弃。
+     * AC-03 的判据面是「全局 {@code catch (Exception)} 吞没流程失败」，本处捕获的是具体异常且有降级语义。
+     * 消费链路的其余异常不在 try 内，照常逃逸至 Kafka 容器的有界重试 → 死信主题。
+     * </p>
+     */
     private ConclusionType parseConclusion(String code) {
         if (code == null) {
             return ConclusionType.POSTPONE;

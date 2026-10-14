@@ -29,7 +29,10 @@ import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.util.backoff.FixedBackOff;
 
+import com.titanium.common.messaging.DltMetricsRecoverer;
 import com.titanium.metadata.topic.CrossDomainTopics;
+
+import io.micrometer.core.instrument.MeterRegistry;
 
 /**
  * Kafka配置类
@@ -142,13 +145,14 @@ public class KafkaConfig {
      * Kafka监听器容器工厂
      */
     @Bean
-    public KafkaListenerContainerFactory<ConcurrentMessageListenerContainer<String, String>> kafkaListenerContainerFactory() {
+    public KafkaListenerContainerFactory<ConcurrentMessageListenerContainer<String, String>> kafkaListenerContainerFactory(
+            MeterRegistry meterRegistry) {
         ConcurrentKafkaListenerContainerFactory<String, String> factory = new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(consumerFactory());
         // 🔴 必须显式挂载：本仓未引入 spring-boot-kafka，Boot 不会把容器里的 CommonErrorHandler
         // 自动接到容器工厂上。不挂载即退回 Spring Kafka 默认（10 次零间隔重试后丢弃），
         // 正是 D-501-15 中「重试耗尽消息被静默丢弃」的成因。
-        factory.setCommonErrorHandler(kafkaDefaultErrorHandler(kafkaTemplate()));
+        factory.setCommonErrorHandler(kafkaDefaultErrorHandler(kafkaTemplate(), meterRegistry));
         return factory;
     }
 
@@ -171,15 +175,23 @@ public class KafkaConfig {
      * 并由 {@code PolicyKafkaDeadLetterConfigTest} 机械守护「监听器主题 ↔ 死信主题」的一致性。
      * </p>
      *
+     * <p>
+     * 死信投递经 {@link DltMetricsRecoverer} 旁路计数（{@code titanium.kafka.dlt.published} /
+     * {@code titanium.kafka.dlt.recovery.failed}），死信条数与投递失败可被 Prometheus 采集告警（G16/AC-03）。
+     * </p>
+     *
      * @param kafkaTemplate 生产者模板（死信转发的投递通道）
+     * @param meterRegistry 指标注册表（死信投递计数）
      * @return 入站消息终态处理器
      */
     @Bean
-    public DefaultErrorHandler kafkaDefaultErrorHandler(KafkaTemplate<String, String> kafkaTemplate) {
+    public DefaultErrorHandler kafkaDefaultErrorHandler(KafkaTemplate<String, String> kafkaTemplate,
+                                                       MeterRegistry meterRegistry) {
         // 分区传 -1 表示交由 Kafka 默认分区器选择，避免源主题分区数多于死信主题时报分区越界
         DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(kafkaTemplate,
                 (record, exception) -> new TopicPartition(record.topic() + DEAD_LETTER_SUFFIX, -1));
-        return new DefaultErrorHandler(recoverer, new FixedBackOff(RETRY_INTERVAL_MILLIS, RETRY_MAX_ATTEMPTS));
+        return new DefaultErrorHandler(new DltMetricsRecoverer(recoverer, meterRegistry),
+                new FixedBackOff(RETRY_INTERVAL_MILLIS, RETRY_MAX_ATTEMPTS));
     }
 
     /**

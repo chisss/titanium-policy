@@ -2,6 +2,7 @@ package com.titanium.policy.infrastructure.messaging;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -83,22 +84,28 @@ class PaymentPaidListenerTest {
         verifyNoInteractions(orchestrator);
     }
 
+    /**
+     * 畸形 JSON 无法解析，属真失败：一律上抛交容器有界重试 → 死信主题（G16/AC-03），
+     * 不再就地吞掉——吞掉会让「解析失败」在死信队列中不可见、不可重放。
+     */
     @Test
-    void shouldNotThrowWhenPayloadIsMalformed() {
-        assertDoesNotThrow(() -> listener.onPaymentPaid("{not-a-json"));
+    void shouldPropagateWhenPayloadIsMalformed() {
+        assertThrows(RuntimeException.class, () -> listener.onPaymentPaid("{not-a-json"));
 
         verifyNoInteractions(orchestrator);
     }
 
     /**
-     * 重复投递（实收已记账）与保单不存在等场景重试不可能成功，重抛只会让消息被无限重放。
+     * 编排失败（保单不存在、远程依赖不可用等）一律上抛：交容器有界重试后转死信主题，
+     * 使失败可检索、可重放；不靠就地吞异常换取「消费成功」的假象。
      */
     @Test
-    void shouldSwallowOrchestratorFailure() {
+    void shouldPropagateOrchestratorFailure() {
         doThrow(new IllegalStateException("支付流水 PAY-001 已记账，忽略重复回调"))
                 .when(orchestrator).onPaymentSucceeded(any(PremiumCollectionNotice.class));
 
-        assertDoesNotThrow(() -> listener.onPaymentPaid(payload("POLICY-003", "POLICY", "CNY")));
+        assertThrows(IllegalStateException.class,
+                () -> listener.onPaymentPaid(payload("POLICY-003", "POLICY", "CNY")));
     }
 
     /**
