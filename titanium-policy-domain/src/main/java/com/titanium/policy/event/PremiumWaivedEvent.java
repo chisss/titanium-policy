@@ -2,6 +2,8 @@ package com.titanium.policy.event;
 
 import java.time.LocalDateTime;
 
+import org.axonframework.serialization.Revision;
+
 import com.titanium.policy.common.enums.PremiumWaiverReason;
 
 /**
@@ -17,6 +19,7 @@ import com.titanium.policy.common.enums.PremiumWaiverReason;
  * @param occurredAt 事件发生时间
  * @param tenantId 租户ID
  */
+@Revision("1")
 public record PremiumWaivedEvent(String policyId, PremiumWaiverReason reason, String operatorId,
                                  LocalDateTime occurredAt, String tenantId) {
 }

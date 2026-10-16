@@ -2,6 +2,8 @@ package com.titanium.policy.event;
 
 import java.time.LocalDateTime;
 
+import org.axonframework.serialization.Revision;
+
 /**
  * 被保险人已移除事件（团单减保 / 家庭险减员）
  *
@@ -12,6 +14,7 @@ import java.time.LocalDateTime;
  * @param operatorId 操作人
  * @param tenantId 租户ID
  */
+@Revision("1")
 public record InsuredMemberRemovedEvent(
         String policyId,
         String insuredId,

@@ -50,7 +50,7 @@ import lombok.NoArgsConstructor;
  * 无参构造器创建后执行本方法（首笔建账户），存在时加载后执行（追加放款）。
  * </p>
  */
-@Aggregate
+@Aggregate(snapshotTriggerDefinition = "policySnapshotTriggerDefinition")
 @Getter
 /** 仅供 Axon 回放使用（Lombok 生成 protected 无参构造器），业务代码禁止调用 */
 @NoArgsConstructor(access = AccessLevel.PROTECTED)

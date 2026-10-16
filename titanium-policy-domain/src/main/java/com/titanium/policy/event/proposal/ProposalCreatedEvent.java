@@ -4,6 +4,8 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import org.axonframework.serialization.Revision;
+
 import com.titanium.metadata.enums.billing.PremiumCollectionMode;
 import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.policy.PolicyForm;
@@ -30,6 +32,7 @@ import com.titanium.policy.valueobject.policy.ChannelInfo;
  * @param createTime 创建时间
  * @param tenantId 租户ID
  */
+@Revision("1")
 public record ProposalCreatedEvent(
         String proposalId,
         String proposalNo,

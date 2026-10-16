@@ -2,6 +2,8 @@ package com.titanium.policy.event;
 
 import java.util.List;
 
+import org.axonframework.serialization.Revision;
+
 import com.titanium.metadata.enums.insurance.InsuranceProductType;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.valueobject.Money;
@@ -55,6 +57,7 @@ import com.titanium.policy.valueobject.policy.PolicyStatus;
  * @param insuranceType    主险险种三级分类（读侧便捷冗余）
  * @param tenantId         租户ID
  */
+@Revision("1")
 public record PolicyCreatedEvent(String policyId, PolicyNo policyNo, PolicyForm policyForm, String productId,
                                  String insuranceId, String proposalId, String underwritingId, String bizNo,
                                  String marketPackageId,

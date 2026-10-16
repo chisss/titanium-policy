@@ -2,6 +2,8 @@ package com.titanium.policy.event.proposal;
 
 import java.time.LocalDateTime;
 
+import org.axonframework.serialization.Revision;
+
 /**
  * 意向单提交事件
  *
@@ -10,6 +12,7 @@ import java.time.LocalDateTime;
  * @param submitTime 提交时间
  * @param tenantId 租户ID
  */
+@Revision("1")
 public record ProposalSubmittedEvent(
         String proposalId,
         String changeReason,

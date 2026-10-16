@@ -3,6 +3,8 @@ package com.titanium.policy.event.insurance;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+import org.axonframework.serialization.Revision;
+
 import com.titanium.metadata.enums.underwriting.UnderwritingEnum.ConclusionType;
 
 /**
@@ -12,6 +14,7 @@ import com.titanium.metadata.enums.underwriting.UnderwritingEnum.ConclusionType;
  * 标准体/拒保时为 null。IssuanceSaga 监听此事件并存储加费率，在出单时并入保费。
  * </p>
  */
+@Revision("1")
 public record UnderwritingResultReceivedEvent(
         String insuranceId,
         String underwritingId,

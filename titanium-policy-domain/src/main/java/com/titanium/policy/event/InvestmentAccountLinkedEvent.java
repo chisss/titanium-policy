@@ -2,6 +2,8 @@ package com.titanium.policy.event;
 
 import java.time.LocalDateTime;
 
+import org.axonframework.serialization.Revision;
+
 /**
  * 投资账户已挂接事件（投连/万能保单关联投资账户）
  *
@@ -11,6 +13,7 @@ import java.time.LocalDateTime;
  * @param operatorId 操作人
  * @param tenantId 租户ID
  */
+@Revision("1")
 public record InvestmentAccountLinkedEvent(
         String policyId,
         String investmentAccountId,

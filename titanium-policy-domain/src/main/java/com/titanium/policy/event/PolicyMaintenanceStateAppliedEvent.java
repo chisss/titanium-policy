@@ -3,6 +3,8 @@ package com.titanium.policy.event;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import org.axonframework.serialization.Revision;
+
 import com.titanium.metadata.enums.maintenance.PolicyMaintenanceAction;
 import com.titanium.metadata.enums.policy.PolicyEnum.TerminationReason;
 import com.titanium.policy.common.enums.EndorsementCategory;
@@ -11,6 +13,7 @@ import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceAppliedField
 import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceExecutionState;
 
 /** Policy 在单一事件中原子应用案件字段与合同状态动作。 */
+@Revision("1")
 public record PolicyMaintenanceStateAppliedEvent(
         String policyId,
         String requestId,

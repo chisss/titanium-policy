@@ -2,6 +2,8 @@ package com.titanium.policy.event;
 
 import java.time.LocalDateTime;
 
+import org.axonframework.serialization.Revision;
+
 import com.titanium.policy.common.enums.EndorsementCategory;
 import com.titanium.policy.common.enums.PolicyDataUpdateType;
 
@@ -17,6 +19,7 @@ import com.titanium.policy.common.enums.PolicyDataUpdateType;
  * 调用 {@code incrementVersion()} 产生。读模型/批单记录的版本以重放后的 basicInfo.policyVersion() 为准。
  * </p>
  */
+@Revision("1")
 public record PolicyEndorsedEvent(
         String policyId,
         String endorsementNo,

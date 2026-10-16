@@ -3,6 +3,8 @@ package com.titanium.policy.event;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import org.axonframework.serialization.Revision;
+
 import com.titanium.policy.common.enums.EndorsementCategory;
 import com.titanium.policy.common.enums.PolicyDataUpdateType;
 import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceAmountFact;
@@ -11,6 +13,7 @@ import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceExecutionSta
 import com.titanium.policy.valueobject.policy.PolicyServiceRestrictions;
 
 /** Policy 已在单一聚合事件中应用字段、生成批单、版本和实际快照。 */
+@Revision("1")
 public record PolicyMaintenanceAppliedEvent(
         String policyId,
         String requestId,

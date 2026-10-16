@@ -2,6 +2,8 @@ package com.titanium.policy.event;
 
 import java.time.LocalDateTime;
 
+import org.axonframework.serialization.Revision;
+
 import com.titanium.metadata.valueobject.Money;
 
 /**
@@ -12,6 +14,7 @@ import com.titanium.metadata.valueobject.Money;
  * 免去下游跨域查询保费；历史事件（无保费字段）反序列化时该字段为 null。
  * </p>
  */
+@Revision("1")
 public record PolicyActivatedEvent(String policyId, String insuranceId, String bizNo, LocalDateTime activatedAt,
                                    String tenantId, Money totalPremium) {
 

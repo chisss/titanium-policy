@@ -12,8 +12,6 @@ import org.springframework.data.redis.serializer.GenericJacksonJsonRedisSerializ
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
-import tools.jackson.databind.ObjectMapper;
-
 /**
  * 保单查询缓存配置
  * <p>
@@ -39,7 +37,9 @@ public class PolicyQueryCacheConfig {
                 .serializeValuesWith(RedisSerializationContext.SerializationPair
     // ✅ m22-03（审查报告 SPR-04）定性：本处**有意独立构造**——Redis 缓存需要**独立的序列化器**（GenericJacksonJsonRedisSerializer 自带类型信息），
     // 与 HTTP 响应体的 JSON 形态不同，不能共用 Spring 全局实例。
-                        .fromSerializer(new GenericJacksonJsonRedisSerializer(new ObjectMapper())));
+    // ✅ m26-06（AXN-05）：由 Jackson 3 的裸构造改为框架 builder() 默认形态——Jackson 3 已内置 java.time，
+    // 裸构造与 builder() 实测 serialize 字节 5/5 逐字一致 + 交叉读通（builder() 默认 defaultTyping=false，与原形态同分支）。
+                        .fromSerializer(GenericJacksonJsonRedisSerializer.builder().build()));
 
         return RedisCacheManager.builder(connectionFactory).cacheDefaults(config).build();
     }

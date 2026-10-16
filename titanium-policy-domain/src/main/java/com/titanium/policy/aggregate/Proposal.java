@@ -44,7 +44,7 @@ import lombok.Getter;
  * CONVERTED_TO_APPLICATION / VOIDED
  * </p>
  */
-@Aggregate
+@Aggregate(snapshotTriggerDefinition = "policySnapshotTriggerDefinition")
 @Getter
 public class Proposal extends BaseAggregate {
     /** 聚合根唯一标识 */

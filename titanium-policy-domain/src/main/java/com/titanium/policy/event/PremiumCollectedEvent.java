@@ -2,6 +2,8 @@ package com.titanium.policy.event;
 
 import java.time.LocalDateTime;
 
+import org.axonframework.serialization.Revision;
+
 import com.titanium.metadata.enums.billing.BillingEnum.PaymentMethod;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.common.enums.PremiumCollectionStatus;
@@ -25,6 +27,7 @@ import com.titanium.policy.common.enums.PremiumCollectionStatus;
  * @param operatorId         操作人ID
  * @param tenantId           租户ID
  */
+@Revision("1")
 public record PremiumCollectedEvent(String policyId, String paymentId, String paymentNo, Money collectedAmount,
                                     Money accumulatedAmount, PremiumCollectionStatus collectionStatus,
                                     PaymentMethod paymentMethod, LocalDateTime collectedTime, String operatorId,

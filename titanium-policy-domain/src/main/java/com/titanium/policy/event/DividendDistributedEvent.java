@@ -3,6 +3,8 @@ package com.titanium.policy.event;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+import org.axonframework.serialization.Revision;
+
 import com.titanium.policy.common.enums.DividendOption;
 
 /**
@@ -21,6 +23,7 @@ import com.titanium.policy.common.enums.DividendOption;
  * @param occurredAt 事件发生时间
  * @param tenantId 租户ID
  */
+@Revision("1")
 public record DividendDistributedEvent(String policyId, BigDecimal dividendAmount, DividendOption option,
                                        int policyYear, BigDecimal accumulatedDividend, String operatorId,
                                        LocalDateTime occurredAt, String tenantId) {

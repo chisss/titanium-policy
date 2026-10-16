@@ -50,7 +50,7 @@ import lombok.extern.slf4j.Slf4j;
  * 作为投保单聚合的唯一对外交互入口，管理投保信息、核保对接、承保出单全流程。
  * </p>
  */
-@Aggregate
+@Aggregate(snapshotTriggerDefinition = "policySnapshotTriggerDefinition")
 @Getter
 @Slf4j
 public class Insurance extends BaseAggregate {

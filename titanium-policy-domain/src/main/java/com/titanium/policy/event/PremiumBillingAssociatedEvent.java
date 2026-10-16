@@ -1,5 +1,7 @@
 package com.titanium.policy.event;
 
+import org.axonframework.serialization.Revision;
+
 import com.titanium.policy.common.enums.PremiumCollectionStatus;
 
 /**
@@ -15,6 +17,7 @@ import com.titanium.policy.common.enums.PremiumCollectionStatus;
  * @param collectionStatus 保单当前收讫状态
  * @param tenantId        租户ID
  */
+@Revision("1")
 public record PremiumBillingAssociatedEvent(String policyId, String bizNo, String billId, String paymentOrderId,
                                             PremiumCollectionStatus collectionStatus, String tenantId) {
 }

@@ -2,6 +2,8 @@ package com.titanium.policy.event;
 
 import java.time.LocalDateTime;
 
+import org.axonframework.serialization.Revision;
+
 import com.titanium.policy.common.enums.FamilyRelation;
 import com.titanium.policy.entity.insurance.InsuredPartyList.InsuredInfo;
 
@@ -15,6 +17,7 @@ import com.titanium.policy.entity.insurance.InsuredPartyList.InsuredInfo;
  * @param operatorId 操作人
  * @param tenantId 租户ID
  */
+@Revision("1")
 public record InsuredMemberAddedEvent(
         String policyId,
         InsuredInfo member,

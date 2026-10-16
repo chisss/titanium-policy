@@ -2,6 +2,8 @@ package com.titanium.policy.event;
 
 import java.time.LocalDateTime;
 
+import org.axonframework.serialization.Revision;
+
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.common.enums.AnnuityPayoutStatus;
 
@@ -22,6 +24,7 @@ import com.titanium.policy.common.enums.AnnuityPayoutStatus;
  * @param occurredAt 事件发生时间
  * @param tenantId 租户ID
  */
+@Revision("1")
 public record AnnuityBenefitPaidEvent(String policyId, int installmentNo, Money amount, int paidInstallments,
                                       LocalDateTime nextPayoutDate, AnnuityPayoutStatus status, String operatorId,
                                       LocalDateTime occurredAt, String tenantId) {

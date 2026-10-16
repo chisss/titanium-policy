@@ -3,6 +3,8 @@ package com.titanium.policy.event;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+import org.axonframework.serialization.Revision;
+
 /**
  * 投资账户价值已回写事件（投连/万能保单账户价值更新）
  *
@@ -13,6 +15,7 @@ import java.time.LocalDateTime;
  * @param updatedAt 回写时间
  * @param tenantId 租户ID
  */
+@Revision("1")
 public record AccountValueUpdatedEvent(
         String policyId,
         String accountId,

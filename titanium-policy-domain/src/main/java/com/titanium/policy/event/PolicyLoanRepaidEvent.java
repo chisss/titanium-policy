@@ -3,6 +3,8 @@ package com.titanium.policy.event;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+import org.axonframework.serialization.Revision;
+
 /**
  * 保单贷款还款事件（g04-04，record）。
  * <p>
@@ -32,6 +34,7 @@ import java.time.LocalDateTime;
  * @param operatorId 操作人ID
  * @param tenantId 租户ID
  */
+@Revision("1")
 public record PolicyLoanRepaidEvent(
         String loanAccountId,
         String policyId,

@@ -3,6 +3,8 @@ package com.titanium.policy.event;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+import org.axonframework.serialization.Revision;
+
 /**
  * 保单满期给付事件（两全险/生存给付型寿险）
  * <p>
@@ -17,6 +19,7 @@ import java.time.LocalDateTime;
  * @param occurredAt 事件发生时间
  * @param tenantId 租户ID
  */
+@Revision("1")
 public record PolicyMaturedEvent(String policyId, BigDecimal maturityBenefit, String operatorId,
                                  LocalDateTime occurredAt, String tenantId) {
 }

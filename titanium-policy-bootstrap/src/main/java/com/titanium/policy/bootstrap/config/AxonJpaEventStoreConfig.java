@@ -16,10 +16,12 @@ import org.axonframework.eventsourcing.eventstore.jpa.SQLErrorCodesResolver;
 import org.axonframework.modelling.saga.repository.SagaStore;
 import org.axonframework.modelling.saga.repository.jpa.JpaSagaStore;
 import org.axonframework.serialization.Serializer;
+import org.axonframework.serialization.upcasting.event.EventUpcasterChain;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import com.titanium.policy.bootstrap.upcaster.InsuranceCreatedEventUpcaster;
+import com.titanium.policy.bootstrap.upcaster.PolicyCreatedEventLegacyKeyStripUpcaster;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -59,6 +61,10 @@ public class AxonJpaEventStoreConfig {
 
     /**
      * 配置基于JPA的事件存储引擎
+     * <p>
+     * 🔴 Upcaster 链注册点（m26-05）：新增 Upcaster 必须在此注册才生效——「写了 Upcaster ≠ Upcaster 生效」，
+     * 链与 {@code LegacyEventReplayTest} 测试拼链的一致性由该测试的源码断言钉住。
+     * </p>
      */
     @Bean
     public EventStorageEngine eventStorageEngine(
@@ -66,11 +72,15 @@ public class AxonJpaEventStoreConfig {
             PersistenceExceptionResolver persistenceExceptionResolver,
             EntityManagerProvider entityManagerProvider,
             TransactionManager transactionManager,
-            InsuranceCreatedEventUpcaster insuranceCreatedEventUpcaster) {
+            InsuranceCreatedEventUpcaster insuranceCreatedEventUpcaster,
+            PolicyCreatedEventLegacyKeyStripUpcaster policyCreatedEventLegacyKeyStripUpcaster) {
 
         return JpaEventStorageEngine.builder()
                 .snapshotSerializer(defaultSerializer)
-                .upcasterChain(insuranceCreatedEventUpcaster)
+                // JpaEventStorageEngine.Builder#upcasterChain 为单参：多 Upcaster 用 EventUpcasterChain 组装
+                // （顺序即链序，逐级传递）
+                .upcasterChain(new EventUpcasterChain(
+                        insuranceCreatedEventUpcaster, policyCreatedEventLegacyKeyStripUpcaster))
                 .persistenceExceptionResolver(persistenceExceptionResolver)
                 .eventSerializer(defaultSerializer)
                 .snapshotFilter(e -> true)

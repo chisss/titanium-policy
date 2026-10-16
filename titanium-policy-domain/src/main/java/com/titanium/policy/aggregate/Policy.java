@@ -125,7 +125,7 @@ import lombok.Getter;
  * 继承 {@link BaseAggregate}，复用租户ID、创建时间、更新时间等领域审计字段。
  * </p>
  */
-@Aggregate
+@Aggregate(snapshotTriggerDefinition = "policySnapshotTriggerDefinition")
 @Getter
 public class Policy extends BaseAggregate {
     /**

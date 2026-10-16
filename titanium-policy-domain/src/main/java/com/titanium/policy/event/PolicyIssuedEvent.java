@@ -2,6 +2,8 @@ package com.titanium.policy.event;
 
 import java.time.LocalDateTime;
 
+import org.axonframework.serialization.Revision;
+
 import com.titanium.metadata.valueobject.Money;
 
 /**
@@ -11,6 +13,7 @@ import com.titanium.metadata.valueobject.Money;
  * 由下游按 {@code productId} 调产品域反查（policy 创建链无险种结构化来源）。
  * </p>
  */
+@Revision("1")
 public record PolicyIssuedEvent(
         String policyId,
         String policyNo,

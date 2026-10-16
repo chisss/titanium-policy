@@ -2,6 +2,8 @@ package com.titanium.policy.event.proposal;
 
 import java.time.LocalDateTime;
 
+import org.axonframework.serialization.Revision;
+
 /**
  * 意向单作废事件
  *
@@ -10,6 +12,7 @@ import java.time.LocalDateTime;
  * @param voidTime 作废时间
  * @param tenantId 租户ID
  */
+@Revision("1")
 public record ProposalVoidedEvent(
         String proposalId,
         String changeReason,
