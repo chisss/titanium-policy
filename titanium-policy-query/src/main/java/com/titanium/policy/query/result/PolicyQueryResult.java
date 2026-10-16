@@ -96,12 +96,12 @@ public class PolicyQueryResult {
     /**
      * 保额
      */
-    private Double                      sumInsured;
+    private BigDecimal                  sumInsured;
 
     /**
      * 保费
      */
-    private Double                      premium;
+    private BigDecimal                  premium;
 
     /**
      * 币种
@@ -209,12 +209,12 @@ public class PolicyQueryResult {
         /**
          * 保额
          */
-        private Double  sumInsured;
+        private BigDecimal sumInsured;
 
         /**
          * 保费
          */
-        private Double  premium;
+        private BigDecimal premium;
 
         /**
          * 保险期限

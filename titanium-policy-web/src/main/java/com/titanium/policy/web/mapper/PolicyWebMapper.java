@@ -427,14 +427,14 @@ public interface PolicyWebMapper {
     }
 
     /**
-     * 数值 + 币种 → 金额 DTO（空安全）
+     * 数值 + 币种 → 金额 DTO（空安全）。🔴 DSN-07（m25-09）：入参为 BigDecimal 直传，不再从 double 升格。
      */
-    default Amount toAmount(Double value, String currency) {
+    default Amount toAmount(BigDecimal value, String currency) {
         if (value == null) {
             return null;
         }
         Amount amount = new Amount();
-        amount.setValue(BigDecimal.valueOf(value));
+        amount.setValue(value);
         amount.setCurrency(currency);
         return amount;
     }

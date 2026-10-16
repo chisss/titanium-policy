@@ -61,10 +61,10 @@ public class PolicyDetailVO {
     private String                  productName;
 
     @Schema(description = "保额")
-    private Double                  sumInsured;
+    private BigDecimal              sumInsured;
 
     @Schema(description = "保费")
-    private Double                  premium;
+    private BigDecimal              premium;
 
     @Schema(description = "生效日期")
     private LocalDateTime           effectiveDate;

@@ -18,10 +18,10 @@ import java.util.Set;
 import org.springframework.stereotype.Service;
 
 import com.titanium.metadata.valueobject.Money;
+import com.titanium.metadata.valueobject.RuleDecision;
 import com.titanium.policy.entity.policy.InsuredSubject;
 import com.titanium.policy.entity.policy.PolicyProduct;
 import com.titanium.policy.service.PolicyCompositionDomainService;
-import com.titanium.policy.valueobject.RuleDecision;
 
 /**
  * 保单构成领域服务实现（纯领域逻辑，可脱离 Spring 用 {@code new} 直测）

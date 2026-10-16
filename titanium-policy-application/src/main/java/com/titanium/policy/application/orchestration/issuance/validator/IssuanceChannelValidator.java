@@ -3,9 +3,9 @@ package com.titanium.policy.application.orchestration.issuance.validator;
 import org.springframework.stereotype.Component;
 
 import com.titanium.metadata.errorcode.PolicyErrorCode;
+import com.titanium.metadata.valueobject.RuleDecision;
 import com.titanium.policy.exception.RemoteDependencyUnavailableException;
 import com.titanium.policy.port.channel.ChannelAuthorizationPort;
-import com.titanium.policy.valueobject.RuleDecision;
 import com.titanium.policy.valueobject.channel.ChannelAuthorization;
 
 import lombok.RequiredArgsConstructor;

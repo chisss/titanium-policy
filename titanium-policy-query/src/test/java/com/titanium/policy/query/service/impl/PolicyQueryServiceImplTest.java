@@ -66,7 +66,9 @@ class PolicyQueryServiceImplTest {
         assertEquals("underwriting-1", result.getUnderwritingId());
         assertEquals("package-1", result.getMarketPackageId());
         assertEquals("product-id-1", result.getProductId());
-        assertEquals(100000.00, result.getSumInsured());
+        // 🔴 DSN-07（m25-09）：直传 BigDecimal 后断言改用 BigDecimal（scale 敏感）——原 double 字面量
+        //    经 Double.equals 与 BigDecimal 恒不等；此断言同时锁定「不再经 doubleValue() 降精度」
+        assertEquals(new BigDecimal("100000.00"), result.getSumInsured());
         assertEquals(new BigDecimal("1200.00"), result.getTotalPremium());
         assertEquals(2, result.getLineCount());
         assertEquals("ONLINE", result.getCollectionMode());

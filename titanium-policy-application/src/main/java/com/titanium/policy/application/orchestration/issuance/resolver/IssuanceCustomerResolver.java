@@ -98,8 +98,12 @@ public class IssuanceCustomerResolver {
         String customerId = resolveCustomer(holder.customerId(), holder.name(), holder.certType(), holder.certNo(),
                 gender, holder.phone(), tenantId, operatorId, byIdentity, identityByCustomerId);
         remember(holder.customerId(), customerId, holder.name(), byOriginalId, byName);
-        return new InsuredPartyList.HolderInfo(customerId, holder.holderId(), holder.name(), holder.certType(),
-                holder.certNo(), holder.phone());
+        // 🔴 8 参全量重建（m25-08/DSN-06）：原 6 参窄构造器在每次解析时把性别与出生日期静默清空；
+        // 性别以解析用值（matchingInsuredGender 合并结果）兜底，避免投保人输入未带性别时快照恒为 null。
+        // 标识统一为 resolved customerId：装配层可能传空（待建档），回填后必须与 customerId 一致。
+        return new InsuredPartyList.HolderInfo(customerId, customerId, holder.name(), holder.certType(),
+                holder.certNo(), holder.phone(), holder.gender() != null ? holder.gender() : gender,
+                holder.birthDate());
     }
 
     private InsuredPartyList.InsuredInfo resolveInsured(InsuredPartyList.InsuredInfo insured,
@@ -119,7 +123,8 @@ public class IssuanceCustomerResolver {
                     insured.gender(), insured.phone(), tenantId, operatorId, byIdentity, identityByCustomerId);
         }
         remember(insured.customerId(), customerId, insured.name(), byOriginalId, byName);
-        return new InsuredPartyList.InsuredInfo(customerId, insured.insuredId(), insured.name(), insured.certType(),
+        // 标识统一为 resolved customerId（m25-08/DSN-06）：装配层传入的标识在 customerId 缺失时为 null
+        return new InsuredPartyList.InsuredInfo(customerId, customerId, insured.name(), insured.certType(),
                 insured.certNo(), insured.age(), insured.gender(), insured.phone(), insured.relationToHolder(),
                 insured.familyRelation());
     }
@@ -137,7 +142,8 @@ public class IssuanceCustomerResolver {
                 beneficiary.certNo(), beneficiary.gender(), beneficiary.phone(), tenantId, operatorId, byIdentity,
                 identityByCustomerId);
         remember(beneficiary.customerId(), customerId, beneficiary.name(), byOriginalId, byName);
-        return new InsuredPartyList.BeneficiaryInfo(customerId, beneficiary.beneficiaryId(), beneficiary.name(),
+        // 标识统一为 resolved customerId（m25-08/DSN-06）：装配层传入的标识在 customerId 缺失时为 null
+        return new InsuredPartyList.BeneficiaryInfo(customerId, customerId, beneficiary.name(),
                 beneficiary.certType(), beneficiary.certNo(), beneficiary.gender(), beneficiary.phone(),
                 beneficiary.beneficiaryType(), beneficiary.order(), beneficiary.beneficiaryRatio());
     }

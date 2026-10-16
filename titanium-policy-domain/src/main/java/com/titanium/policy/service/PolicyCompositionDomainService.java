@@ -3,8 +3,8 @@ package com.titanium.policy.service;
 import java.util.List;
 
 import com.titanium.metadata.valueobject.Money;
+import com.titanium.metadata.valueobject.RuleDecision;
 import com.titanium.policy.entity.policy.PolicyProduct;
-import com.titanium.policy.valueobject.RuleDecision;
 
 /**
  * 保单构成领域服务（纯领域服务）

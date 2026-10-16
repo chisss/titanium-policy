@@ -13,9 +13,9 @@ import org.junit.jupiter.api.Test;
 
 import com.titanium.metadata.errorcode.PolicyErrorCode;
 import com.titanium.metadata.errorcode.SystemErrorCode;
+import com.titanium.metadata.valueobject.RuleDecision;
 import com.titanium.policy.exception.RemoteDependencyUnavailableException;
 import com.titanium.policy.port.channel.ChannelAuthorizationPort;
-import com.titanium.policy.valueobject.RuleDecision;
 import com.titanium.policy.valueobject.channel.ChannelAuthorization;
 
 /**

@@ -21,6 +21,7 @@ import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.enums.underwriting.UnderwritingEnum.ConclusionType;
 import com.titanium.metadata.errorcode.PolicyErrorCode;
 import com.titanium.metadata.valueobject.Money;
+import com.titanium.metadata.valueobject.RuleDecision;
 import com.titanium.policy.command.ConvertProposalToInsuranceCommand;
 import com.titanium.policy.command.CreateInsuranceDirectlyCommand;
 import com.titanium.policy.command.ReceiveUnderwritingResultCommand;
@@ -34,7 +35,6 @@ import com.titanium.policy.event.insurance.InsuranceIssuedEvent;
 import com.titanium.policy.event.insurance.InsuranceSubmittedForUnderwritingEvent;
 import com.titanium.policy.event.insurance.UnderwritingResultReceivedEvent;
 import com.titanium.policy.exception.PolicyBusinessRuleException;
-import com.titanium.policy.valueobject.RuleDecision;
 import com.titanium.policy.valueobject.insurance.InsuranceBasicInfo;
 import com.titanium.policy.valueobject.insurance.InsuranceStatus;
 import com.titanium.policy.valueobject.insurance.UnderwritingResult;
@@ -42,7 +42,6 @@ import com.titanium.policy.valueobject.policy.ChannelInfo;
 import com.titanium.policy.valueobject.product.ProductSumInsuredTiers;
 
 import lombok.Getter;
-import lombok.experimental.SuperBuilder;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -54,7 +53,6 @@ import lombok.extern.slf4j.Slf4j;
 @Aggregate
 @Getter
 @Slf4j
-@SuperBuilder(toBuilder = true)
 public class Insurance extends BaseAggregate {
     /** 聚合根唯一标识 */
     @AggregateIdentifier
@@ -384,15 +382,6 @@ public class Insurance extends BaseAggregate {
         return this.insuranceLines.stream().map(InsuranceLine::productCode).filter(code -> code != null).toList();
     }
 
-    /**
-     * 设置投保参与方清单
-     */
-    public void setInsuredPartyList(InsuredPartyList insuredPartyList) {
-        ensureDraftStatus();
-        this.insuredPartyList = insuredPartyList;
-        this.updateTime = LocalDateTime.now();
-    }
-
     // ==================== 校验方法 ====================
 
     private void validateApplicationInfo() {
@@ -560,6 +549,7 @@ public class Insurance extends BaseAggregate {
         }
     }
 
+    /** 仅供 Axon 回放使用（框架反射实例化），业务代码禁止调用 */
     protected Insurance() {
     }
 
@@ -584,4 +574,9 @@ public class Insurance extends BaseAggregate {
         }
     }
 
+
+    /** insuranceLines 不可变视图（DSN-02：杜绝经 getter 外泄内部集合引用，变更须经命令与事件） */
+    public List<InsuranceLine> getInsuranceLines() {
+        return insuranceLines == null ? null : List.copyOf(insuranceLines);
+    }
 }

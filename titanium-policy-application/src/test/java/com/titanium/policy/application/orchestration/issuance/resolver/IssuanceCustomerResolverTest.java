@@ -169,6 +169,30 @@ class IssuanceCustomerResolverTest {
         assertTrue(exception.retryable());
     }
 
+    /** 参与方标识统一为解析后 customerId：装配层在 customerId 缺失时传空标识，回填后必须一致（m25-08/DSN-06）。 */
+    @Test
+    void resolvedParticipantIdsAreUnifiedWithResolvedCustomerIds() {
+        when(customerServicePort.resolveCustomer(any(), eq(TENANT_ID)))
+                .thenReturn(HOLDER_ID, "CUSTOMER_INSURED", "CUSTOMER_BENEFICIARY");
+        InsuredPartyList.BeneficiaryInfo beneficiary = new InsuredPartyList.BeneficiaryInfo(null, null, "李四",
+                IdCardType.CHINA_ID_CARD, "110101199101011235", CustomerGender.FEMALE, "13900139000",
+                BeneficiaryType.DEATH, 1, 1.0d);
+        InsuredPartyList parties = new InsuredPartyList("PARTIES_007",
+                new InsuredPartyList.HolderInfo(null, null, "张三", IdCardType.CHINA_ID_CARD, "110101199001011234",
+                        "13800138000"),
+                List.of(new InsuredPartyList.InsuredInfo(null, null, "王五", IdCardType.CHINA_ID_CARD,
+                        "110101199506063333", 30, CustomerGender.MALE, "13700137000", null, null)),
+                List.of(beneficiary));
+
+        IssuanceRequest resolved = resolver.resolve(request(parties));
+
+        InsuredPartyList resolvedParties = resolved.insuredPartyList();
+        assertEquals(HOLDER_ID, resolvedParties.holderInfo().holderId());
+        assertEquals(HOLDER_ID, resolvedParties.holderInfo().customerId());
+        assertEquals("CUSTOMER_INSURED", resolvedParties.insuredList().getFirst().insuredId());
+        assertEquals("CUSTOMER_BENEFICIARY", resolvedParties.beneficiaryList().getFirst().beneficiaryId());
+    }
+
     private IssuanceRequest request(InsuredPartyList parties) {
         IssuancePlanLine line = new IssuancePlanLine(1, "PRODUCT_001", ProductCategory.MAIN, null, null, null, null,
                 null, null, List.of(), null);

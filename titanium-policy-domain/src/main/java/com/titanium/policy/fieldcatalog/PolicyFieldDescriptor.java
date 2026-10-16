@@ -9,7 +9,7 @@ import com.titanium.metadata.enums.policy.fieldcatalog.PolicyFieldSensitivityLev
 import com.titanium.metadata.enums.policy.fieldcatalog.PolicyFieldValueType;
 import com.titanium.metadata.errorcode.PolicyErrorCode;
 import com.titanium.metadata.fieldcatalog.FieldAnalysisCapability;
-import com.titanium.policy.valueobject.RuleDecision;
+import com.titanium.metadata.valueobject.RuleDecision;
 
 /** Policy 对外发布的稳定字段描述。 */
 public record PolicyFieldDescriptor(
@@ -73,9 +73,11 @@ public record PolicyFieldDescriptor(
      *
      * <p>🔴 <b>为何四条都落在这里、而不像需求文档 §g07-03 第 3 点所说「内聚为
      * {@code FieldAnalysisCapability} 的紧凑构造器不变量」</b>：规则 2 需要 {@code valueType}、
-     * 规则 3 需要 {@code collection}，metadata 侧的 {@code FieldAnalysisCapability} 看不到这两个事实；
-     * 而本方法的返回类型 {@link RuleDecision} 定义在 policy-domain，metadata 反向依赖它会破坏
-     * 「metadata 是纯契约 jar」的定位。规则只能内聚在**唯一能同时看到三个事实的地方**——
+     * 规则 3 需要 {@code collection}，metadata 侧的 {@code FieldAnalysisCapability} 看不到这两个事实。
+     * 🔧 订正（2026-10-15，DSN-08/m25-10）：原记「本方法返回类型 {@link RuleDecision} 定义在
+     * policy-domain，metadata 反向依赖会破坏纯契约 jar 定位」已失实——统一版现就在 metadata
+     * （{@code com.titanium.metadata.valueobject.RuleDecision}）；上述「看不到 descriptor 上下文」
+     * 的主论据不因此缓解，规则内聚点不变。规则只能内聚在**唯一能同时看到三个事实的地方**——
      * 即本类。已同批勘误文档措辞。</p>
      *
      * <p>🔴 <b>为何返回 {@link RuleDecision} 而不只抛异常</b>：调用方有两类诉求——构造期要

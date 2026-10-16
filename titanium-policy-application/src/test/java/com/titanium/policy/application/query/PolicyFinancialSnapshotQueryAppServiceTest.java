@@ -109,7 +109,9 @@ class PolicyFinancialSnapshotQueryAppServiceTest {
 
     @Test
     void shouldFailClosedWhenTenantMismatch() {
-        stubAggregateLoad(policyWithBasis().toBuilder().tenantId("OTHER").build());
+        Policy policy = policyWithBasis();
+        when(policy.getTenantId()).thenReturn("OTHER");
+        stubAggregateLoad(policy);
 
         DomainException exception = assertThrows(DomainException.class, () -> service.query(TENANT_ID, POLICY_ID));
         assertEquals(PolicyErrorCode.POLICY_NOT_EXIST, exception.getErrorCode());
@@ -117,7 +119,9 @@ class PolicyFinancialSnapshotQueryAppServiceTest {
 
     @Test
     void shouldFailClosedWhenEffectiveDateMissing() {
-        stubAggregateLoad(policyWithBasis().toBuilder().policyPeriod(null).build());
+        Policy policy = policyWithBasis();
+        when(policy.getPolicyPeriod()).thenReturn(null);
+        stubAggregateLoad(policy);
 
         DomainException exception = assertThrows(DomainException.class, () -> service.query(TENANT_ID, POLICY_ID));
         assertEquals(PolicyErrorCode.POLICY_FINANCIAL_DATA_MISSING, exception.getErrorCode());
@@ -125,7 +129,9 @@ class PolicyFinancialSnapshotQueryAppServiceTest {
 
     @Test
     void shouldFailClosedWhenPremiumBasisMissing() {
-        stubAggregateLoad(policyWithBasis().toBuilder().productId(null).build());
+        Policy policy = policyWithBasis();
+        when(policy.getProductId()).thenReturn(null);
+        stubAggregateLoad(policy);
 
         DomainException exception = assertThrows(DomainException.class, () -> service.query(TENANT_ID, POLICY_ID));
         assertEquals(PolicyErrorCode.POLICY_FINANCIAL_DATA_MISSING, exception.getErrorCode());
@@ -135,7 +141,9 @@ class PolicyFinancialSnapshotQueryAppServiceTest {
     void shouldFailClosedWhenPolicyProductsEmpty() {
         // 现金价值取数已放行（与下方「原保额缺失」结论不同，锁定失败归因于原保额分支）
         stubCashValueAvailable();
-        stubAggregateLoad(policyWithBasis().toBuilder().policyProducts(List.of()).build());
+        Policy policy = policyWithBasis();
+        when(policy.getPolicyProducts()).thenReturn(List.of());
+        stubAggregateLoad(policy);
 
         DomainException exception = assertThrows(DomainException.class, () -> service.query(TENANT_ID, POLICY_ID));
         assertEquals(PolicyErrorCode.POLICY_FINANCIAL_DATA_MISSING, exception.getErrorCode());
@@ -145,9 +153,9 @@ class PolicyFinancialSnapshotQueryAppServiceTest {
     void shouldFailClosedWhenMainLineAbsent() {
         // 只有附加险段：不得以附加险保额冒充原保额（取数口径只认主险段）
         stubCashValueAvailable();
-        stubAggregateLoad(policyWithBasis().toBuilder()
-                .policyProducts(List.of(riderProduct()))
-                .build());
+        Policy policy = policyWithBasis();
+        when(policy.getPolicyProducts()).thenReturn(List.of(riderProduct()));
+        stubAggregateLoad(policy);
 
         DomainException exception = assertThrows(DomainException.class, () -> service.query(TENANT_ID, POLICY_ID));
         assertEquals(PolicyErrorCode.POLICY_FINANCIAL_DATA_MISSING, exception.getErrorCode());
@@ -157,9 +165,9 @@ class PolicyFinancialSnapshotQueryAppServiceTest {
     void shouldFailClosedWhenMainLineSumInsuredBlank() {
         // 主险段在、保额空白：不得以 0 兜底
         stubCashValueAvailable();
-        stubAggregateLoad(policyWithBasis().toBuilder()
-                .policyProducts(List.of(mainProduct(null)))
-                .build());
+        Policy policy = policyWithBasis();
+        when(policy.getPolicyProducts()).thenReturn(List.of(mainProduct(null)));
+        stubAggregateLoad(policy);
 
         DomainException exception = assertThrows(DomainException.class, () -> service.query(TENANT_ID, POLICY_ID));
         assertEquals(PolicyErrorCode.POLICY_FINANCIAL_DATA_MISSING, exception.getErrorCode());
@@ -170,9 +178,10 @@ class PolicyFinancialSnapshotQueryAppServiceTest {
         // 主险段在、保额在，但段标识空白：PolicyProduct 对标识无构造器校验，故来源侧须自守——
         // 空白 objectId 下发到跨域契约会让下游字段执行器的逐字比对失败，属「坏数据出域」
         stubCashValueAvailable();
-        stubAggregateLoad(policyWithBasis().toBuilder()
-                .policyProducts(List.of(product("  ", ProductCategory.MAIN, ORIGINAL_SUM_INSURED)))
-                .build());
+        Policy policy = policyWithBasis();
+        when(policy.getPolicyProducts()).thenReturn(
+                List.of(product("  ", ProductCategory.MAIN, ORIGINAL_SUM_INSURED)));
+        stubAggregateLoad(policy);
 
         DomainException exception = assertThrows(DomainException.class, () -> service.query(TENANT_ID, POLICY_ID));
         assertEquals(PolicyErrorCode.POLICY_FINANCIAL_DATA_MISSING, exception.getErrorCode());
@@ -190,11 +199,11 @@ class PolicyFinancialSnapshotQueryAppServiceTest {
 
     @Test
     void shouldTreatNoRecordsAsZeroBusinessFact() {
-        stubAggregateLoad(policyWithBasis().toBuilder()
-                .accumulatedDividend(null)
-                .investmentAccountValue(null)
-                .paymentRecords(List.of())
-                .build());
+        Policy policy = policyWithBasis();
+        when(policy.getAccumulatedDividend()).thenReturn(null);
+        when(policy.getInvestmentAccountValue()).thenReturn(null);
+        when(policy.getPaymentRecords()).thenReturn(List.of());
+        stubAggregateLoad(policy);
         when(policyCashValuePort.getCashValue(eq(TENANT_ID), eq("PROD1"), eq(2), any(), any(), any()))
                 .thenReturn(Optional.of(cashValue(new BigDecimal("8800.00"))));
         when(billingServicePort.getUnpaidBills(POLICY_ID)).thenReturn(List.of());
@@ -230,11 +239,12 @@ class PolicyFinancialSnapshotQueryAppServiceTest {
 
     @Test
     void shouldCountOnlyReconciledPaymentsAsPaidInstallments() {
-        Policy policy = policyWithBasis().toBuilder().paymentRecords(List.of(
+        Policy policy = policyWithBasis();
+        when(policy.getPaymentRecords()).thenReturn(List.of(
                 payment(ReconciliationStatus.RECONCILED),
                 payment(ReconciliationStatus.RECONCILED),
                 payment(ReconciliationStatus.UNRECONCILED),
-                payment(ReconciliationStatus.FAILED))).build();
+                payment(ReconciliationStatus.FAILED)));
         stubAggregateLoad(policy);
         when(policyCashValuePort.getCashValue(eq(TENANT_ID), eq("PROD1"), eq(2), any(), any(), any()))
                 .thenReturn(Optional.of(cashValue(new BigDecimal("1.00"))));
@@ -280,21 +290,30 @@ class PolicyFinancialSnapshotQueryAppServiceTest {
 
     // ==================== 夹具 ====================
 
-    /** 现金价值要素齐备的保单（生效日 2025-01-01，估值日跨两年 → 保单年度 2）。 */
+    /**
+     * 现金价值要素齐备的保单替身（生效日 2025-01-01，估值日跨两年 → 保单年度 2）。
+     * <p>
+     * 🔴 用 mock 替身而非构造器/事件回放：本类测试的本质是「给取数编排喂数据」，且 fail-closed
+     * 用例需要表达「畸形状态」（policyPeriod=null 等）——事件回放构造的合法状态表达不了；聚合
+     * builder 与无参构造器已按 DSN-02 收紧（去 SuperBuilder、构造器 protected），外部亦不可
+     * 凭空构造。缺省未 stub 的 getter 返回 null，天然对应「要素缺失」，由各失败用例按需覆写。
+     * </p>
+     */
     private Policy policyWithBasis() {
-        return Policy.builder()
-                .policyId(POLICY_ID)
-                .tenantId(TENANT_ID)
-                .productId("PROD1")
-                .totalPremium(Money.of(new BigDecimal("10000"), "CNY"))
-                .policyPeriod(PolicyPeriod.of(LocalDateTime.of(2025, 1, 1, 0, 0), null))
-                .policyProducts(List.of(mainProduct(ORIGINAL_SUM_INSURED)))
-                .accumulatedDividend(Money.of(new BigDecimal("300.00"), "CNY"))
-                .investmentAccountValue(new BigDecimal("20000"))
-                .paymentRecords(List.of(
-                        payment(ReconciliationStatus.RECONCILED),
-                        payment(ReconciliationStatus.RECONCILED)))
-                .build();
+        Policy policy = mock(Policy.class);
+        when(policy.getPolicyId()).thenReturn(POLICY_ID);
+        when(policy.getTenantId()).thenReturn(TENANT_ID);
+        when(policy.getProductId()).thenReturn("PROD1");
+        when(policy.getTotalPremium()).thenReturn(Money.of(new BigDecimal("10000"), "CNY"));
+        when(policy.getPolicyPeriod()).thenReturn(PolicyPeriod.of(LocalDateTime.of(2025, 1, 1, 0, 0), null));
+        when(policy.getPolicyProducts()).thenReturn(List.of(mainProduct(ORIGINAL_SUM_INSURED)));
+        when(policy.mainLine()).thenReturn(mainProduct(ORIGINAL_SUM_INSURED));
+        when(policy.getAccumulatedDividend()).thenReturn(Money.of(new BigDecimal("300.00"), "CNY"));
+        when(policy.getInvestmentAccountValue()).thenReturn(new BigDecimal("20000"));
+        when(policy.getPaymentRecords()).thenReturn(List.of(
+                payment(ReconciliationStatus.RECONCILED),
+                payment(ReconciliationStatus.RECONCILED)));
+        return policy;
     }
 
     /** 主险段（减额缴清「原保额」的取数口径：只认主险段，附加险段不参与该不等式）。 */

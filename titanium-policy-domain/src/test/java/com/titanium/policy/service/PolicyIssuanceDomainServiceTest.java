@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -39,12 +41,14 @@ class PolicyIssuanceDomainServiceTest {
         // 领域服务无外部依赖，直接实例化
         domainService = new PolicyIssuanceDomainServiceImpl();
 
-        // 构造一张承保要素齐备的投保单聚合（SuperBuilder 直接构建，不走事件溯源）
+        // 构造一张承保要素齐备的投保单替身（只 stub 领域服务取数面：basicInfo/policyForm；聚合
+        // builder 已按 DSN-02 移除、无参构造器收紧为 protected，mock 替身同时使「要素缺失」形态可按需覆写）
         InsuranceBasicInfo basicInfo = new InsuranceBasicInfo("holder-001", 1, Money.of(new java.math.BigDecimal("1200"),
                 "CNY"), LocalDateTime.of(2026, 7, 1, 0, 0), LocalDateTime.of(2027, 7, 1, 0, 0),
                 List.of("PROD_A"), 0);
-        approvedInsurance = Insurance.builder().insuranceId("INS-001").insuranceNo("INS202607010001")
-                .policyForm(PolicyForm.INDIVIDUAL).basicInfo(basicInfo).tenantId("tenant-001").build();
+        approvedInsurance = mock(Insurance.class);
+        when(approvedInsurance.getBasicInfo()).thenReturn(basicInfo);
+        when(approvedInsurance.getPolicyForm()).thenReturn(PolicyForm.INDIVIDUAL);
     }
 
     @Test

@@ -81,8 +81,12 @@ public class ConfirmedPremiumRequestValidator {
     }
 
     private void validateSubjectInfo(ConfirmedPremiumRequest request) {
-        if (request.age() == null || request.gender() == null || request.gender().isBlank()) {
-            throw new BusinessException("险种段缺少被保险人年龄或性别: lineNo=" + lineNoOf(request),
+        // 🔴 m25-08（DSN-06）：原判据 `age() == null` 为活校验（ConfirmedPremiumRequest.age 是 Integer，
+        // 任务书「int age==null 恒 false 死校验」的断言经实读证伪）；本次增补 age < 0 属防御深度——
+        // 负年龄在出单装配器已被拒（400），此条件仅拦截绕过装配层构造的请求（如存量事件重放/测试直构）。
+        // 判据顺序保证 null 先短路，负值比较不做拆箱。
+        if (request.age() == null || request.age() < 0 || request.gender() == null || request.gender().isBlank()) {
+            throw new BusinessException("险种段缺少或被保险人年龄非法（年龄不可为负）: lineNo=" + lineNoOf(request),
                     PolicyErrorCode.ISSUANCE_PREMIUM_SUBJECT_INFO_MISSING);
         }
     }

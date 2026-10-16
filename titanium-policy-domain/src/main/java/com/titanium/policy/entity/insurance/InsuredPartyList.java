@@ -234,9 +234,12 @@ public record InsuredPartyList(
                                */
                               String certNo,
                               /*
-                               * 年龄
+                               * 年龄（出单时点快照，参与费率与投保资格校验）
+                               * 🔴 m25-08（DSN-06）由 int 改 Integer：原先装配器把「未提供」静默落成 0，
+                               * 与真实「0 岁」不可区分。改可空后由出单装配器保证提供（age 或 birthDate
+                               * 推算，双缺即拒）；历史事件中的 0 仍表示「未知」。
                                */
-                              int age,
+                              Integer age,
                               /*
                                * 性别
                                */

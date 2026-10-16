@@ -15,9 +15,9 @@ import com.titanium.metadata.enums.policy.PolicyLineStatus;
 import com.titanium.metadata.enums.product.ProductEnum.ProductCategory;
 import com.titanium.metadata.errorcode.PolicyErrorCode;
 import com.titanium.metadata.valueobject.Money;
+import com.titanium.metadata.valueobject.RuleDecision;
 import com.titanium.policy.entity.policy.PolicyProduct;
 import com.titanium.policy.service.impl.PolicyCompositionDomainServiceImpl;
-import com.titanium.policy.valueobject.RuleDecision;
 
 /**
  * 保单构成领域服务测试

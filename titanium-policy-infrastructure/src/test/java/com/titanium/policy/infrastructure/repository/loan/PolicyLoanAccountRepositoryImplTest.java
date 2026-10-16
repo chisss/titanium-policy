@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.lang.reflect.Constructor;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -119,7 +120,7 @@ class PolicyLoanAccountRepositoryImplTest {
         // 随后在无命令上下文中 load 重建
         UnitOfWork<?> writeUnitOfWork = DefaultUnitOfWork.startAndGet(null);
         try {
-            realRepository.newInstance(() -> new PolicyLoan())
+            realRepository.newInstance(PolicyLoanAccountRepositoryImplTest::newAccountInstance)
                     .execute(account -> AggregateLifecycle.apply(new PolicyLoanDisbursedEvent(
                             PolicyLoan.loanAccountIdOf(POLICY_ID), "L1", POLICY_ID,
                             new BigDecimal("10000.00"), new BigDecimal("0.060000"),
@@ -157,7 +158,7 @@ class PolicyLoanAccountRepositoryImplTest {
         writeEvents(foreignRepository, () -> new ForeignStreamAggregate(),
                 new ForeignStreamEvent(POLICY_ID));
         // 再写入贷款账户事件流（标识 LOAN:P1，与保单标识空间隔离）
-        writeEvents(loanRepository, PolicyLoan::new,
+        writeEvents(loanRepository, PolicyLoanAccountRepositoryImplTest::newAccountInstance,
                 new PolicyLoanDisbursedEvent(
                         PolicyLoan.loanAccountIdOf(POLICY_ID), "L1", POLICY_ID,
                         new BigDecimal("10000.00"), new BigDecimal("0.060000"),
@@ -203,9 +204,26 @@ class PolicyLoanAccountRepositoryImplTest {
     record ForeignStreamEvent(String foreignId) {
     }
 
+    /**
+     * 实例化贷款账户聚合（与 Axon 回放同一路径）。
+     * <p>
+     * 聚合无参构造器已按 DSN-02 收紧为 protected（仅供框架反射回放），测试跨包不可直接 {@code new}，
+     * 故经反射按 Axon 同款方式（getDeclaredConstructor + setAccessible）实例化。
+     * </p>
+     */
+    private static PolicyLoan newAccountInstance() {
+        try {
+            Constructor<PolicyLoan> constructor = PolicyLoan.class.getDeclaredConstructor();
+            constructor.setAccessible(true);
+            return constructor.newInstance();
+        } catch (ReflectiveOperationException exception) {
+            throw new IllegalStateException("无法实例化 PolicyLoan（Axon 回放路径）", exception);
+        }
+    }
+
     /** 按事件流重建聚合（与 Axon 仓储同一路径：无参构造器 + 事件回放）。 */
     private PolicyLoan accountWith(String tenantId, String loanId, String amount, String rate) {
-        PolicyLoan account = new PolicyLoan();
+        PolicyLoan account = newAccountInstance();
         account.on(new PolicyLoanDisbursedEvent(
                 PolicyLoan.loanAccountIdOf(POLICY_ID), loanId, POLICY_ID,
                 new BigDecimal(amount), new BigDecimal(rate), LOAN_DATE, "op-1", tenantId));

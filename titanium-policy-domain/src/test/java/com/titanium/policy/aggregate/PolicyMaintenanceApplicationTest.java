@@ -117,6 +117,23 @@ class PolicyMaintenanceApplicationTest {
                                 }))));
     }
 
+    /** 改手机号不得波及同一快照的身份要素：性别与出生日期必须保真（m25-08/DSN-06 回归）。 */
+    @Test
+    void shouldPreserveHolderGenderAndBirthDateWhenChangingMobileOnly() {
+        ApplyPolicyMaintenanceCommand command = command("13900000000");
+
+        fixture.given(createdEvent(holderProfileParties("13800000000")), activatedEvent())
+                .when(command)
+                .expectSuccessfulHandlerExecution()
+                .expectState(policy -> {
+                    InsuredPartyList.HolderInfo holder = policy.getInsuredPartyList().holderInfo();
+                    assertEquals("13900000000", holder.phone());
+                    assertEquals(CustomerGender.MALE, holder.gender());
+                    assertEquals(LocalDate.of(1990, 1, 1), holder.birthDate());
+                    assertEquals("张三", holder.name());
+                });
+    }
+
     @Test
     void shouldApplyMainCoverageAmountAndReturnCoverageEndorsement() {
         ApplyPolicyMaintenanceCommand command = coverageCommand("120000");
@@ -1018,6 +1035,14 @@ class PolicyMaintenanceApplicationTest {
     private InsuredPartyList parties(String mobile) {
         InsuredPartyList.HolderInfo holder = new InsuredPartyList.HolderInfo(
                 "customer-1", "holder-1", "张三", null, "ID-1", mobile);
+        return new InsuredPartyList("parties-1", holder, List.of(), List.of());
+    }
+
+    /** 携带完整身份要素（性别/出生日期）的投保人快照：用于「改 A 字段不得清空 B 字段」的保真回归 */
+    private InsuredPartyList holderProfileParties(String mobile) {
+        InsuredPartyList.HolderInfo holder = new InsuredPartyList.HolderInfo(
+                "customer-1", "holder-1", "张三", IdCardType.CHINA_ID_CARD, "ID-1", mobile,
+                CustomerGender.MALE, LocalDate.of(1990, 1, 1));
         return new InsuredPartyList("parties-1", holder, List.of(), List.of());
     }
 

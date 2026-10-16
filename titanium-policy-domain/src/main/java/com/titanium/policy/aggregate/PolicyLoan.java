@@ -22,6 +22,7 @@ import com.titanium.policy.event.PolicyLoanDisbursedEvent;
 import com.titanium.policy.event.PolicyLoanRepaidEvent;
 import com.titanium.policy.exception.PolicyBusinessRuleException;
 
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -51,7 +52,8 @@ import lombok.NoArgsConstructor;
  */
 @Aggregate
 @Getter
-@NoArgsConstructor
+/** 仅供 Axon 回放使用（Lombok 生成 protected 无参构造器），业务代码禁止调用 */
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class PolicyLoan {
 
     /** 聚合标识：贷款账户ID（"LOAN:" + policyId，与保单聚合标识空间隔离） */
@@ -271,5 +273,10 @@ public class PolicyLoan {
                 || !Objects.equals(this.tenantId, commandTenantId)) {
             throw new PolicyBusinessRuleException(PolicyErrorCode.POLICY_NOT_EXIST, "保单贷款账户不存在");
         }
+    }
+
+    /** entries 不可变视图（DSN-02：杜绝经 getter 外泄内部集合引用，变更须经命令与事件） */
+    public List<PolicyLoanEntry> getEntries() {
+        return entries == null ? null : List.copyOf(entries);
     }
 }

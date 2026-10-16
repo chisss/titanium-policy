@@ -90,7 +90,9 @@ class PolicyLoanApplicationServiceTest {
 
     @Test
     void shouldRejectWhenTenantMismatch() {
-        stubAggregateLoad(policyWith(PolicyStatusCode.EFFECTIVE).toBuilder().tenantId("OTHER").build());
+        Policy policy = policyWith(PolicyStatusCode.EFFECTIVE);
+        when(policy.getTenantId()).thenReturn("OTHER");
+        stubAggregateLoad(policy);
 
         DomainException exception = assertThrows(DomainException.class, () -> service.disburse(command()));
 
@@ -124,12 +126,13 @@ class PolicyLoanApplicationServiceTest {
                 new BigDecimal("1000.00"), new BigDecimal("0.050000"), LocalDateTime.now(), "op-1");
     }
 
+    /** 保单替身：只 stub 本层取数面（状态/租户），其余 getter 缺省返回 null（本类不触达）。 */
     private Policy policyWith(PolicyStatusCode statusCode) {
-        return Policy.builder()
-                .policyId(POLICY_ID)
-                .tenantId(TENANT_ID)
-                .status(new PolicyStatus(statusCode, LocalDateTime.now(), "测试状态", "op-1"))
-                .build();
+        Policy policy = mock(Policy.class);
+        when(policy.getPolicyId()).thenReturn(POLICY_ID);
+        when(policy.getTenantId()).thenReturn(TENANT_ID);
+        when(policy.getStatus()).thenReturn(new PolicyStatus(statusCode, LocalDateTime.now(), "测试状态", "op-1"));
+        return policy;
     }
 
     /** load 返回聚合包装，经 invoke 提取聚合根（与生产代码一致的 mock 形态）。 */

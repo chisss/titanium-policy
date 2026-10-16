@@ -6,8 +6,8 @@ import com.titanium.metadata.enums.policy.IssuanceStrategy;
 import com.titanium.metadata.enums.product.ProductEnum.IssuanceMode;
 import com.titanium.metadata.errorcode.BaseErrorCode;
 import com.titanium.metadata.valueobject.Money;
+import com.titanium.metadata.valueobject.RuleDecision;
 import com.titanium.policy.common.enums.IssuanceStage;
-import com.titanium.policy.valueobject.RuleDecision;
 import com.titanium.policy.valueobject.policy.CollectionResult;
 
 /**

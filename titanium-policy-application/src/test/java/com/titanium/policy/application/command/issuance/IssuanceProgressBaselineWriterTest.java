@@ -16,10 +16,10 @@ import com.titanium.metadata.enums.billing.PremiumCollectionMode;
 import com.titanium.metadata.enums.policy.IssuanceStrategy;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.errorcode.PolicyErrorCode;
+import com.titanium.metadata.valueobject.RuleDecision;
 import com.titanium.policy.common.enums.IssuanceStage;
 import com.titanium.policy.query.repository.IssuanceProgressViewRepository;
 import com.titanium.policy.query.view.IssuanceProgressView;
-import com.titanium.policy.valueobject.RuleDecision;
 import com.titanium.policy.valueobject.issuance.IssuanceRequest;
 import com.titanium.policy.valueobject.issuance.IssuanceResult;
 

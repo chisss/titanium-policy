@@ -13,7 +13,7 @@ import com.titanium.metadata.enums.policy.fieldcatalog.PolicyFieldValueType;
 import com.titanium.metadata.errorcode.BaseErrorCode;
 import com.titanium.metadata.errorcode.PolicyErrorCode;
 import com.titanium.metadata.fieldcatalog.FieldAnalysisCapability;
-import com.titanium.policy.valueobject.RuleDecision;
+import com.titanium.metadata.valueobject.RuleDecision;
 
 /**
  * 「可分析」能力位四条不变量（G07/g07-03/AC-03）的单元测试。

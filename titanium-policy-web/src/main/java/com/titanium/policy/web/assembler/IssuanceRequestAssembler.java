@@ -2,6 +2,10 @@ package com.titanium.policy.web.assembler;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.Period;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -21,6 +25,9 @@ import com.titanium.metadata.enums.product.ProductEnum.PaymentFrequency;
 import com.titanium.metadata.enums.product.ProductEnum.PeriodUnit;
 import com.titanium.metadata.enums.product.ProductEnum.ProductCategory;
 import com.titanium.metadata.enums.product.ProductEnum.SalesChannel;
+import com.titanium.metadata.errorcode.PolicyErrorCode;
+import com.titanium.metadata.errorcode.SystemErrorCode;
+import com.titanium.metadata.exception.DomainException;
 import com.titanium.metadata.valueobject.Money;
 import com.titanium.policy.api.request.issuance.SubmitIssuanceRequest;
 import com.titanium.policy.api.response.issuance.IssuanceResponse;
@@ -51,6 +58,8 @@ public class IssuanceRequestAssembler {
     private static final String DEFAULT_CURRENCY = CurrencyEnum.CNY.getCode();
     /** 受益份额百分比 → 比例的换算基数（契约传 100 表示 100%，领域侧以 1.0 表示） */
     private static final BigDecimal RATIO_BASE = new BigDecimal("100");
+    /** 参与方清单标识（listId）的幂等派生命名空间：同一业务流水号重复装配恒得同一标识 */
+    private static final String PARTY_LIST_ID_NAMESPACE = "policy-issuance:party-list:";
 
     /**
      * 契约请求 → 领域出单请求。
@@ -109,23 +118,30 @@ public class IssuanceRequestAssembler {
 
     /**
      * 扁平参与方列表 → 嵌套参与方清单（投保人 + 被保险人清单 + 受益人清单）。
+     * <p>
+     * 🔴 m25-08（DSN-06）三处去伪造/丢字段：① 参与方标识（holderId/insuredId/beneficiaryId）不再于
+     * customerId 缺失时以随机 UUID 填充——customerId 为空表示「待 customer 域按证件 upsert 建档」，
+     * 标识由 {@code IssuanceCustomerResolver} 在解析回填后统一为 resolved customerId，装配层只原样
+     * 透传；② 清单标识由业务流水号确定性派生（同一 bizNo 重复装配恒得同一标识，同
+     * {@code PaymentWebMapper} 幂等派生先例）；③ 投保人快照改全参构造，性别与出生日期不再静默丢失
+     * （原 6 参窄构造器把两者置 null）。
+     * </p>
      */
     private InsuredPartyList toInsuredPartyList(SubmitIssuanceRequest request) {
         SubmitIssuanceRequest.PartyInput holderInput = request.getHolder();
         InsuredPartyList.HolderInfo holder = holderInput != null
-                ? new InsuredPartyList.HolderInfo(holderInput.getCustomerId(),
-                        holderInput.getCustomerId() != null ? holderInput.getCustomerId() : UUID.randomUUID().toString(),
+                ? new InsuredPartyList.HolderInfo(holderInput.getCustomerId(), holderInput.getCustomerId(),
                         holderInput.getName(), parseCertType(holderInput.getCertType()), holderInput.getCertNo(),
-                        holderInput.getMobile())
+                        holderInput.getMobile(), parseGender(holderInput.getGender()),
+                        toLocalDate(holderInput.getBirthDate()))
                 : null;
 
         List<InsuredPartyList.InsuredInfo> insuredList = new ArrayList<>();
         if (request.getInsuredList() != null) {
             for (SubmitIssuanceRequest.PartyInput input : request.getInsuredList()) {
-                insuredList.add(new InsuredPartyList.InsuredInfo(input.getCustomerId(),
-                        input.getCustomerId() != null ? input.getCustomerId() : UUID.randomUUID().toString(),
+                insuredList.add(new InsuredPartyList.InsuredInfo(input.getCustomerId(), input.getCustomerId(),
                         input.getName(), parseCertType(input.getCertType()), input.getCertNo(),
-                        input.getAge() != null ? input.getAge() : 0, parseGender(input.getGender()), input.getMobile(),
+                        resolveAge(input, request.getPeriodStart()), parseGender(input.getGender()), input.getMobile(),
                         input.getRelationToHolder(), parseFamilyRelation(input.getFamilyRelation())));
             }
         }
@@ -133,8 +149,7 @@ public class IssuanceRequestAssembler {
         List<InsuredPartyList.BeneficiaryInfo> beneficiaryList = new ArrayList<>();
         if (request.getBeneficiaryList() != null) {
             for (SubmitIssuanceRequest.PartyInput input : request.getBeneficiaryList()) {
-                beneficiaryList.add(new InsuredPartyList.BeneficiaryInfo(input.getCustomerId(),
-                        input.getCustomerId() != null ? input.getCustomerId() : UUID.randomUUID().toString(),
+                beneficiaryList.add(new InsuredPartyList.BeneficiaryInfo(input.getCustomerId(), input.getCustomerId(),
                         input.getName(), parseCertType(input.getCertType()), input.getCertNo(),
                         parseGender(input.getGender()), input.getMobile(),
                         parseBeneficiaryType(input.getBeneficiaryType()),
@@ -142,7 +157,7 @@ public class IssuanceRequestAssembler {
                         toRatio(input.getShareRatio())));
             }
         }
-        return new InsuredPartyList(UUID.randomUUID().toString(), holder, insuredList, beneficiaryList);
+        return new InsuredPartyList(deriveListId(request.getBizNo()), holder, insuredList, beneficiaryList);
     }
 
     /**
@@ -197,6 +212,49 @@ public class IssuanceRequestAssembler {
             policies.add(policy);
         }
         return List.copyOf(policies);
+    }
+
+    /**
+     * 被保险人年龄解析：显式 age 优先；缺失时按出生日期与保单起期推算整岁；两者皆缺即拒绝装配。
+     * <p>
+     * 🔴 m25-08（DSN-06）取代原「{@code age != null ? age : 0}」的 0 默认值——「未提供」不得伪装成
+     * 「0 岁」。推算基准刻意取保单起期（{@code periodStart}）而非系统当前时间：同一请求任意时刻
+     * 装配结果相同（确定性），且与费率计算时点语义一致。负年龄属非法入参同样拒绝。
+     * </p>
+     *
+     * @param input       参与方契约输入
+     * @param periodStart 保单起期（推算基准；可空——为空且未显式给 age 时无法推算）
+     * @return 年龄（非空、非负）
+     */
+    private Integer resolveAge(SubmitIssuanceRequest.PartyInput input, LocalDateTime periodStart) {
+        if (input.getAge() != null) {
+            if (input.getAge() < 0) {
+                throw new DomainException(SystemErrorCode.PARAM_INVALID,
+                        "被保险人年龄不能为负数：" + input.getAge());
+            }
+            return input.getAge();
+        }
+        if (input.getBirthDate() != null && periodStart != null) {
+            return Period.between(input.getBirthDate().toLocalDate(), periodStart.toLocalDate()).getYears();
+        }
+        throw new DomainException(PolicyErrorCode.ISSUANCE_INSURED_AGE_MISSING,
+                "被保险人缺少年龄信息且无法推算（需 age，或 birthDate 与保单起期）："
+                        + (input.getName() != null ? input.getName() : ""));
+    }
+
+    /**
+     * 参与方清单标识：由业务流水号确定性派生（UUID v3 形态 36 位，同一 bizNo 重复装配恒同值）。
+     */
+    private String deriveListId(String bizNo) {
+        String seed = PARTY_LIST_ID_NAMESPACE + (bizNo != null ? bizNo : "");
+        return UUID.nameUUIDFromBytes(seed.getBytes(StandardCharsets.UTF_8)).toString();
+    }
+
+    /**
+     * 出生日期契约值（含时刻）→ 领域快照日期（空安全）。
+     */
+    private LocalDate toLocalDate(LocalDateTime dateTime) {
+        return dateTime != null ? dateTime.toLocalDate() : null;
     }
 
     /**

@@ -40,8 +40,11 @@ public class HolderMobilePolicyMaintenanceFieldExecutor implements PolicyMainten
         }
         InsuredPartyList.HolderInfo holder = parties.holderInfo();
         String phone = normalize(change.canonicalValue());
+        // 🔴 8 参全量重建（m25-08/DSN-06）：原 6 参窄构造器在改手机号时把性别与出生日期静默清空
+        // （存量数据事故点）；全量重建保证「改一处、其余保真」。
         InsuredPartyList.HolderInfo updatedHolder = new InsuredPartyList.HolderInfo(
-                holder.customerId(), holder.holderId(), holder.name(), holder.certType(), holder.certNo(), phone);
+                holder.customerId(), holder.holderId(), holder.name(), holder.certType(), holder.certNo(), phone,
+                holder.gender(), holder.birthDate());
         InsuredPartyList updated = new InsuredPartyList(
                 parties.listId(), updatedHolder, parties.insuredList(), parties.beneficiaryList());
         PolicyMaintenanceAppliedField applied = new PolicyMaintenanceAppliedField(

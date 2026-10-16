@@ -29,11 +29,11 @@ import java.util.Map;
 import org.springframework.stereotype.Service;
 
 import com.titanium.metadata.valueobject.Money;
+import com.titanium.metadata.valueobject.RuleDecision;
 import com.titanium.policy.common.constant.PolicyConstants;
 import com.titanium.policy.entity.insurance.InsuredPartyList;
 import com.titanium.policy.service.IssuanceEligibilityDomainService;
 import com.titanium.policy.service.VinValidator;
-import com.titanium.policy.valueobject.RuleDecision;
 import com.titanium.policy.valueobject.issuance.IssuancePlanLine;
 import com.titanium.policy.valueobject.issuance.IssuanceRequest;
 import com.titanium.policy.valueobject.product.HealthDeclarationItem;

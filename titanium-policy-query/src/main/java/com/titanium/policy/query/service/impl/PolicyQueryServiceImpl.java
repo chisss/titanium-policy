@@ -579,12 +579,9 @@ public class PolicyQueryServiceImpl implements PolicyQueryService {
         result.setInsuredName(view.getInsuredName());
         result.setProductCode(view.getProductCode());
         // 列表保持保单主视图字段；详情由 enrichDetail 从保单产品快照补齐产品名称。
-        if (view.getPremium() != null) {
-            result.setPremium(view.getPremium().doubleValue());
-        }
-        if (view.getSumInsured() != null) {
-            result.setSumInsured(view.getSumInsured().doubleValue());
-        }
+        // 🔴 DSN-07（m25-09）：金额直传 BigDecimal，不再经 doubleValue() 降精度为 double
+        result.setPremium(view.getPremium());
+        result.setSumInsured(view.getSumInsured());
         result.setCurrency(view.getCurrency());
         result.setEffectiveDate(view.getStartDate());
         result.setExpiryDate(view.getEndDate());

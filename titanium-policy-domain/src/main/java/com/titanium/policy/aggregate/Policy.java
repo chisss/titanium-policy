@@ -26,6 +26,7 @@ import com.titanium.metadata.enums.policy.PolicyEnum;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.errorcode.PolicyErrorCode;
 import com.titanium.metadata.valueobject.Money;
+import com.titanium.metadata.valueobject.RuleDecision;
 import com.titanium.policy.command.ActivatePolicyCommand;
 import com.titanium.policy.command.AddInsuredMemberCommand;
 import com.titanium.policy.command.ApplyPolicyEndorsementCommand;
@@ -96,7 +97,6 @@ import com.titanium.policy.service.maintenance.PolicyMaintenanceFieldExecutorReg
 import com.titanium.policy.service.maintenance.PolicyMaintenanceHashing;
 import com.titanium.policy.valueobject.AnnuityPayoutPlan;
 import com.titanium.policy.valueobject.PremiumPlan;
-import com.titanium.policy.valueobject.RuleDecision;
 import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceAmountFact;
 import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceApplicationReceipt;
 import com.titanium.policy.valueobject.maintenance.PolicyMaintenanceExecutionState;
@@ -115,7 +115,6 @@ import com.titanium.policy.valueobject.policy.PolicyServiceRestrictions;
 import com.titanium.policy.valueobject.policy.PolicyStatus;
 
 import lombok.Getter;
-import lombok.experimental.SuperBuilder;
 
 /**
  * 正式保单聚合根
@@ -128,7 +127,6 @@ import lombok.experimental.SuperBuilder;
  */
 @Aggregate
 @Getter
-@SuperBuilder(toBuilder = true)
 public class Policy extends BaseAggregate {
     /**
      * 保单正式应用（{@code ApplyPolicyMaintenanceCommand}）可承接的保全生效方式白名单。
@@ -1768,6 +1766,7 @@ public class Policy extends BaseAggregate {
         this.policyDocuments.add(document);
     }
 
+    /** 仅供 Axon 回放使用（框架反射实例化），业务代码禁止调用 */
     protected Policy() {
     }
 
@@ -1792,4 +1791,29 @@ public class Policy extends BaseAggregate {
         }
     }
 
+
+    /** policyProducts 不可变视图（DSN-02：杜绝经 getter 外泄内部集合引用，变更须经命令与事件） */
+    public List<PolicyProduct> getPolicyProducts() {
+        return policyProducts == null ? null : List.copyOf(policyProducts);
+    }
+
+    /** paymentRecords 不可变视图（DSN-02：杜绝经 getter 外泄内部集合引用，变更须经命令与事件） */
+    public List<PaymentRecord> getPaymentRecords() {
+        return paymentRecords == null ? null : List.copyOf(paymentRecords);
+    }
+
+    /** policyDocuments 不可变视图（DSN-02：杜绝经 getter 外泄内部集合引用，变更须经命令与事件） */
+    public List<PolicyDocument> getPolicyDocuments() {
+        return policyDocuments == null ? null : List.copyOf(policyDocuments);
+    }
+
+    /** endorsements 不可变视图（DSN-02：杜绝经 getter 外泄内部集合引用，变更须经命令与事件） */
+    public List<Endorsement> getEndorsements() {
+        return endorsements == null ? null : List.copyOf(endorsements);
+    }
+
+    /** maintenanceApplications 不可变视图（DSN-02：杜绝经 getter 外泄内部集合引用，变更须经命令与事件） */
+    public List<PolicyMaintenanceApplicationReceipt> getMaintenanceApplications() {
+        return maintenanceApplications == null ? null : List.copyOf(maintenanceApplications);
+    }
 }

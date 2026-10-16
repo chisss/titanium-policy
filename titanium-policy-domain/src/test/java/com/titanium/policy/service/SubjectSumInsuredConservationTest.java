@@ -17,10 +17,10 @@ import com.titanium.metadata.enums.policy.PolicyLineStatus;
 import com.titanium.metadata.enums.product.ProductEnum.ProductCategory;
 import com.titanium.metadata.errorcode.PolicyErrorCode;
 import com.titanium.metadata.valueobject.Money;
+import com.titanium.metadata.valueobject.RuleDecision;
 import com.titanium.policy.entity.policy.InsuredSubject;
 import com.titanium.policy.entity.policy.PolicyProduct;
 import com.titanium.policy.service.impl.PolicyCompositionDomainServiceImpl;
-import com.titanium.policy.valueobject.RuleDecision;
 
 /**
  * 多标的分项保额守恒不变量测试（G11/g11-05，AC-07）。

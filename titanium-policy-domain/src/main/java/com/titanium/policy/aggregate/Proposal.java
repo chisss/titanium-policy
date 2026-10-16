@@ -36,7 +36,6 @@ import com.titanium.policy.valueobject.proposal.ProposalBasicInfo;
 import com.titanium.policy.valueobject.proposal.ProposalStatus;
 
 import lombok.Getter;
-import lombok.experimental.SuperBuilder;
 
 /**
  * 投保意向单聚合根
@@ -47,7 +46,6 @@ import lombok.experimental.SuperBuilder;
  */
 @Aggregate
 @Getter
-@SuperBuilder(toBuilder = true)
 public class Proposal extends BaseAggregate {
     /** 聚合根唯一标识 */
     @AggregateIdentifier
@@ -366,6 +364,7 @@ public class Proposal extends BaseAggregate {
         }
     }
 
+    /** 仅供 Axon 回放使用（框架反射实例化），业务代码禁止调用 */
     protected Proposal() {
     }
 
@@ -390,4 +389,19 @@ public class Proposal extends BaseAggregate {
         }
     }
 
+
+    /** proposalLines 不可变视图（DSN-02：杜绝经 getter 外泄内部集合引用，变更须经命令与事件） */
+    public List<ProposalLine> getProposalLines() {
+        return proposalLines == null ? null : List.copyOf(proposalLines);
+    }
+
+    /** applicants 不可变视图（DSN-02：杜绝经 getter 外泄内部集合引用，变更须经命令与事件） */
+    public List<ProposalHolder> getApplicants() {
+        return applicants == null ? null : List.copyOf(applicants);
+    }
+
+    /** subjects 不可变视图（DSN-02：杜绝经 getter 外泄内部集合引用，变更须经命令与事件） */
+    public List<ProposalSubject> getSubjects() {
+        return subjects == null ? null : List.copyOf(subjects);
+    }
 }
