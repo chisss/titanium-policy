@@ -10,12 +10,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import com.titanium.metadata.enums.BusinessDomainType;
+import com.titanium.metadata.enums.ruleengine.RuleDecision;
 import com.titanium.metadata.response.ApiResponse;
 import com.titanium.policy.common.enums.RuleEngineDecision;
 import com.titanium.ruleengine.api.RuleEngineApi;
 import com.titanium.ruleengine.api.request.execution.RuleFacts;
 import com.titanium.ruleengine.api.response.execution.RuleExecutionResultResponse;
-import com.titanium.ruleengine.common.enums.RuleDecision;
 
 class RuleEngineServiceAdapterTest {
 

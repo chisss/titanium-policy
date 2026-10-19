@@ -29,7 +29,7 @@
         <!-- 通用内核（聚合根基类 BaseAggregate 等共享构件） -->
         <dependency>
             <groupId>com.titanium</groupId>
-            <artifactId>titanium-common</artifactId>
+            <artifactId>titanium-kernel</artifactId>
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
         <!-- 元数据模块 -->
@@ -41,7 +41,7 @@
         <!-- Axon Framework -->
         <dependency>
             <groupId>org.axonframework</groupId>
-            <artifactId>axon-spring-boot-starter</artifactId>
+            <artifactId>axon-spring</artifactId>
         </dependency>
 
         <dependency>
@@ -61,14 +61,57 @@
             <artifactId>mockito-core</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- 测试面 JSON 往返（InsuredPartyListTest；m27-01 起显式声明，
+             原经 titanium-common 传递获得。生产面禁用裸 ObjectMapper，见根 §3.4.17） -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>org.axonframework</groupId>
             <artifactId>axon-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    
+        <dependency>
+            <groupId>org.axonframework</groupId>
+            <artifactId>axon-messaging</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.axonframework</groupId>
+            <artifactId>axon-eventsourcing</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.axonframework</groupId>
+            <artifactId>axon-modelling</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
+    
+        <!-- Jackson 注解（值对象/事件 @JsonIgnore 等，生产面使用；m27-01：原经 titanium-common 传递获得） -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+        </dependency>
+    
+        <!-- Spring 注解（domain 内 @Service/@Component 领域服务；PKG-01：domain 不引入 Boot） -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-context</artifactId>
+            <scope>provided</scope>
         </dependency>
     </dependencies>
 
     <build>
         <plugins>
+            <!-- m27-01/PKG-01：领域层 classpath 纯净门禁（规则见 titanium-parent pluginManagement） -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+            </plugin>
             <!-- 禁用Spring Boot Maven Plugin的repackage目标，因为这是一个领域层模块，不需要主类 -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>

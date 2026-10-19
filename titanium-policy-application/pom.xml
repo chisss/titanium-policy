@@ -81,6 +81,13 @@
             <artifactId>titanium-policy-api</artifactId>
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
+    
+        <!-- m27-01/PKG-01：显式声明实际使用的内核/starter 模块（原经 titanium-common 传递获得） -->
+        <dependency>
+            <groupId>com.titanium</groupId>
+            <artifactId>titanium-kernel</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
     </dependencies>
 
     <build>

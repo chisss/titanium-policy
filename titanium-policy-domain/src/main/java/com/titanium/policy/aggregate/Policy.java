@@ -342,8 +342,12 @@ public class Policy extends BaseAggregate {
         if (this.policyPeriod != null && !this.policyPeriod.hasStarted(LocalDateTime.now())) {
             throw new PolicyBusinessRuleException("POLICY_RULE_VIOLATION", "Insurance period has not started yet");
         }
+        // m27-04/PKG-04：随激活事件外发计费要素（产品 + 保障起期），供 billing 本地投影后直接向
+        // product 查询现金价值，消除 billing→policy 同步依赖。两者允许为 null（历史数据/期间缺失），
+        // 消费方按「要素不全即取不到」降级，不得代填。
         AggregateLifecycle.apply(new PolicyActivatedEvent(this.policyId, this.insuranceId, this.bizNo,
-                LocalDateTime.now(), this.tenantId, this.totalPremium));
+                LocalDateTime.now(), this.tenantId, this.totalPremium, this.productId,
+                this.policyPeriod != null ? this.policyPeriod.insurancePeriodStart() : null));
     }
 
     /**

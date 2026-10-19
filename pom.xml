@@ -148,6 +148,12 @@
                 <artifactId>axon-test</artifactId>
                 <version>${axon.version}</version>
             </dependency>
+            <!-- 共享内核（m27-01/PKG-01：原 titanium-common 的纯 Java 内核部分） -->
+            <dependency>
+                <groupId>com.titanium</groupId>
+                <artifactId>titanium-kernel</artifactId>
+                <version>1.0.0-SNAPSHOT</version>
+            </dependency>
             <dependency>
                 <groupId>com.titanium</groupId>
                 <artifactId>titanium-common</artifactId>

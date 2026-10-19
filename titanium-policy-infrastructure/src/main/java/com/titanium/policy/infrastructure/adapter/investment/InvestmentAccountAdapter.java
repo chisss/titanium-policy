@@ -6,7 +6,7 @@ import org.springframework.stereotype.Component;
 
 import com.titanium.investment.api.InvestmentAccountApi;
 import com.titanium.investment.api.InvestmentAccountApi.CreateAccountRequest;
-import com.titanium.investment.query.result.InvestmentAccountQueryResult;
+import com.titanium.investment.api.response.InvestmentAccountResponse;
 import com.titanium.metadata.enums.CurrencyEnum;
 import com.titanium.metadata.enums.policy.PolicyForm;
 import com.titanium.metadata.response.ApiResponse;
@@ -47,24 +47,24 @@ public class InvestmentAccountAdapter implements InvestmentAccountPort {
         // 取数失败在 ProductServicePort 侧即上抛、不会以 null 到达此处（见 Port javadoc）。
         request.setManagementFeeRate(managementFeeRate);
 
-        ApiResponse<InvestmentAccountQueryResult> response = investmentAccountApi.createAccount(request);
+        ApiResponse<InvestmentAccountResponse> response = investmentAccountApi.createAccount(request);
         if (response == null || !response.isSuccess() || response.getData() == null) {
             log.error("为保单开立投资账户失败: policyId={}, message={}", policyId,
                     response != null ? response.getMessage() : "无响应");
             return null;
         }
-        return response.getData().getAccountId();
+        return response.getData().accountId();
     }
 
     @Override
     public Money accountValue(String accountId) {
-        ApiResponse<InvestmentAccountQueryResult> response = investmentAccountApi.getAccount(accountId);
+        ApiResponse<InvestmentAccountResponse> response = investmentAccountApi.getAccount(accountId);
         if (response == null || !response.isSuccess() || response.getData() == null) {
             log.warn("查询投资账户价值失败: accountId={}", accountId);
             return null;
         }
-        InvestmentAccountQueryResult data = response.getData();
-        return Money.of(data.getAccountValue(), data.getCurrency());
+        InvestmentAccountResponse data = response.getData();
+        return Money.of(data.accountValue(), data.currency());
     }
 
     /**

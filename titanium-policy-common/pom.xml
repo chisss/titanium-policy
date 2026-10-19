@@ -20,6 +20,11 @@
     </properties>
 
     <dependencies>
+        <dependency>
+            <groupId>com.titanium</groupId>
+            <artifactId>titanium-metadata</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
         <!-- Commons Lang3 -->
         <dependency>
             <groupId>org.apache.commons</groupId>
@@ -27,16 +32,8 @@
         </dependency>
         
         <!-- Fastjson -->
-        <dependency>
-            <groupId>com.alibaba.fastjson2</groupId>
-            <artifactId>fastjson2</artifactId>
-        </dependency>
         
         <!-- Common Project -->
-        <dependency>
-            <groupId>com.titanium</groupId>
-            <artifactId>titanium-common</artifactId>
-        </dependency>
 
         <!-- Test：本模块枚举的机械判据（如 PolicyDataUpdateType 映射/标志位）随类存放 -->
         <dependency>
