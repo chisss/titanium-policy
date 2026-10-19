@@ -39,45 +39,6 @@ public class CustomerResolutionException extends RuntimeException {
         this.retryable = retryable;
     }
 
-    /**
-     * @param errorCode 错误码
-     * @param message   错误信息
-     * @deprecated 裸字符串错误码无法国际化，新代码请改用
-     *         {@link #CustomerResolutionException(BaseErrorCode, String, Throwable, boolean)}
-     */
-    @Deprecated(since = "2026-08", forRemoval = true)
-    public CustomerResolutionException(String errorCode, String message) {
-        this(errorCode, message, null, false);
-    }
-
-    /**
-     * @param errorCode 错误码
-     * @param message   错误信息
-     * @param cause     失败原因
-     * @deprecated 裸字符串错误码无法国际化，新代码请改用
-     *         {@link #CustomerResolutionException(BaseErrorCode, String, Throwable, boolean)}
-     */
-    @Deprecated(since = "2026-08", forRemoval = true)
-    public CustomerResolutionException(String errorCode, String message, Throwable cause) {
-        this(errorCode, message, cause, false);
-    }
-
-    /**
-     * @param errorCode 错误码
-     * @param message   错误信息
-     * @param cause     失败原因
-     * @param retryable 是否可原样重试
-     * @deprecated 裸字符串错误码无法国际化，新代码请改用
-     *         {@link #CustomerResolutionException(BaseErrorCode, String, Throwable, boolean)}
-     */
-    @Deprecated(since = "2026-08", forRemoval = true)
-    public CustomerResolutionException(String errorCode, String message, Throwable cause, boolean retryable) {
-        super(message, cause);
-        this.errorCode = errorCode;
-        this.errorCodeEnum = null;
-        this.retryable = retryable;
-    }
-
     public String errorCode() {
         return errorCode;
     }

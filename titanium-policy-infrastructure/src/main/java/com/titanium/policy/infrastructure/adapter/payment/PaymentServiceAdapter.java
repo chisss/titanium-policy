@@ -62,7 +62,8 @@ public class PaymentServiceAdapter implements PaymentServicePort {
             PaymentOrderResponse order = response.getData();
             log.info("保费支付单创建成功: policyId={}, paymentOrderId={}, 金额={}", request.policyId(),
                     order.getOrderId(), order.getAmount());
-            // TODO(PAY-SP): payment 域补支付凭据字段后改为透传真实凭据（支付链接/二维码/预支付串）
+            // GAP(PAY-SP)：payment 域契约尚无支付凭据字段（支付链接/二维码/预支付串），
+            // 此处以支付单ID占位并告警；登记见 docs/技术文档/注释与实现一致性治理-2026-10.md §2 G-1
             log.warn("支付凭据暂以支付单ID占位（PAY-SP 专项落地真实网关凭据）: paymentOrderId={}", order.getOrderId());
             return PaymentOrderResult.succeeded(order.getOrderId(), toMoney(order), order.getStatus(),
                     order.getOrderId());

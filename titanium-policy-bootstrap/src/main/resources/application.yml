@@ -194,6 +194,9 @@ tenant:
 
 # 日志配置
 logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [traceId=%X{traceId:-} tenantId=%X{tenantId:-}] %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [traceId=%X{traceId:-} tenantId=%X{tenantId:-}] %logger{36} - %msg%n"
   level:
     com.titanium: debug
     org.axonframework: debug
