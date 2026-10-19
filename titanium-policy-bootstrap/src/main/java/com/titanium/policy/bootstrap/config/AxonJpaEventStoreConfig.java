@@ -17,8 +17,10 @@ import org.axonframework.modelling.saga.repository.SagaStore;
 import org.axonframework.modelling.saga.repository.jpa.JpaSagaStore;
 import org.axonframework.serialization.Serializer;
 import org.axonframework.serialization.upcasting.event.EventUpcasterChain;
+import org.axonframework.spring.messaging.unitofwork.SpringTransactionManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.transaction.PlatformTransactionManager;
 
 import com.titanium.policy.bootstrap.upcaster.InsuranceCreatedEventUpcaster;
 import com.titanium.policy.bootstrap.upcaster.PolicyCreatedEventLegacyKeyStripUpcaster;
@@ -45,6 +47,28 @@ public class AxonJpaEventStoreConfig {
     @Bean
     public EntityManagerProvider entityManagerProvider() {
         return () -> entityManager;
+    }
+
+    /**
+     * Axon 事务管理器：显式绑定 Spring 的 {@link PlatformTransactionManager}（本域实际为 JPA 事务管理器）。
+     * <p>
+     * 🔴 不可依赖 Axon 的 {@code TransactionAutoConfiguration} 自动提供：它同样以 Boot 4 已迁包的旧类名声明
+     * {@code @AutoConfigureAfter}，评估早于 JPA 自动配置注册 {@code transactionManager} 的时机，其
+     * {@code @ConditionalOnBean(PlatformTransactionManager)} 遂不匹配，随后由
+     * {@code NoOpTransactionAutoConfiguration} 兜底注入 {@code NoOpTransactionManager}。
+     * 2026-10-19 条件评估报告实测：{@code TransactionAutoConfiguration#axonTransactionManager} did not match —
+     * 「did not find any beans of type PlatformTransactionManager」，而
+     * {@code NoOpTransactionAutoConfiguration#axonTransactionManager} matched。
+     * </p>
+     * <p>
+     * NoOp 下 {@code JpaEventStorageEngine.appendEvents} 不在事务内执行，真实写事件即抛
+     * {@code TransactionRequiredException: No EntityManager with actual transaction available for current thread}
+     * （payment 域 {@code PaymentDeadLetterResilienceTest} 首次真实写事件时暴露，本域同步修复）。
+     * </p>
+     */
+    @Bean
+    public TransactionManager axonTransactionManager(PlatformTransactionManager platformTransactionManager) {
+        return new SpringTransactionManager(platformTransactionManager);
     }
 
     /**
